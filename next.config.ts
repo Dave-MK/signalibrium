@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  distDir: ".signalibrium-next",
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;
