@@ -21,13 +21,13 @@ export default function ScannerPage() {
         action={<ActionLink href="/trade-tickets">Prepared Tickets</ActionLink>}
       />
 
-      <Panel className="p-4 sm:p-5">
+      <Panel className="p-3 sm:p-3.5">
         <p className="micro-label">Filter State</p>
-        <div className="mt-3 flex flex-wrap gap-[5px]">
+        <div className="mt-2.5 flex flex-wrap gap-[5px]">
           {filterPills.map((pill) => (
             <span
               key={pill}
-              className="signal-surface-soft rounded-full px-3.5 py-1.5 text-sm text-slate-200"
+              className="signal-surface-soft rounded-full px-3 py-1 text-[0.82rem] text-slate-200"
             >
               {pill}
             </span>
@@ -35,18 +35,18 @@ export default function ScannerPage() {
         </div>
       </Panel>
 
-      <Panel className="p-4 sm:p-5">
+      <Panel className="p-3 sm:p-3.5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="micro-label">Scanner Results</p>
-            <h2 className="mt-2 text-xl font-semibold text-white sm:text-[1.35rem]">
+            <h2 className="mt-1.5 text-lg font-semibold text-white sm:text-[1.15rem]">
               Current ranked opportunities
             </h2>
           </div>
           <StatusChip label="BACKTESTED" />
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-3 overflow-x-auto">
           <table className="data-table min-w-[1040px]">
             <thead>
               <tr>
@@ -73,7 +73,7 @@ export default function ScannerPage() {
                     >
                       {setup.symbol}
                     </Link>
-                    <p className="mt-1 text-sm text-slate-400">{setup.assetClass}</p>
+                    <p className="mt-0.5 text-[0.82rem] text-slate-400">{setup.assetClass}</p>
                   </td>
                   <td className="text-slate-200">{setup.strategy}</td>
                   <td className="font-semibold text-white">{setup.score}</td>

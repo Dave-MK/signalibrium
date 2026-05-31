@@ -50,13 +50,13 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div className="max-w-3xl space-y-2.5">
+    <div className="flex flex-col gap-4 py-1 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-3xl space-y-3 pl-1 sm:pl-1.5">
         <p className="micro-label">{eyebrow}</p>
-        <h1 className="text-[1.9rem] font-semibold leading-tight tracking-tight text-white sm:text-[2.35rem] lg:text-[2.7rem]">
+        <h1 className="text-[1.6rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[1.95rem] lg:text-[2.25rem]">
           {title}
         </h1>
-        <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-[0.95rem]">
+        <p className="max-w-2xl text-[0.88rem] leading-6 text-slate-300 sm:text-[0.92rem]">
           {description}
         </p>
       </div>
@@ -72,16 +72,16 @@ export function MetricCard({
   accent = "cyan",
 }: MetricCardProps) {
   return (
-    <Panel className="overflow-hidden p-4 sm:p-5">
+    <Panel className="overflow-hidden p-3 sm:p-3.5">
       <div
-        className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-r ${accentMap[accent]}`}
+        className={`absolute inset-x-0 top-0 h-16 bg-gradient-to-r ${accentMap[accent]}`}
       />
       <div className="relative space-y-2.5">
         <p className="micro-label">{label}</p>
-        <p className="text-2xl font-semibold tracking-tight text-white sm:text-[1.75rem]">
+        <p className="text-[1.35rem] font-semibold tracking-tight text-white sm:text-[1.55rem]">
           {value}
         </p>
-        <p className="text-sm leading-5 text-slate-300">{detail}</p>
+        <p className="text-[0.84rem] leading-[1.45rem] text-slate-300">{detail}</p>
       </div>
     </Panel>
   );
@@ -93,7 +93,7 @@ export function StatusChip({ label }: { label: string }) {
     "border border-white/10 bg-white/[0.04] text-slate-100";
 
   return (
-    <span className={`inline-flex rounded-[0.58rem] px-2.5 py-1 text-[0.72rem] font-semibold ${tone}`}>
+    <span className={`inline-flex rounded-[0.4rem] px-2.5 py-[0.3rem] text-[0.67rem] font-semibold leading-none ${tone}`}>
       {label}
     </span>
   );
@@ -111,7 +111,7 @@ export function ActionLink({
   return (
     <Link
       href={href}
-      className={`inline-flex items-center justify-center rounded-[0.62rem] px-4 py-2.5 text-sm font-semibold transition ${
+      className={`inline-flex items-center justify-center rounded-[0.46rem] px-3.5 py-2 text-[0.84rem] font-semibold transition ${
         variant === "primary"
           ? "signal-button"
           : "signal-surface-soft text-white hover:border-cyan-300/24 hover:bg-white/[0.04]"
@@ -134,10 +134,10 @@ export function KeyValue({
   return (
     <div className="min-w-0 space-y-1">
       <p className="micro-label">{label}</p>
-      <p className="text-base font-semibold leading-tight text-white sm:text-[1.05rem]">
+      <p className="text-[0.95rem] font-semibold leading-tight text-white sm:text-[1rem]">
         {value}
       </p>
-      {detail ? <p className="text-sm leading-5 text-slate-400">{detail}</p> : null}
+      {detail ? <p className="text-[0.82rem] leading-5 text-slate-400">{detail}</p> : null}
     </div>
   );
 }

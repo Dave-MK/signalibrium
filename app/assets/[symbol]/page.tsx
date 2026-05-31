@@ -48,15 +48,15 @@ export default async function AssetDetailPage({
       />
 
       <div className="grid gap-[5px] xl:grid-cols-[1.25fr_0.8fr]">
-        <Panel className="p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-4">
+        <Panel className="p-3 sm:p-3.5">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <p className="micro-label">Price Structure</p>
-              <h2 className="mt-2 text-[1.9rem] font-semibold text-white">
+              <h2 className="mt-1.5 text-[1.55rem] font-semibold text-white">
                 {formatCurrency(asset.price)}
               </h2>
               <p
-                className={`mt-2 text-sm ${
+                className={`mt-1.5 text-[0.82rem] ${
                   asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"
                 }`}
               >
@@ -66,15 +66,15 @@ export default async function AssetDetailPage({
             <StatusChip label={asset.regime.toUpperCase()} />
           </div>
 
-          <div className="signal-surface mt-5 rounded-[0.62rem] p-4">
+          <div className="signal-surface mt-4 rounded-[0.46rem] p-3">
             <div className="flex flex-wrap items-center gap-2">
               <StatusChip label="SMA 50" />
               <StatusChip label="SMA 200" />
               <StatusChip label="RSI" />
               <StatusChip label="ATR" />
             </div>
-            <Sparkline data={asset.sparkline} className="mt-5 h-40 w-full sm:h-52" />
-            <div className="mt-5 grid gap-[5px] sm:grid-cols-3">
+            <Sparkline data={asset.sparkline} className="mt-4 h-36 w-full sm:h-44" />
+            <div className="mt-4 grid gap-[5px] sm:grid-cols-3">
               <KeyValue label="ATR" value={formatNumber(asset.atr)} />
               <KeyValue label="Liquidity" value={asset.liquidity} />
               <KeyValue label="Volatility" value={asset.volatility} />
@@ -83,9 +83,9 @@ export default async function AssetDetailPage({
         </Panel>
 
         <div className="panel-stack-5">
-          <Panel className="p-4 sm:p-5">
+          <Panel className="p-3 sm:p-3.5">
             <p className="micro-label">Risk Profile</p>
-            <div className="mt-4 grid gap-[5px]">
+            <div className="mt-3 grid gap-[5px]">
               <KeyValue
                 label="Tradeability"
                 value={asset.tradeable ? "Ticket ready" : "Watchlist only"}
@@ -104,15 +104,15 @@ export default async function AssetDetailPage({
             </div>
           </Panel>
 
-          <Panel className="p-4 sm:p-5">
+          <Panel className="p-3 sm:p-3.5">
             <p className="micro-label">Strategy Match</p>
-            <h2 className="mt-3 text-lg font-semibold text-white sm:text-[1.25rem]">
+            <h2 className="mt-2.5 text-[1rem] font-semibold text-white sm:text-[1.1rem]">
               {matchedStrategy?.name}
             </h2>
-            <p className="mt-3 text-sm leading-5 text-slate-300">
+            <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
               {matchedStrategy?.thesis}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {matchedStrategy?.bestRegimes.map((regime) => (
                 <StatusChip key={regime} label={regime.toUpperCase()} />
               ))}
@@ -122,22 +122,22 @@ export default async function AssetDetailPage({
       </div>
 
       <div className="grid gap-[5px] xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel className="p-4 sm:p-5">
+        <Panel className="p-3 sm:p-3.5">
           <p className="micro-label">Active Setups</p>
-          <div className="mt-4 panel-stack-5">
+          <div className="mt-3 panel-stack-5">
             {assetSetups.map((setup) => (
               <div
                 key={setup.id}
-                className="signal-surface-soft rounded-[0.58rem] p-3.5"
+                className="signal-surface-soft rounded-[0.4rem] p-3"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-white">{setup.strategy}</p>
-                    <p className="text-sm text-slate-400">{setup.timeframe}</p>
+                    <p className="text-[0.92rem] font-semibold text-white">{setup.strategy}</p>
+                    <p className="text-[0.82rem] text-slate-400">{setup.timeframe}</p>
                   </div>
                   <StatusChip label={setup.tradeability} />
                 </div>
-                <div className="mt-4 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
                   <KeyValue label="Entry" value={setup.entryZone} />
                   <KeyValue label="Stop" value={setup.stopLoss} />
                   <KeyValue label="Target" value={setup.takeProfit} />
@@ -151,16 +151,16 @@ export default async function AssetDetailPage({
           </div>
         </Panel>
 
-        <Panel className="p-4 sm:p-5">
+        <Panel className="p-3 sm:p-3.5">
           <p className="micro-label">Backtest Summary</p>
-          <div className="mt-4 panel-stack-5">
+          <div className="mt-3 panel-stack-5">
             {relatedBacktests.map((backtest) => (
               <div
                 key={backtest.id}
-                className="signal-surface-soft rounded-[0.58rem] p-3.5"
+                className="signal-surface-soft rounded-[0.4rem] p-3"
               >
-                <p className="font-semibold text-white">{backtest.strategy}</p>
-                <div className="mt-4 grid gap-[5px] sm:grid-cols-2">
+                <p className="text-[0.92rem] font-semibold text-white">{backtest.strategy}</p>
+                <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
                   <KeyValue
                     label="Total Return"
                     value={formatPercent(backtest.totalReturn)}

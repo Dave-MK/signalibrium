@@ -43,3 +43,7 @@ next-env.d.ts
 
 # local handover extraction
 /handover_pack/
+/.codex-tmp-favicon/
+
+# local MVP persistence store
+/data/workspace.json

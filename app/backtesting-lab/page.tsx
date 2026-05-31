@@ -15,9 +15,9 @@ export default function BacktestingLabPage() {
       />
 
       <div className="grid gap-[5px] xl:grid-cols-[0.82fr_1.18fr]">
-        <Panel className="p-4 sm:p-5">
+        <Panel className="p-3 sm:p-3.5">
           <p className="micro-label">Backtest Inputs</p>
-          <div className="mt-4 grid gap-[5px]">
+          <div className="mt-3 grid gap-[5px]">
             {[
               ["Asset", focus.asset],
               ["Strategy", focus.strategy],
@@ -29,27 +29,27 @@ export default function BacktestingLabPage() {
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="signal-surface-soft rounded-[0.58rem] px-3.5 py-3"
+                className="signal-surface-soft rounded-[0.4rem] px-3 py-2.5"
               >
                 <p className="micro-label">{label}</p>
-                <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+                <p className="mt-1.5 text-[0.84rem] font-semibold text-white">{value}</p>
               </div>
             ))}
           </div>
         </Panel>
 
-        <Panel className="p-4 sm:p-5">
+        <Panel className="p-3 sm:p-3.5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="micro-label">Output Snapshot</p>
-              <h2 className="mt-2 text-xl font-semibold text-white sm:text-[1.35rem]">
+              <h2 className="mt-1.5 text-lg font-semibold text-white sm:text-[1.15rem]">
                 {focus.asset} / {focus.strategy}
               </h2>
             </div>
             <StatusChip label="BACKTESTED" />
           </div>
 
-          <div className="mt-5 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
             <KeyValue
               label="Total Return"
               value={formatPercent(focus.totalReturn)}
@@ -72,26 +72,26 @@ export default function BacktestingLabPage() {
             <KeyValue label="AI Read" value="Edge intact" />
           </div>
 
-          <div className="mt-6 grid gap-[5px] lg:grid-cols-2">
-            <div className="signal-surface rounded-[0.62rem] p-4">
+          <div className="mt-4 grid gap-[5px] lg:grid-cols-2">
+            <div className="signal-surface rounded-[0.46rem] p-3">
               <p className="micro-label">Equity Curve</p>
-              <Sparkline data={focus.equityCurve} className="mt-4 h-32 w-full sm:h-40" />
+              <Sparkline data={focus.equityCurve} className="mt-3 h-28 w-full sm:h-36" />
             </div>
-            <div className="signal-surface rounded-[0.62rem] p-4">
+            <div className="signal-surface rounded-[0.46rem] p-3">
               <p className="micro-label">Drawdown Curve</p>
               <Sparkline
                 data={focus.drawdownCurve}
-                className="mt-4 h-32 w-full sm:h-40"
+                className="mt-3 h-28 w-full sm:h-36"
                 color="#EF4444"
               />
             </div>
           </div>
 
-          <div className="mt-5 panel-stack-5">
+          <div className="mt-4 panel-stack-5">
             {focus.warnings.map((warning) => (
               <div
                 key={warning}
-                className="signal-warning-surface rounded-[0.58rem] p-3.5 text-sm leading-5 text-slate-200"
+                className="signal-warning-surface rounded-[0.4rem] p-3 text-[0.82rem] leading-5 text-slate-200"
               >
                 {warning}
               </div>
