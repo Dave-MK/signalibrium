@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { PersistedWatchlist } from "@/app/_lib/server/workspace-types";
+import type {
+  PersistedAssetRecord,
+  PersistedWatchlist,
+} from "@/app/_lib/server/workspace-types";
 import { Sparkline } from "../_components/sparkline";
 import { PageHeader, Panel, StatusChip } from "../_components/ui";
 import { formatCurrency, formatPercent } from "../_lib/format";
 import {
-  assetUniverse,
   getDefaultPersistedWatchlist,
 } from "../_lib/reference-data";
 import {
@@ -18,11 +20,14 @@ import {
 
 export default function AssetsPageClient({
   initialWatchlists,
+  initialAssets,
 }: {
   initialWatchlists: PersistedWatchlist[];
+  initialAssets: PersistedAssetRecord[];
 }) {
   const initialSelectedWatchlist = getDefaultPersistedWatchlist(initialWatchlists);
   const [watchlists, setWatchlists] = useState<PersistedWatchlist[]>(initialWatchlists);
+  const [assets] = useState<PersistedAssetRecord[]>(initialAssets);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>(
     initialSelectedWatchlist?.id ?? "",
   );
@@ -303,7 +308,7 @@ export default function AssetsPageClient({
       </Panel>
 
       <div className="grid gap-[5px] lg:grid-cols-2">
-        {assetUniverse.map((asset) => {
+        {assets.map((asset) => {
           const inSelectedWatchlist =
             selectedWatchlist?.itemSymbols.includes(asset.symbol) ?? false;
 

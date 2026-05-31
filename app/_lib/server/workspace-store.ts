@@ -23,11 +23,51 @@ async function ensureStoreFile() {
   return storePath;
 }
 
+function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
+  const candidate = (raw ?? {}) as Partial<PersistedWorkspaceData>;
+
+  return {
+    schemaVersion: 2,
+    updatedAt:
+      typeof candidate.updatedAt === "string"
+        ? candidate.updatedAt
+        : defaultWorkspaceData.updatedAt,
+    workspace: {
+      id: candidate.workspace?.id ?? defaultWorkspaceData.workspace.id,
+      name: candidate.workspace?.name ?? defaultWorkspaceData.workspace.name,
+      createdAt:
+        candidate.workspace?.createdAt ?? defaultWorkspaceData.workspace.createdAt,
+      updatedAt:
+        candidate.workspace?.updatedAt ?? defaultWorkspaceData.workspace.updatedAt,
+    },
+    watchlists: Array.isArray(candidate.watchlists)
+      ? candidate.watchlists
+      : defaultWorkspaceData.watchlists,
+    tradeTickets: Array.isArray(candidate.tradeTickets)
+      ? candidate.tradeTickets
+      : defaultWorkspaceData.tradeTickets,
+    journalEntries: Array.isArray(candidate.journalEntries)
+      ? candidate.journalEntries
+      : defaultWorkspaceData.journalEntries,
+    assets: Array.isArray(candidate.assets)
+      ? candidate.assets
+      : defaultWorkspaceData.assets,
+    scannerResults: Array.isArray(candidate.scannerResults)
+      ? candidate.scannerResults
+      : defaultWorkspaceData.scannerResults,
+    backtests: Array.isArray(candidate.backtests)
+      ? candidate.backtests
+      : defaultWorkspaceData.backtests,
+    marketSnapshot:
+      candidate.marketSnapshot ?? defaultWorkspaceData.marketSnapshot,
+  };
+}
+
 export async function readWorkspaceData() {
   const storePath = await ensureStoreFile();
   const raw = await fs.readFile(storePath, "utf8");
 
-  return JSON.parse(raw) as PersistedWorkspaceData;
+  return normalizeWorkspaceData(JSON.parse(raw));
 }
 
 export async function writeWorkspaceData(nextData: PersistedWorkspaceData) {

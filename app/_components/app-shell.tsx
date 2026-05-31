@@ -3,13 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { startTransition, useEffect, useState, type ReactNode } from "react";
-import { marketSnapshot, setups } from "../_data/mock-data";
+import type {
+  PersistedMarketSnapshot,
+  PersistedScannerResult,
+} from "@/app/_lib/server/workspace-types";
 import { formatCompactCurrency, formatPercent } from "../_lib/format";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const topSetup = setups[0];
+export function AppShell({
+  children,
+  marketSnapshot,
+  topScannerResult,
+}: {
+  children: ReactNode;
+  marketSnapshot: PersistedMarketSnapshot;
+  topScannerResult: PersistedScannerResult | null;
+}) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -97,15 +107,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavLinks collapsed={isSidebarCollapsed} />
           </div>
 
-          <div
-            className={`mt-4 hidden h-[calc(100vh-3.5rem)] flex-col ${
-              isSidebarCollapsed ? "lg:hidden" : "lg:flex"
-            }`}
-          >
+          <div className={`mt-4 hidden ${isSidebarCollapsed ? "lg:hidden" : "lg:block"}`}>
             <div className="signal-accent-surface mt-[5px] rounded-[0.46rem] p-3">
               <p className="text-[0.84rem] font-semibold text-white">Protected Ticket Focus</p>
               <p className="mt-1.5 text-[0.95rem] font-medium text-cyan-100">
-                {topSetup.symbol} {topSetup.strategy}
+                {topScannerResult
+                  ? `${topScannerResult.symbol} ${topScannerResult.strategy}`
+                  : "Awaiting scanner results"}
               </p>
               <p className="mt-2.5 text-[0.82rem] leading-5 text-slate-300">
                 Best ranked setup remains aligned with the current market state and
@@ -115,34 +123,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                 Review Ticket
               </button>
             </div>
-
-            <div className="mt-auto space-y-[5px]">
-              <div className="signal-surface p-3">
-                <p className="text-[0.64rem] font-medium uppercase tracking-[0.18em] text-slate-500">
-                  Market Time
-                </p>
-                <p className="mt-2 text-[1.55rem] font-semibold text-cyan-200">03:47</p>
-                <p className="mt-1 text-[0.82rem] text-slate-300">31 May 2026 / BST</p>
-                <p className="mt-1 text-[0.8rem] text-slate-500">Private prototype session</p>
-              </div>
-              <div className="signal-success-surface p-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(34,197,94,0.6)]" />
-                  <p className="text-[0.84rem] font-medium text-emerald-100">All systems operational</p>
-                </div>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                  Current pulse: {marketSnapshot.state}.
-                </p>
-              </div>
-            </div>
           </div>
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-white/6 bg-[#07111d]/90 backdrop-blur-xl">
             <div className="flex flex-col gap-[5px] px-[5px] py-[5px] sm:px-[5px] lg:px-[5px]">
-              <div className="flex flex-col gap-[5px] xl:flex-row xl:items-center xl:justify-between">
-                <div className="signal-toolbar-card flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2">
+              <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1.2fr)]">
+                <div className="signal-toolbar-card flex min-w-0 items-center gap-2.5 px-3 py-2">
                   <svg
                     viewBox="0 0 20 20"
                     className="h-4.5 w-4.5 shrink-0 text-slate-400"
@@ -156,43 +144,53 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <span className="truncate text-[0.84rem] text-slate-400">
                     Search assets, strategies, or insights...
                   </span>
-                  <span className="signal-surface-soft rounded-[0.34rem] px-2 py-0.5 text-[0.68rem] font-semibold text-slate-500">
+                  <span className="signal-surface-soft ml-auto rounded-[0.34rem] px-2 py-0.5 text-[0.68rem] font-semibold text-slate-500">
                     K
                   </span>
                 </div>
 
-                <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="signal-toolbar-card px-3 py-2">
-                    <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                      BTC
+                <div className="signal-toolbar-card px-3 py-2">
+                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+                    BTC
+                  </p>
+                  <p className="mt-1 text-[0.84rem] font-semibold text-white">$105,238.41</p>
+                  <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+1.35%</p>
+                </div>
+                <div className="signal-toolbar-card px-3 py-2">
+                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+                    ETH
+                  </p>
+                  <p className="mt-1 text-[0.84rem] font-semibold text-white">$2,587.12</p>
+                  <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+0.92%</p>
+                </div>
+                <div className="signal-toolbar-card px-3 py-2">
+                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+                    Total Mkt Cap
+                  </p>
+                  <p className="mt-1 text-[0.84rem] font-semibold text-white">$2.62T</p>
+                  <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+0.81%</p>
+                </div>
+                <div className="signal-toolbar-card px-3 py-2">
+                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+                    Market Time
+                  </p>
+                  <p className="mt-1 text-[1rem] font-semibold text-cyan-200">03:47</p>
+                  <p className="mt-0.5 text-[0.76rem] text-slate-300">31 May 2026 / BST</p>
+                  <p className="mt-0.5 text-[0.68rem] text-slate-500">Private prototype session</p>
+                </div>
+                <div className="signal-success-surface rounded-[0.46rem] px-3 py-2">
+                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-emerald-200/70">
+                    System Status
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(34,197,94,0.5)]" />
+                    <p className="text-[0.84rem] font-semibold text-emerald-100">
+                      All systems operational
                     </p>
-                    <p className="mt-1 text-[0.84rem] font-semibold text-white">$105,238.41</p>
-                    <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+1.35%</p>
                   </div>
-                  <div className="signal-toolbar-card px-3 py-2">
-                    <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                      ETH
-                    </p>
-                    <p className="mt-1 text-[0.84rem] font-semibold text-white">$2,587.12</p>
-                    <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+0.92%</p>
-                  </div>
-                  <div className="signal-toolbar-card px-3 py-2">
-                    <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                      Total Mkt Cap
-                    </p>
-                    <p className="mt-1 text-[0.84rem] font-semibold text-white">$2.62T</p>
-                    <p className="mt-0.5 text-[0.82rem] font-medium text-emerald-300">+0.81%</p>
-                  </div>
-                  <div className="signal-accent-surface rounded-[0.46rem] px-3 py-2">
-                    <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-400">
-                      Market Status
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(34,197,94,0.5)]" />
-                      <p className="text-[0.84rem] font-semibold text-white">Open</p>
-                    </div>
-                    <p className="mt-0.5 text-[0.68rem] text-slate-400">Signalibrium pulse active</p>
-                  </div>
+                  <p className="mt-0.5 text-[0.68rem] text-slate-300">
+                    Current pulse: {marketSnapshot.state}.
+                  </p>
                 </div>
               </div>
 

@@ -1,16 +1,18 @@
 import Link from "next/link";
+import { listAssets } from "@/app/_lib/server/repositories/assets";
+import { listBacktests } from "@/app/_lib/server/repositories/backtests";
 import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
+import { getMarketSnapshot } from "@/app/_lib/server/repositories/market-snapshot";
+import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
 import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
 import type {
   PersistedJournalEntry,
+  PersistedScannerResult,
   PersistedTradeTicket,
 } from "./_lib/server/workspace-types";
 import {
-  backtests,
-  marketSnapshot,
   riskWarnings,
-  setups,
   type Asset,
 } from "./_data/mock-data";
 import {
@@ -20,7 +22,6 @@ import {
   formatRiskReward,
 } from "./_lib/format";
 import {
-  assetUniverse,
   getDefaultPersistedWatchlist,
   resolveAssetsForWatchlist,
 } from "./_lib/reference-data";
@@ -36,8 +37,6 @@ const regimeSignals = [
 ];
 
 const alertTitles = ["Elevated Volatility", "Correlation Spike", "Liquidity Watch"];
-const topSetups = setups.slice(0, 6);
-const backtestFocus = backtests[0];
 const benchmarkCurve = [100, 99, 101, 100, 102, 103, 101, 104, 106, 105, 107, 109];
 
 function SectionHeader({
@@ -117,7 +116,7 @@ function SetupMobileCard({
   setup,
   index,
 }: {
-  setup: (typeof setups)[number];
+  setup: PersistedScannerResult;
   index: number;
 }) {
   return (
@@ -253,18 +252,25 @@ function formatReminderTime(timestamp: string) {
 }
 
 export default async function DashboardPage() {
-  const [watchlists, tradeTickets, journalEntries] = await Promise.all([
+  const [watchlists, tradeTickets, journalEntries, assets, scannerResults, backtests, marketSnapshot] =
+    await Promise.all([
     listWatchlists(),
     listTradeTickets(),
     listJournalEntries(),
+    listAssets(),
+    listScannerResults(),
+    listBacktests(),
+    getMarketSnapshot(),
   ]);
 
   const activeWatchlist = getDefaultPersistedWatchlist(watchlists);
   const topWatchlist = (
     activeWatchlist
-      ? resolveAssetsForWatchlist(activeWatchlist.itemSymbols)
-      : assetUniverse
+      ? resolveAssetsForWatchlist(activeWatchlist.itemSymbols, assets)
+      : assets
   ).slice(0, 6);
+  const topSetups = scannerResults.slice(0, 6);
+  const backtestFocus = backtests[0] ?? null;
   const recentTickets = [...tradeTickets]
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     .slice(0, 5);
@@ -482,6 +488,7 @@ export default async function DashboardPage() {
 
         <Panel className="overflow-hidden p-2.5 sm:p-3">
           <SectionHeader title="Latest Backtest Results" />
+          {backtestFocus ? (
           <div className="mt-3 grid gap-3 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[372px_minmax(0,1fr)]">
             <div className="space-y-3">
               <div>
@@ -545,7 +552,9 @@ export default async function DashboardPage() {
                   <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
                     Trades
                   </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-white sm:text-[1.45rem]">142</p>
+                  <p className="mt-1 text-[1.28rem] font-semibold text-white sm:text-[1.45rem]">
+                    {backtestFocus.equityCurve.length}
+                  </p>
                 </div>
               </div>
 
@@ -566,13 +575,15 @@ export default async function DashboardPage() {
                   <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
                     Timeframe
                   </p>
-                  <p className="mt-1 text-[0.82rem] text-white">4H</p>
+                  <p className="mt-1 text-[0.82rem] text-white">{backtestFocus.timeframe}</p>
                 </div>
                 <div>
                   <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
                     Capital
                   </p>
-                  <p className="mt-1 text-[0.82rem] text-white">$10,000</p>
+                  <p className="mt-1 text-[0.82rem] text-white">
+                    ${backtestFocus.startingCapital.toLocaleString("en-US")}
+                  </p>
                 </div>
               </div>
             </div>
@@ -635,6 +646,11 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+          ) : (
+            <div className="mt-3 rounded-[0.4rem] bg-white/[0.03] p-3 text-[0.84rem] text-slate-300">
+              No persisted backtest records are available yet.
+            </div>
+          )}
         </Panel>
       </div>
 

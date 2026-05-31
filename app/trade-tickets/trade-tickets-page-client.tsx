@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { PersistedTradeTicket } from "@/app/_lib/server/workspace-types";
+import type {
+  PersistedScannerResult,
+  PersistedTradeTicket,
+} from "@/app/_lib/server/workspace-types";
 import { ActionLink, KeyValue, PageHeader, Panel, StatusChip } from "../_components/ui";
 import { formatCurrency, formatRiskReward } from "../_lib/format";
 import {
-  availableSetups,
-  buildTradeTicketInputFromSetup,
+  buildTradeTicketInputFromScannerResult,
 } from "../_lib/reference-data";
 import {
   createTradeTicket,
@@ -23,20 +25,28 @@ const statusCycle: PersistedTradeTicket["status"][] = [
 
 export default function TradeTicketsPageClient({
   initialTradeTickets,
+  scannerResults,
 }: {
   initialTradeTickets: PersistedTradeTicket[];
+  scannerResults: PersistedScannerResult[];
 }) {
   const [tradeTickets, setTradeTickets] = useState<PersistedTradeTicket[]>(initialTradeTickets);
-  const [selectedSetupId, setSelectedSetupId] = useState(availableSetups[0]?.id ?? "");
+  const [selectedSetupId, setSelectedSetupId] = useState(scannerResults[0]?.id ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCreateTradeTicket() {
     try {
+      const scannerResult = scannerResults.find((result) => result.id === selectedSetupId);
+
+      if (!scannerResult) {
+        throw new Error("Scanner result not found");
+      }
+
       setIsSaving(true);
       setError(null);
       const nextTicket = await createTradeTicket(
-        buildTradeTicketInputFromSetup(selectedSetupId),
+        buildTradeTicketInputFromScannerResult(scannerResult),
       );
       setTradeTickets((current) => [nextTicket, ...current]);
     } catch (createError) {
@@ -98,7 +108,7 @@ export default function TradeTicketsPageClient({
                 onChange={(event) => setSelectedSetupId(event.target.value)}
                 className="signal-surface-soft rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
               >
-                {availableSetups.map((setup) => (
+                {scannerResults.map((setup) => (
                   <option key={setup.id} value={setup.id}>
                     {setup.symbol} / {setup.strategy} / {setup.tradeability}
                   </option>

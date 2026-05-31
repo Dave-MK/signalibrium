@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
-import {
-  backtests,
-  getAssetBySymbol,
-  getSetupsForSymbol,
-  strategies,
-} from "../../_data/mock-data";
+import { getAssetBySymbol } from "@/app/_lib/server/repositories/assets";
+import { listBacktests } from "@/app/_lib/server/repositories/backtests";
+import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
+import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
+import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
+import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
+import { strategies } from "../../_data/mock-data";
 import {
   formatCurrency,
+  formatDateLabel,
   formatNumber,
   formatPercent,
   formatRiskReward,
@@ -26,17 +28,37 @@ export default async function AssetDetailPage({
   params: Promise<{ symbol: string }>;
 }) {
   const { symbol } = await params;
-  const asset = getAssetBySymbol(symbol);
+  const asset = await getAssetBySymbol(symbol);
 
   if (!asset) {
     notFound();
   }
 
-  const assetSetups = getSetupsForSymbol(asset.symbol);
+  const [watchlists, tradeTickets, journalEntries, scannerResults, backtests] =
+    await Promise.all([
+      listWatchlists(),
+      listTradeTickets(),
+      listJournalEntries(),
+      listScannerResults(),
+      listBacktests(),
+    ]);
+
+  const assetSetups = scannerResults.filter((result) => result.symbol === asset.symbol);
   const matchedStrategy = strategies.find(
     (strategy) => strategy.name === asset.activeStrategy,
   );
   const relatedBacktests = backtests.filter((backtest) => backtest.asset === asset.symbol);
+  const relatedTickets = tradeTickets.filter((ticket) => ticket.symbol === asset.symbol);
+  const relatedTicketIds = new Set(relatedTickets.map((ticket) => ticket.id));
+  const relatedJournalEntries = journalEntries.filter(
+    (entry) => entry.asset === asset.symbol || (entry.ticketId ? relatedTicketIds.has(entry.ticketId) : false),
+  );
+  const containingWatchlists = watchlists.filter((watchlist) =>
+    watchlist.itemSymbols.includes(asset.symbol),
+  );
+  const latestJournalEntry = [...relatedJournalEntries].sort(
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+  )[0];
 
   return (
     <div className="panel-stack-5">
@@ -44,7 +66,13 @@ export default async function AssetDetailPage({
         eyebrow="Asset Detail"
         title={`${asset.symbol} intelligence view`}
         description={`${asset.name} currently maps to the ${asset.activeStrategy} playbook. This page combines chart context, active setups, backtest confidence, regime assessment, risk profile, and AI explanation.`}
-        action={<ActionLink href="/trade-tickets">Create Protected Ticket</ActionLink>}
+        action={
+          relatedTickets[0] ? (
+            <ActionLink href={`/trade-tickets/${relatedTickets[0].id}`}>Open Linked Ticket</ActionLink>
+          ) : (
+            <ActionLink href="/scanner">Prepare From Scanner</ActionLink>
+          )
+        }
       />
 
       <div className="grid gap-[5px] xl:grid-cols-[1.25fr_0.8fr]">
@@ -102,6 +130,57 @@ export default async function AssetDetailPage({
                 detail="Grounded language, not prediction theatre."
               />
             </div>
+          </Panel>
+
+          <Panel className="p-3 sm:p-3.5">
+            <p className="micro-label">Workspace Context</p>
+            <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
+              <KeyValue
+                label="Watchlists"
+                value={String(containingWatchlists.length)}
+                detail={containingWatchlists[0]?.name ?? "Not currently saved"}
+              />
+              <KeyValue
+                label="Trade Tickets"
+                value={String(relatedTickets.length)}
+                detail={relatedTickets[0]?.status ?? "No linked ticket yet"}
+              />
+              <KeyValue
+                label="Journal Entries"
+                value={String(relatedJournalEntries.length)}
+                detail={latestJournalEntry ? formatDateLabel(latestJournalEntry.date) : "No saved review yet"}
+              />
+            </div>
+
+            {relatedTickets.length > 0 ? (
+              <div className="mt-3 panel-stack-5">
+                {relatedTickets.slice(0, 2).map((ticket) => (
+                  <div
+                    key={ticket.id}
+                    className="signal-surface-soft rounded-[0.4rem] p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[0.88rem] font-semibold text-white">{ticket.strategy}</p>
+                        <p className="mt-0.5 text-[0.78rem] text-slate-400">
+                          Entry {formatCurrency(ticket.entry)} / Target {formatCurrency(ticket.takeProfit)}
+                        </p>
+                      </div>
+                      <StatusChip label={ticket.status.toUpperCase()} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {latestJournalEntry ? (
+              <div className="signal-accent-surface mt-3 rounded-[0.4rem] p-3">
+                <p className="text-[0.84rem] font-semibold text-white">Latest journal read</p>
+                <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-200">
+                  {latestJournalEntry.aiReview}
+                </p>
+              </div>
+            ) : null}
           </Panel>
 
           <Panel className="p-3 sm:p-3.5">

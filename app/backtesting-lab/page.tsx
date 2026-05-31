@@ -1,10 +1,28 @@
-import { backtests } from "../_data/mock-data";
+import { listBacktests } from "@/app/_lib/server/repositories/backtests";
 import { formatPercent } from "../_lib/format";
 import { Sparkline } from "../_components/sparkline";
 import { KeyValue, PageHeader, Panel, StatusChip } from "../_components/ui";
 
-export default function BacktestingLabPage() {
-  const focus = backtests[0];
+export default async function BacktestingLabPage() {
+  const backtests = await listBacktests();
+  const focus = backtests[0] ?? null;
+
+  if (!focus) {
+    return (
+      <div className="panel-stack-5">
+        <PageHeader
+          eyebrow="Backtesting Lab"
+          title="Test the edge before capital does"
+          description="No persisted backtest records are available yet."
+        />
+        <Panel className="p-3 sm:p-3.5">
+          <p className="text-[0.84rem] text-slate-300">
+            Seed or create a backtest record to activate this lab view.
+          </p>
+        </Panel>
+      </div>
+    );
+  }
 
   return (
     <div className="panel-stack-5">
@@ -21,11 +39,11 @@ export default function BacktestingLabPage() {
             {[
               ["Asset", focus.asset],
               ["Strategy", focus.strategy],
-              ["Timeframe", "4H"],
-              ["Date Range", "01 Jan 2025 - 31 May 2026"],
-              ["Starting Capital", "$100,000"],
-              ["Fees", "0.12%"],
-              ["Slippage", "0.18%"],
+              ["Timeframe", focus.timeframe],
+              ["Date Range", focus.dateRange],
+              ["Starting Capital", `$${focus.startingCapital.toLocaleString("en-US")}`],
+              ["Fees", `${(focus.feesBps / 100).toFixed(2)}%`],
+              ["Slippage", `${(focus.slippageBps / 100).toFixed(2)}%`],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -68,8 +86,8 @@ export default function BacktestingLabPage() {
               label="Profit Factor"
               value={focus.profitFactor.toFixed(2)}
             />
-            <KeyValue label="Trade Count" value="61" />
-            <KeyValue label="AI Read" value="Edge intact" />
+            <KeyValue label="Trade Count" value={String(focus.equityCurve.length)} />
+            <KeyValue label="AI Read" value={focus.aiRead} />
           </div>
 
           <div className="mt-4 grid gap-[5px] lg:grid-cols-2">

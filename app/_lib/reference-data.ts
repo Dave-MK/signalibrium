@@ -6,6 +6,8 @@ import {
   type Setup,
 } from "@/app/_data/mock-data";
 import type {
+  PersistedAssetRecord,
+  PersistedScannerResult,
   PersistedTradeTicket,
   PersistedWatchlist,
 } from "@/app/_lib/server/workspace-types";
@@ -29,10 +31,29 @@ function parseEntryZone(entryZone: string) {
 export const assetUniverse = watchlist;
 export const availableSetups = setups;
 
-export function resolveAssetsForWatchlist(itemSymbols: string[]) {
+type SetupLike = Pick<
+  Setup | PersistedScannerResult,
+  | "id"
+  | "symbol"
+  | "strategy"
+  | "timeframe"
+  | "riskReward"
+  | "entryZone"
+  | "stopLoss"
+  | "takeProfit"
+  | "liquidityStatus"
+  | "tradeability"
+>;
+
+export function resolveAssetsForWatchlist(
+  itemSymbols: string[],
+  assets: Array<Asset | PersistedAssetRecord> = assetUniverse,
+) {
+  const assetMap = new Map(assets.map((asset) => [asset.symbol, asset]));
+
   return itemSymbols
-    .map((symbol) => getAssetBySymbol(symbol))
-    .filter((asset): asset is Asset => Boolean(asset));
+    .map((symbol) => assetMap.get(symbol.toUpperCase()) ?? getAssetBySymbol(symbol))
+    .filter((asset): asset is Asset | PersistedAssetRecord => Boolean(asset));
 }
 
 export function getDefaultPersistedWatchlist(watchlists: PersistedWatchlist[]) {
@@ -43,7 +64,7 @@ export function getSetupById(setupId: string) {
   return availableSetups.find((setup) => setup.id === setupId) ?? null;
 }
 
-function buildGateResults(setup: Setup, asset: Asset) {
+function buildGateResults(setup: SetupLike, asset: Asset) {
   return [
     {
       label: "Structure intact",
@@ -97,6 +118,18 @@ export function buildTradeTicketInputFromSetup(
     throw new Error("Setup not found");
   }
 
+  return buildTradeTicketInputFromSetupLike(setup);
+}
+
+export function buildTradeTicketInputFromScannerResult(
+  scannerResult: SetupLike,
+): Omit<PersistedTradeTicket, "id" | "createdAt" | "updatedAt"> {
+  return buildTradeTicketInputFromSetupLike(scannerResult);
+}
+
+function buildTradeTicketInputFromSetupLike(
+  setup: SetupLike,
+): Omit<PersistedTradeTicket, "id" | "createdAt" | "updatedAt"> {
   const asset = getAssetBySymbol(setup.symbol);
 
   if (!asset) {

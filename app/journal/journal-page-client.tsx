@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import type { PersistedJournalEntry } from "@/app/_lib/server/workspace-types";
+import type {
+  PersistedAssetRecord,
+  PersistedJournalEntry,
+  PersistedTradeTicket,
+} from "@/app/_lib/server/workspace-types";
 import { PageHeader, Panel, StatusChip } from "../_components/ui";
 import { formatDateLabel, formatPercent } from "../_lib/format";
-import { assetUniverse } from "../_lib/reference-data";
 import {
   createJournalEntry,
   deleteJournalEntry,
@@ -27,20 +31,25 @@ function todayLabel() {
 
 export default function JournalPageClient({
   initialJournalEntries,
+  tradeTickets,
+  assets,
 }: {
   initialJournalEntries: PersistedJournalEntry[];
+  tradeTickets: PersistedTradeTicket[];
+  assets: PersistedAssetRecord[];
 }) {
   const [journalEntries, setJournalEntries] = useState<PersistedJournalEntry[]>(initialJournalEntries);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draftEntry, setDraftEntry] = useState({
     date: todayLabel(),
-    asset: assetUniverse[0]?.symbol ?? "LINK",
+    asset: assets[0]?.symbol ?? "LINK",
     status: "Planned" as PersistedJournalEntry["status"],
     pnl: 0,
     notes: "",
     emotionTags: "Calm, Focused",
     aiReview: "Review structure, execution quality, and discipline before locking the lesson.",
+    ticketId: "",
   });
 
   async function handleCreateJournalEntry() {
@@ -58,12 +67,13 @@ export default function JournalPageClient({
           .map((tag) => tag.trim())
           .filter(Boolean),
         aiReview: draftEntry.aiReview,
-        ticketId: null,
+        ticketId: draftEntry.ticketId || null,
       });
       setJournalEntries((current) => [nextEntry, ...current]);
       setDraftEntry((current) => ({
         ...current,
         notes: "",
+        ticketId: "",
       }));
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create journal entry");
@@ -116,6 +126,14 @@ export default function JournalPageClient({
     entry.emotionTags.some((tag) => ["IMPATIENT", "REACTIVE", "FOMO"].includes(tag)),
   ).length;
 
+  function getLinkedTicket(ticketId: string | null) {
+    if (!ticketId) {
+      return null;
+    }
+
+    return tradeTickets.find((ticket) => ticket.id === ticketId) ?? null;
+  }
+
   return (
     <div className="panel-stack-5">
       <PageHeader
@@ -161,7 +179,7 @@ export default function JournalPageClient({
               }
               className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
             >
-              {assetUniverse.map((asset) => (
+              {assets.map((asset) => (
                 <option key={asset.symbol} value={asset.symbol}>
                   {asset.symbol}
                 </option>
@@ -200,6 +218,30 @@ export default function JournalPageClient({
               }
               className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
             />
+          </label>
+          <label className="space-y-1 xl:col-span-2">
+            <span className="micro-label">Linked Ticket</span>
+            <select
+              value={draftEntry.ticketId}
+              onChange={(event) => {
+                const nextTicketId = event.target.value;
+                const linkedTicket = tradeTickets.find((ticket) => ticket.id === nextTicketId);
+
+                setDraftEntry((current) => ({
+                  ...current,
+                  ticketId: nextTicketId,
+                  asset: linkedTicket?.symbol ?? current.asset,
+                }));
+              }}
+              className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
+            >
+              <option value="">No linked ticket</option>
+              {tradeTickets.map((ticket) => (
+                <option key={ticket.id} value={ticket.id}>
+                  {ticket.symbol} / {ticket.strategy} / {ticket.status}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="space-y-1 xl:col-span-2">
             <span className="micro-label">Emotion Tags</span>
@@ -250,11 +292,14 @@ export default function JournalPageClient({
       <Panel className="p-3 sm:p-3.5">
         <p className="micro-label">Recent Entries</p>
         <div className="mt-4 panel-stack-5">
-          {journalEntries.map((entry) => (
-            <div
-              key={entry.id}
-              className="signal-surface rounded-[0.46rem] p-3"
-            >
+          {journalEntries.map((entry) => {
+            const linkedTicket = getLinkedTicket(entry.ticketId);
+
+            return (
+              <div
+                key={entry.id}
+                className="signal-surface rounded-[0.46rem] p-3"
+              >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-3">
@@ -264,6 +309,14 @@ export default function JournalPageClient({
                   <p className="text-[0.82rem] text-slate-400">
                     {formatDateLabel(entry.date)} / P/L {formatPercent(entry.pnl, true)}
                   </p>
+                  {linkedTicket ? (
+                    <Link
+                      href={`/trade-tickets/${linkedTicket.id}`}
+                      className="inline-flex text-[0.76rem] font-semibold text-cyan-200 transition hover:text-white"
+                    >
+                      Linked ticket: {linkedTicket.symbol} / {linkedTicket.strategy}
+                    </Link>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {entry.emotionTags.map((tag) => (
@@ -377,8 +430,9 @@ export default function JournalPageClient({
                   Delete
                 </button>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </Panel>
     </div>
