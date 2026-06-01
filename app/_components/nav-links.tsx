@@ -100,8 +100,8 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
 
   return (
     <nav
-      className={`grid grid-cols-2 gap-[5px] sm:flex sm:overflow-x-auto sm:gap-[5px] sm:pb-1 lg:block lg:overflow-visible lg:pb-0 ${
-        collapsed ? "lg:-mx-2 lg:space-y-[5px]" : "lg:-mx-3 lg:space-y-[5px]"
+      className={`grid grid-cols-2 gap-1.25 sm:flex sm:overflow-x-auto sm:gap-1.25 sm:pb-1 lg:block lg:overflow-visible lg:pb-0 ${
+        collapsed ? "lg:-mx-2 lg:space-y-1.25" : "lg:-mx-3 lg:space-y-1.25"
       }`}
     >
       {links.map((link) => {
@@ -115,7 +115,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
             href={link.href}
             aria-label={link.label}
             title={collapsed ? link.label : undefined}
-            className={`group flex min-w-0 items-center gap-2 rounded-none px-2.5 py-2 text-[0.82rem] font-semibold transition sm:min-w-[126px] sm:shrink-0 sm:text-[0.86rem] lg:min-w-0 ${
+            className={`group flex min-w-0 items-center gap-2 rounded-none px-2.5 py-2 text-[0.82rem] font-semibold transition sm:min-w-31.5 sm:shrink-0 sm:text-[0.86rem] lg:min-w-0 ${
               collapsed ? "lg:justify-center lg:px-0 lg:py-2.5" : "lg:px-3 lg:py-2.5"
             } ${
               isActive
@@ -129,7 +129,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
               } ${
                 isActive
                   ? "bg-cyan-400/10 text-cyan-200"
-                  : "bg-white/[0.025] text-slate-400 group-hover:bg-cyan-400/8 group-hover:text-white"
+                  : "bg-white/2.5 text-slate-400 group-hover:bg-cyan-400/8 group-hover:text-white"
               }`}
             >
               {link.icon as ReactNode}

@@ -88,8 +88,11 @@ Request parsing and validation live in `app/_lib/server/request-parsers.ts`.
 ### Assets and market data
 
 - `/assets` renders persisted asset records
+- `/assets` can trigger a manual provider sync through `POST /api/market-data/sync`
 - `/assets/[symbol]` now combines persisted asset, scanner result, backtest, watchlist, ticket, and journal data for symbol-level workspace context
 - the app shell reads the persisted market snapshot and top persisted scanner result in its header/sidebar surfaces
+- live sync currently uses Twelve Data to refresh prices and short trailing series for the MVP watchlist basket
+- internal composite symbols (`AINF`, `NUKZ`, `TKNX`) use listed ETF proxies during sync and return warnings in the sync summary
 
 ### Backtests
 
@@ -189,6 +192,25 @@ Implemented.
 - `createdAt`
 - `updatedAt`
 
+### External ingestion layer
+
+Implemented for MVP manual sync.
+
+- provider: `twelvedata`
+- env:
+  - `TWELVE_DATA_API_KEY`
+  - `SIGNALIBRIUM_MARKET_DATA_PROVIDER=twelvedata`
+- live sync route:
+  - `POST /api/market-data/sync`
+- sync summary returns:
+  - `provider`
+  - `syncedAt`
+  - `syncedSymbols`
+  - `skippedSymbols`
+  - `warnings`
+  - `assets`
+  - `marketSnapshot`
+
 ### Still prototype or planned
 
 These remain display-oriented or roadmap entities rather than fully modeled persisted services:
@@ -196,7 +218,6 @@ These remain display-oriented or roadmap entities rather than fully modeled pers
 - `strategies`
 - `riskProfiles`
 - user/account ownership
-- external market data ingestion
 - live scanner computation services
 - real backtest execution jobs
 
@@ -214,6 +235,8 @@ app/
     journal-entries/
       route.ts
       [entryId]/route.ts
+    market-data/
+      sync/route.ts
     market-snapshot/
       route.ts
     scanner-results/
@@ -244,7 +267,13 @@ app/
       page.tsx
       trade-ticket-detail-client.tsx
   _lib/
+    market-data-contract.ts
     server/
+      market-data/
+        asset-catalog.ts
+        provider-types.ts
+        sync-market-data.ts
+        twelve-data.ts
       repositories/
         assets.ts
         backtests.ts
@@ -280,6 +309,22 @@ The file store is a single JSON document containing:
 
 The store is now on `schemaVersion: 2`, and older workspace files are normalized forward automatically so the newer entity arrays can be introduced without losing saved watchlists, tickets, or journal entries.
 
+## External Provider Notes
+
+The current ingestion setup is intentionally conservative:
+
+- it refreshes live prices and a short trailing series for each persisted asset
+- it updates `assets` and recomputes a persisted `marketSnapshot`
+- it leaves scanner ranking logic and backtest computation as persisted product logic for now
+
+Twelve Data’s official docs indicate:
+
+- the `quote` endpoint provides the latest price and percent change for a symbol
+- the `time_series` endpoint provides historical bars for charting and lightweight signal context
+- reference datasets such as `/cryptocurrencies` and `/etf` are available to confirm supported symbols
+
+For public display, review Twelve Data attribution requirements before launch.
+
 ## Migration Path Later
 
 When the app is ready for a real backend:
@@ -288,6 +333,6 @@ When the app is ready for a real backend:
 2. replace file IO inside `workspace-store.ts`
 3. map the same entity shapes into database tables
 4. add auth and per-user workspace scoping
-5. replace seeded market/scanner/backtest entities with real ingestion and computation services
+5. deepen the live ingestion layer into scheduled sync, scanner recomputation, and backtest execution services
 
 That should allow the product surfaces to keep most of their existing contracts while the storage engine changes underneath.

@@ -12,6 +12,7 @@ import {
 } from "../_lib/reference-data";
 import { createTradeTicket } from "../_lib/workspace-api";
 import { ActionLink, PageHeader, Panel, StatusChip } from "../_components/ui";
+import { LabelWithTip } from "../_components/help-tip";
 
 const filterPills = [
   "Crypto + ETF focus",
@@ -105,21 +106,66 @@ export default function ScannerPageClient({
         </div>
 
         <div className="mt-3 overflow-x-auto">
-          <table className="data-table min-w-[1180px]">
+          <table className="data-table data-table--compact min-w-[1080px]">
             <thead>
               <tr>
                 <th>Asset</th>
                 <th>Strategy</th>
-                <th>Score</th>
-                <th>Risk</th>
-                <th>Regime</th>
-                <th>Entry</th>
-                <th>Stop</th>
-                <th>Target</th>
-                <th>R/R</th>
-                <th>Liquidity</th>
+                <th>
+                  <LabelWithTip
+                    label="Score"
+                    tooltip="Internal setup rank score combining structure, timing, and context."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="Risk"
+                    tooltip="Internal risk score. Lower is calmer; higher means more unstable structure."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="Regime"
+                    tooltip="The current market backdrop the setup is being judged against."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="Entry"
+                    tooltip="The preferred entry zone for the setup."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="SL"
+                    tooltip="Stop-loss. The invalidation point that protects downside."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="TP"
+                    tooltip="Take-profit. The first planned target area for the setup."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="R/R"
+                    tooltip="Risk/reward ratio: projected gain divided by planned downside."
+                  />
+                </th>
+                <th>
+                  <LabelWithTip
+                    label="Liquidity"
+                    tooltip="How easy it should be to enter and exit without large slippage."
+                  />
+                </th>
                 <th>Status</th>
-                <th>Ticket Flow</th>
+                <th>
+                  <LabelWithTip
+                    label="Flow"
+                    tooltip="Create or open a trade ticket directly from the ranked setup."
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -159,9 +205,9 @@ export default function ScannerPageClient({
                           <StatusChip label={linkedTicket.status.toUpperCase()} />
                           <Link
                             href={`/trade-tickets/${linkedTicket.id}`}
-                            className="inline-flex rounded-[0.4rem] bg-white/[0.04] px-2.5 py-1 text-[0.74rem] font-semibold text-white"
+                            className="inline-flex rounded-[0.4rem] bg-white/[0.04] px-2.25 py-1 text-[0.7rem] font-semibold text-white"
                           >
-                            Open Ticket
+                            Open
                           </Link>
                         </div>
                       ) : (
@@ -169,7 +215,7 @@ export default function ScannerPageClient({
                           type="button"
                           onClick={() => void handlePrepareTicket(setup)}
                           disabled={isSaving}
-                          className="signal-button rounded-[0.46rem] px-3 py-2 text-[0.76rem] font-semibold disabled:opacity-50"
+                          className="signal-button rounded-[0.46rem] px-2.5 py-1.5 text-[0.72rem] font-semibold disabled:opacity-50"
                         >
                           Prepare Ticket
                         </button>

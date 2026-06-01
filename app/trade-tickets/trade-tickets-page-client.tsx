@@ -162,19 +162,30 @@ export default function TradeTicketsPageClient({
 
             <div className="mt-4 grid gap-[5px] sm:grid-cols-2">
               <KeyValue label="Entry" value={formatCurrency(ticket.entry)} />
-              <KeyValue label="Stop" value={formatCurrency(ticket.stopLoss)} />
-              <KeyValue label="Target" value={formatCurrency(ticket.takeProfit)} />
+              <KeyValue
+                label="Stop"
+                value={formatCurrency(ticket.stopLoss)}
+                tooltip="The planned exit level that caps downside if the trade invalidates."
+              />
+              <KeyValue
+                label="Target"
+                value={formatCurrency(ticket.takeProfit)}
+                tooltip="The planned first profit objective for the ticket."
+              />
               <KeyValue
                 label="Risk/Reward"
                 value={formatRiskReward(ticket.riskReward)}
+                tooltip="Projected upside divided by planned downside from entry to stop-loss."
               />
               <KeyValue
                 label="Planned Loss"
                 value={formatCurrency(ticket.plannedLoss)}
+                tooltip="Expected loss if the trade fills and then reaches the stop-loss."
               />
               <KeyValue
                 label="Potential Gain"
                 value={formatCurrency(ticket.potentialGain)}
+                tooltip="Expected gain if the trade fills and then reaches the take-profit target."
               />
             </div>
 

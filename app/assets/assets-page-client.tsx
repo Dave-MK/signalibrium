@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
 import type {
   PersistedAssetRecord,
   PersistedWatchlist,
 } from "@/app/_lib/server/workspace-types";
 import { Sparkline } from "../_components/sparkline";
 import { PageHeader, Panel, StatusChip } from "../_components/ui";
-import { formatCurrency, formatPercent } from "../_lib/format";
+import { formatCurrency, formatDateTimeLabel, formatPercent } from "../_lib/format";
 import {
   getDefaultPersistedWatchlist,
 } from "../_lib/reference-data";
@@ -25,9 +27,10 @@ export default function AssetsPageClient({
   initialWatchlists: PersistedWatchlist[];
   initialAssets: PersistedAssetRecord[];
 }) {
+  const router = useRouter();
   const initialSelectedWatchlist = getDefaultPersistedWatchlist(initialWatchlists);
   const [watchlists, setWatchlists] = useState<PersistedWatchlist[]>(initialWatchlists);
-  const [assets] = useState<PersistedAssetRecord[]>(initialAssets);
+  const [assets, setAssets] = useState<PersistedAssetRecord[]>(initialAssets);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>(
     initialSelectedWatchlist?.id ?? "",
   );
@@ -39,9 +42,45 @@ export default function AssetsPageClient({
   const [newWatchlistDescription, setNewWatchlistDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncSummary, setSyncSummary] = useState<MarketDataSyncSummary | null>(null);
 
   const selectedWatchlist =
     watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ?? null;
+
+  useEffect(() => {
+    function handleSynced(event: Event) {
+      const customEvent = event as CustomEvent<MarketDataSyncSummary>;
+      setAssets(customEvent.detail.assets);
+      setSyncSummary(customEvent.detail);
+      setError(null);
+      router.refresh();
+    }
+
+    function handleSyncError(event: Event) {
+      const customEvent = event as CustomEvent<{ message: string }>;
+      setError(customEvent.detail.message);
+    }
+
+    window.addEventListener(
+      "signalibrium:market-data-synced",
+      handleSynced as EventListener,
+    );
+    window.addEventListener(
+      "signalibrium:market-data-sync-error",
+      handleSyncError as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "signalibrium:market-data-synced",
+        handleSynced as EventListener,
+      );
+      window.removeEventListener(
+        "signalibrium:market-data-sync-error",
+        handleSyncError as EventListener,
+      );
+    };
+  }, [router]);
 
   async function handleCreateWatchlist() {
     if (!newWatchlistName.trim()) {
@@ -180,6 +219,38 @@ export default function AssetsPageClient({
         title="Focused watchlist, not infinite noise"
         description="The V1 seed universe is intentionally narrow so the scanner, backtester, and risk layers can prove signal quality before scale. Every asset here links into a detail workstation view."
       />
+
+      {syncSummary ? (
+        <Panel className="p-3 sm:p-3.5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="micro-label">Latest Sync</p>
+              <p className="mt-1.5 text-[0.92rem] font-semibold text-white">
+                {syncSummary.syncedSymbols.length} assets refreshed from {syncSummary.provider}.
+              </p>
+              <p className="mt-1 text-[0.82rem] text-slate-400">
+                Synced at {formatDateTimeLabel(syncSummary.syncedAt)}
+              </p>
+            </div>
+            <div className="text-[0.82rem] text-slate-300">
+              <p>Skipped: {syncSummary.skippedSymbols.length}</p>
+              <p>Warnings: {syncSummary.warnings.length}</p>
+            </div>
+          </div>
+          {syncSummary.warnings.length > 0 ? (
+            <div className="mt-3 grid gap-[5px] lg:grid-cols-2">
+              {syncSummary.warnings.slice(0, 4).map((warning) => (
+                <div key={`${warning.symbol}-${warning.message}`} className="signal-warning-surface rounded-[0.4rem] p-2.5">
+                  <p className="text-[0.76rem] font-semibold text-amber-100">{warning.symbol}</p>
+                  <p className="mt-1 text-[0.78rem] leading-5 text-slate-300">
+                    {warning.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
 
       <Panel className="p-3 sm:p-3.5">
         <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -342,6 +413,10 @@ export default function AssetsPageClient({
                     }`}
                   >
                     {formatPercent(asset.change24h, true)} over the latest session
+                  </p>
+                  <p className="mt-1 text-[0.72rem] text-slate-500">
+                    {asset.source === "sync" ? "Live provider synced" : "Seeded prototype data"} / Last sync{" "}
+                    {formatDateTimeLabel(asset.lastSyncedAt)}
                   </p>
                 </div>
                 <div className="text-[0.82rem] leading-5 text-slate-300">

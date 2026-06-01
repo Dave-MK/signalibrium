@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LabelWithTip } from "./help-tip";
 
 type PanelProps = {
   children: ReactNode;
@@ -50,17 +51,17 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 py-1 lg:flex-row lg:items-end lg:justify-between">
-      <div className="max-w-3xl space-y-3 pl-1 sm:pl-1.5">
+    <div className="flex flex-col gap-3 py-1 lg:flex-row lg:items-start lg:justify-between">
+      <div className="max-w-[52rem] space-y-2.5 pl-1 sm:pl-1.5">
         <p className="micro-label">{eyebrow}</p>
-        <h1 className="text-[1.6rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[1.95rem] lg:text-[2.25rem]">
+        <h1 className="text-[1.55rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[1.9rem] lg:text-[2.12rem]">
           {title}
         </h1>
-        <p className="max-w-2xl text-[0.88rem] leading-6 text-slate-300 sm:text-[0.92rem]">
+        <p className="max-w-3xl text-[0.86rem] leading-[1.75rem] text-slate-300 sm:text-[0.9rem]">
           {description}
         </p>
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="shrink-0 self-start lg:mt-1">{action}</div> : null}
     </div>
   );
 }
@@ -111,7 +112,7 @@ export function ActionLink({
   return (
     <Link
       href={href}
-      className={`inline-flex items-center justify-center rounded-[0.46rem] px-3.5 py-2 text-[0.84rem] font-semibold transition ${
+      className={`inline-flex items-center justify-center rounded-[0.46rem] px-3 py-1.75 text-[0.8rem] font-semibold transition ${
         variant === "primary"
           ? "signal-button"
           : "signal-surface-soft text-white hover:border-cyan-300/24 hover:bg-white/[0.04]"
@@ -126,14 +127,18 @@ export function KeyValue({
   label,
   value,
   detail,
+  tooltip,
 }: {
   label: string;
   value: string;
   detail?: string;
+  tooltip?: string;
 }) {
   return (
     <div className="min-w-0 space-y-1">
-      <p className="micro-label">{label}</p>
+      <p className="micro-label">
+        {tooltip ? <LabelWithTip label={label} tooltip={tooltip} /> : label}
+      </p>
       <p className="text-[0.95rem] font-semibold leading-tight text-white sm:text-[1rem]">
         {value}
       </p>

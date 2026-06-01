@@ -12,13 +12,16 @@ import type { PersistedWorkspaceData } from "./workspace-types";
 const seededAt = "2026-05-31T05:30:00.000Z";
 
 export const defaultWorkspaceData: PersistedWorkspaceData = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   updatedAt: seededAt,
   workspace: {
     id: "workspace-signalibrium-mvp",
     name: "Signalibrium MVP Workspace",
     createdAt: seededAt,
     updatedAt: seededAt,
+  },
+  syncState: {
+    sparklineCursor: 0,
   },
   watchlists: [
     {

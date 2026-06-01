@@ -1,8 +1,13 @@
 import type {
+  MarketChartResponse,
+  MarketDataSyncSummary,
+} from "./market-data-contract";
+import type {
   PersistedJournalEntry,
   PersistedTradeTicket,
   PersistedWatchlist,
 } from "./server/workspace-types";
+import type { SupportedChartInterval } from "./server/market-data/provider-types";
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, {
@@ -155,4 +160,33 @@ export async function deleteJournalEntry(entryId: string) {
   await requestJson<{ success: true }>(`/api/journal-entries/${entryId}`, {
     method: "DELETE",
   });
+}
+
+export async function syncMarketData() {
+  const payload = await requestJson<{ summary: MarketDataSyncSummary }>(
+    "/api/market-data/sync",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.summary;
+}
+
+export async function fetchMarketChart(
+  symbol: string,
+  interval: SupportedChartInterval,
+  outputsize = 48,
+) {
+  const searchParams = new URLSearchParams({
+    symbol,
+    interval,
+    outputsize: String(outputsize),
+  });
+  const payload = await requestJson<MarketChartResponse>(
+    `/api/market-data/chart?${searchParams.toString()}`,
+  );
+
+  return payload.chart;
 }

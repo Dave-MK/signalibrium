@@ -74,6 +74,17 @@ input,
 select,
 textarea {
   font: inherit;
+  min-width: 0;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+textarea {
+  resize: vertical;
 }
 
 body::before,
@@ -337,25 +348,43 @@ a {
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 .data-table th {
   color: var(--signal-gold);
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.14em;
-  padding: 0 0 0.55rem;
+  padding: 0 0.85rem 0.48rem 0;
   white-space: nowrap;
   text-align: left;
   text-transform: uppercase;
+  vertical-align: bottom;
 }
 
 .data-table td {
   border-top: 1px solid rgba(118, 134, 160, 0.11);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.35;
-  padding: 0.76rem 0;
+  padding: 0.68rem 0.85rem 0.68rem 0;
   vertical-align: top;
+}
+
+.data-table th:last-child,
+.data-table td:last-child {
+  padding-right: 0;
+}
+
+.data-table--compact th {
+  font-size: 0.59rem;
+  letter-spacing: 0.12em;
+}
+
+.data-table--compact td {
+  font-size: 0.8rem;
+  padding-top: 0.58rem;
+  padding-bottom: 0.58rem;
 }
 
 .panel p,
@@ -373,8 +402,12 @@ a {
 
 @media (max-width: 640px) {
   .data-table td {
-    font-size: 0.84rem;
-    padding: 0.68rem 0;
+    font-size: 0.8rem;
+    padding: 0.62rem 0.65rem 0.62rem 0;
+  }
+
+  .data-table th {
+    padding-right: 0.65rem;
   }
 }
 

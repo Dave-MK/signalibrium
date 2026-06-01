@@ -8,7 +8,6 @@ import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
 import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
 import type {
   PersistedJournalEntry,
-  PersistedScannerResult,
   PersistedTradeTicket,
 } from "./_lib/server/workspace-types";
 import {
@@ -19,7 +18,6 @@ import {
   formatCurrency,
   formatDateLabel,
   formatPercent,
-  formatRiskReward,
 } from "./_lib/format";
 import {
   getDefaultPersistedWatchlist,
@@ -27,6 +25,8 @@ import {
 } from "./_lib/reference-data";
 import { Sparkline } from "./_components/sparkline";
 import { Panel, StatusChip } from "./_components/ui";
+import { MarketProgressPanel } from "./_components/market-progress-panel";
+import { TopRankedSetupsPanel } from "./_components/top-ranked-setups-panel";
 
 const regimeSignals = [
   { label: "Trend Strength", value: "Strong", tone: "text-cyan-200" },
@@ -68,7 +68,7 @@ function WatchlistCard({
   return (
     <Link
       href={`/assets/${asset.symbol}`}
-      className="signal-surface rounded-[0.46rem] p-2.5 transition hover:border-cyan-300/20 hover:bg-white/[0.04]"
+      className="signal-surface rounded-[0.46rem] p-2.5 transition hover:border-cyan-300/20 hover:bg-white/4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -109,71 +109,6 @@ function WatchlistCard({
         </div>
       </div>
     </Link>
-  );
-}
-
-function SetupMobileCard({
-  setup,
-  index,
-}: {
-  setup: PersistedScannerResult;
-  index: number;
-}) {
-  return (
-    <div className="signal-surface-soft rounded-[0.4rem] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs text-slate-500">#{index + 1}</p>
-          <Link href={`/assets/${setup.symbol}`} className="mt-1 block text-[0.92rem] font-semibold text-white">
-            {setup.symbol}
-          </Link>
-          <p className="mt-1 text-[0.82rem] text-slate-400">{setup.strategy}</p>
-        </div>
-        <div className="text-right">
-          <span className="signal-accent-surface inline-flex h-7.5 w-7.5 items-center justify-center rounded-full text-[0.82rem] font-semibold text-cyan-200">
-            {setup.score}
-          </span>
-          <p className="mt-1.5 text-[0.68rem] text-slate-500">{setup.entryZone}</p>
-        </div>
-      </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 text-[0.82rem]">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Regime</p>
-          <div className="mt-1.5">
-            <TableBadge
-              label={setup.regime === "Risk-On" ? "Risk-On Expansion" : setup.regime}
-              tone={setup.regime === "Risk-On" ? "teal" : "default"}
-            />
-          </div>
-        </div>
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Liquidity</p>
-          <div className="mt-1.5">
-            <TableBadge
-              label={setup.liquidityStatus}
-              tone={
-                setup.liquidityStatus === "High"
-                  ? "teal"
-                  : setup.liquidityStatus === "Moderate"
-                    ? "gold"
-                    : "red"
-              }
-            />
-          </div>
-        </div>
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Stop</p>
-          <p className="mt-1.5 text-red-300">{setup.stopLoss}</p>
-        </div>
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Target</p>
-          <p className="mt-1.5 text-slate-200">{setup.takeProfit}</p>
-          <p className="mt-0.5 text-[0.68rem] font-medium text-emerald-300">
-            {formatRiskReward(setup.riskReward)}
-          </p>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -279,14 +214,14 @@ export default async function DashboardPage() {
     .slice(0, 3);
 
   return (
-    <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1fr)_286px] 2xl:grid-cols-[minmax(0,1fr)_298px]">
+    <div className="grid gap-1.25 xl:grid-cols-[minmax(0,1fr)_286px] 2xl:grid-cols-[minmax(0,1fr)_298px]">
       <div className="panel-stack-5">
         <Panel className="p-3 sm:p-3.5">
           <SectionHeader
             title="Watchlist Summary"
             action={activeWatchlist ? activeWatchlist.name : "Edit Watchlist"}
           />
-          <div className="mt-[5px] grid gap-[5px] md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="mt-1.25 grid gap-1.25 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {topWatchlist.length > 0 ? (
               topWatchlist.map((asset) => (
                 <WatchlistCard key={asset.symbol} asset={asset} />
@@ -299,85 +234,9 @@ export default async function DashboardPage() {
           </div>
         </Panel>
 
-        <Panel className="overflow-hidden p-2.5 sm:p-3">
-          <SectionHeader title="Top-Ranked Setups" />
-          <div className="mt-2.5 space-y-2 md:hidden">
-            {topSetups.map((setup, index) => (
-              <SetupMobileCard key={setup.id} setup={setup} index={index} />
-            ))}
-          </div>
-          <div className="mt-2.5 hidden overflow-x-auto md:block">
-            <table className="data-table min-w-[920px]">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Asset</th>
-                  <th>Strategy</th>
-                  <th>Score</th>
-                  <th>Regime</th>
-                  <th>Entry</th>
-                  <th>Stop-loss</th>
-                  <th>Take-profit Target</th>
-                  <th>Tradeability</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topSetups.map((setup, index) => (
-                  <tr key={setup.id}>
-                    <td className="text-slate-400">{index + 1}</td>
-                    <td>
-                      <Link
-                        href={`/assets/${setup.symbol}`}
-                        className="font-semibold text-white hover:text-cyan-200"
-                      >
-                        {setup.symbol}
-                      </Link>
-                    </td>
-                    <td className="text-slate-300">{setup.strategy}</td>
-                    <td>
-                      <span className="signal-accent-surface inline-flex h-7.5 w-7.5 items-center justify-center rounded-full text-[0.82rem] font-semibold text-cyan-200">
-                        {setup.score}
-                      </span>
-                    </td>
-                    <td>
-                      <TableBadge
-                        label={setup.regime === "Risk-On" ? "Risk-On Expansion" : setup.regime}
-                        tone={setup.regime === "Risk-On" ? "teal" : "default"}
-                      />
-                    </td>
-                    <td className="text-slate-200">{setup.entryZone}</td>
-                    <td className="text-red-300">{setup.stopLoss}</td>
-                    <td>
-                      <p className="text-slate-200">{setup.takeProfit}</p>
-                      <p className="mt-0.5 text-[0.68rem] font-medium text-emerald-300">
-                        {formatRiskReward(setup.riskReward)}
-                      </p>
-                    </td>
-                    <td>
-                      <TableBadge
-                        label={setup.liquidityStatus}
-                        tone={
-                          setup.liquidityStatus === "High"
-                            ? "teal"
-                            : setup.liquidityStatus === "Moderate"
-                              ? "gold"
-                              : "red"
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="signal-outline-divider mt-2 flex justify-center pt-2.5">
-            <Link href="/scanner" className="text-[0.84rem] font-medium text-slate-400 transition hover:text-white">
-              View all setups
-            </Link>
-          </div>
-        </Panel>
+        <TopRankedSetupsPanel initialTradeTickets={tradeTickets} setups={topSetups} />
 
-        <div className="grid gap-[5px] xl:grid-cols-2">
+        <div className="grid gap-1.25 xl:grid-cols-2">
           <Panel className="p-2.5 sm:p-3">
             <SectionHeader title="Recent Trade Tickets" />
             <div className="mt-2.5 space-y-2 md:hidden">
@@ -392,7 +251,7 @@ export default async function DashboardPage() {
               )}
             </div>
             <div className="mt-2.5 hidden overflow-x-auto md:block">
-              <table className="data-table min-w-[520px]">
+              <table className="data-table data-table--compact min-w-115">
                 <thead>
                   <tr>
                     <th>Asset</th>
@@ -616,7 +475,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
               <div className="signal-surface signal-grid mt-3 rounded-[0.46rem] px-2.5 py-2.5">
-                <div className="relative h-[190px] sm:h-[220px]">
+                <div className="relative h-47.5 sm:h-55">
                   <div className="absolute inset-y-0 left-0 flex flex-col justify-between text-xs text-slate-500">
                     <span>60%</span>
                     <span>30%</span>
@@ -647,7 +506,7 @@ export default async function DashboardPage() {
             </div>
           </div>
           ) : (
-            <div className="mt-3 rounded-[0.4rem] bg-white/[0.03] p-3 text-[0.84rem] text-slate-300">
+            <div className="mt-3 rounded-[0.4rem] bg-white/3 p-3 text-[0.84rem] text-slate-300">
               No persisted backtest records are available yet.
             </div>
           )}
@@ -655,19 +514,43 @@ export default async function DashboardPage() {
       </div>
 
       <div className="panel-stack-5 xl:sticky xl:top-[6.85rem] xl:self-start">
+        <MarketProgressPanel
+          assets={topWatchlist.slice(0, 4)}
+          title="Market Progress"
+          description="Follow the active watchlist through a live path view with simple derived indicators."
+        />
+
         <Panel className="p-2.5 sm:p-3">
           <div className="flex items-center justify-between gap-3">
             <SectionHeader title="Market Regime" />
-            <p className="text-xs text-slate-500">Updated 03:47 BST</p>
+            <p className="text-xs text-slate-500">{marketSnapshot.lastRefresh}</p>
           </div>
 
           <div className="mt-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-[1.2rem] font-semibold leading-tight text-white sm:text-[1.35rem]">
-                Risk-On Expansion
+                {marketSnapshot.state}
               </h3>
-              <TableBadge label="Bullish" tone="teal" />
+              <TableBadge
+                label={
+                  marketSnapshot.breadthScore >= 67
+                    ? "Bullish"
+                    : marketSnapshot.breadthScore <= 38
+                      ? "Defensive"
+                      : "Balanced"
+                }
+                tone={
+                  marketSnapshot.breadthScore >= 67
+                    ? "teal"
+                    : marketSnapshot.breadthScore <= 38
+                      ? "red"
+                      : "default"
+                }
+              />
             </div>
+            <p className="mt-2 text-[0.82rem] leading-5 text-slate-400">
+              {marketSnapshot.description}
+            </p>
             <p className="mt-3 text-[0.82rem] text-slate-400">AI Regime Score</p>
             <div className="mt-1.5 flex items-end gap-2">
               <span className="text-[2rem] font-semibold tracking-tight text-cyan-200 sm:text-[2.35rem]">

@@ -5,22 +5,63 @@ import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entri
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
 import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
+import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/twelve-data";
+import type { LiveCandleSeries } from "@/app/_lib/server/market-data/provider-types";
 import { strategies } from "../../_data/mock-data";
 import {
-  formatCurrency,
   formatDateLabel,
-  formatNumber,
+  formatCurrency,
   formatPercent,
   formatRiskReward,
 } from "../../_lib/format";
-import { Sparkline } from "../../_components/sparkline";
 import {
   ActionLink,
   KeyValue,
-  PageHeader,
   Panel,
+  PageHeader,
   StatusChip,
 } from "../../_components/ui";
+import { AssetLiveChartPanel } from "../../_components/asset-live-chart-panel";
+
+function buildFallbackChart(symbol: string, name: string, priceSeries: number[], fetchedAt: string) {
+  const usableSeries = priceSeries.filter((value) => Number.isFinite(value) && value > 0);
+  const closes = usableSeries.length >= 2 ? usableSeries : [usableSeries[0] ?? 0, usableSeries[0] ?? 0].filter(Boolean);
+  const endTime = Date.parse(fetchedAt);
+  const safeEndTime = Number.isFinite(endTime) ? endTime : Date.now();
+
+  const candles = closes.map((close, index) => {
+    const previousClose = closes[index - 1] ?? close;
+    const open = previousClose;
+    const spread = Math.max(Math.abs(close - open) * 0.45, close * 0.0035);
+    const high = Math.max(open, close) + spread;
+    const low = Math.max(0.0001, Math.min(open, close) - spread);
+    const timestamp = new Date(
+      safeEndTime - (closes.length - index - 1) * 60 * 60 * 1000,
+    )
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+
+    return {
+      datetime: timestamp,
+      open: Number(open.toFixed(4)),
+      high: Number(high.toFixed(4)),
+      low: Number(low.toFixed(4)),
+      close: Number(close.toFixed(4)),
+      volume: null,
+    };
+  });
+
+  return {
+    symbol,
+    providerSymbol: symbol,
+    interval: "1h",
+    currency: "USD",
+    candles,
+    fetchedAt: new Date(safeEndTime).toISOString(),
+    chartNote: `${name} opened with a locally reconstructed candle view from the synced close series while the next live OHLC refresh warms up.`,
+  } satisfies LiveCandleSeries;
+}
 
 export default async function AssetDetailPage({
   params,
@@ -42,6 +83,9 @@ export default async function AssetDetailPage({
       listScannerResults(),
       listBacktests(),
     ]);
+  const initialChart = await fetchLiveCandlesForSymbol(asset.symbol, "1h", 48).catch(
+    () => buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt),
+  );
 
   const assetSetups = scannerResults.filter((result) => result.symbol === asset.symbol);
   const matchedStrategy = strategies.find(
@@ -76,39 +120,12 @@ export default async function AssetDetailPage({
       />
 
       <div className="grid gap-[5px] xl:grid-cols-[1.25fr_0.8fr]">
-        <Panel className="p-3 sm:p-3.5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="micro-label">Price Structure</p>
-              <h2 className="mt-1.5 text-[1.55rem] font-semibold text-white">
-                {formatCurrency(asset.price)}
-              </h2>
-              <p
-                className={`mt-1.5 text-[0.82rem] ${
-                  asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"
-                }`}
-              >
-                {formatPercent(asset.change24h, true)} over the latest session
-              </p>
-            </div>
-            <StatusChip label={asset.regime.toUpperCase()} />
-          </div>
-
-          <div className="signal-surface mt-4 rounded-[0.46rem] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusChip label="SMA 50" />
-              <StatusChip label="SMA 200" />
-              <StatusChip label="RSI" />
-              <StatusChip label="ATR" />
-            </div>
-            <Sparkline data={asset.sparkline} className="mt-4 h-36 w-full sm:h-44" />
-            <div className="mt-4 grid gap-[5px] sm:grid-cols-3">
-              <KeyValue label="ATR" value={formatNumber(asset.atr)} />
-              <KeyValue label="Liquidity" value={asset.liquidity} />
-              <KeyValue label="Volatility" value={asset.volatility} />
-            </div>
-          </div>
-        </Panel>
+        <AssetLiveChartPanel
+          symbol={asset.symbol}
+          name={asset.name}
+          price={asset.price}
+          initialChart={initialChart}
+        />
 
         <div className="panel-stack-5">
           <Panel className="p-3 sm:p-3.5">
@@ -118,16 +135,19 @@ export default async function AssetDetailPage({
                 label="Tradeability"
                 value={asset.tradeable ? "Ticket ready" : "Watchlist only"}
                 detail="Protected sizing is allowed only when regime and liquidity line up."
+                tooltip="Whether the asset currently clears the app's regime and liquidity filters for a prepared trade ticket."
               />
               <KeyValue
                 label="Forecast"
                 value={asset.forecast}
                 detail="Scenario framing generated from deterministic structure and regime context."
+                tooltip="A plain-language scenario describing what needs to happen next for the current thesis to stay valid."
               />
               <KeyValue
                 label="AI Explanation"
                 value={asset.aiBias}
                 detail="Grounded language, not prediction theatre."
+                tooltip="A concise interpretation layer built from the stored asset state rather than a live predictive model."
               />
             </div>
           </Panel>
@@ -139,16 +159,19 @@ export default async function AssetDetailPage({
                 label="Watchlists"
                 value={String(containingWatchlists.length)}
                 detail={containingWatchlists[0]?.name ?? "Not currently saved"}
+                tooltip="How many saved workspace watchlists currently include this asset."
               />
               <KeyValue
                 label="Trade Tickets"
                 value={String(relatedTickets.length)}
                 detail={relatedTickets[0]?.status ?? "No linked ticket yet"}
+                tooltip="The count of prepared or simulated tickets in the workspace that reference this asset."
               />
               <KeyValue
                 label="Journal Entries"
                 value={String(relatedJournalEntries.length)}
                 detail={latestJournalEntry ? formatDateLabel(latestJournalEntry.date) : "No saved review yet"}
+                tooltip="Saved trade reviews or notes that either mention this asset directly or are linked through one of its tickets."
               />
             </div>
 
@@ -218,11 +241,20 @@ export default async function AssetDetailPage({
                 </div>
                 <div className="mt-3 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
                   <KeyValue label="Entry" value={setup.entryZone} />
-                  <KeyValue label="Stop" value={setup.stopLoss} />
-                  <KeyValue label="Target" value={setup.takeProfit} />
+                  <KeyValue
+                    label="Stop"
+                    value={setup.stopLoss}
+                    tooltip="The price level where the setup is considered invalid and the trade should be exited."
+                  />
+                  <KeyValue
+                    label="Target"
+                    value={setup.takeProfit}
+                    tooltip="The first planned take-profit zone for the setup."
+                  />
                   <KeyValue
                     label="Risk/Reward"
                     value={formatRiskReward(setup.riskReward)}
+                    tooltip="The projected upside divided by the planned downside for the setup."
                   />
                 </div>
               </div>
@@ -243,18 +275,22 @@ export default async function AssetDetailPage({
                   <KeyValue
                     label="Total Return"
                     value={formatPercent(backtest.totalReturn)}
+                    tooltip="Overall percentage gain or loss across the tested period."
                   />
                   <KeyValue
                     label="Max Drawdown"
                     value={formatPercent(backtest.maxDrawdown)}
+                    tooltip="The deepest peak-to-trough decline experienced during the backtest."
                   />
                   <KeyValue
                     label="Win Rate"
                     value={formatPercent(backtest.winRate)}
+                    tooltip="The percentage of simulated trades that closed profitable."
                   />
                   <KeyValue
                     label="Profit Factor"
                     value={backtest.profitFactor.toFixed(2)}
+                    tooltip="Gross profits divided by gross losses. Higher means the strategy kept more of what it made."
                   />
                 </div>
               </div>

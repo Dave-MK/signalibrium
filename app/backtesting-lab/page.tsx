@@ -32,10 +32,10 @@ export default async function BacktestingLabPage() {
         description="The prototype backtesting surface is shaped around the handover inputs and outputs: asset, strategy, timeframe, capital assumptions, equity curve, drawdown curve, warnings, and AI explanation grounded in measured results."
       />
 
-      <div className="grid gap-[5px] xl:grid-cols-[0.82fr_1.18fr]">
+      <div className="grid gap-1.25 xl:grid-cols-[0.82fr_1.18fr]">
         <Panel className="p-3 sm:p-3.5">
           <p className="micro-label">Backtest Inputs</p>
-          <div className="mt-3 grid gap-[5px]">
+          <div className="mt-3 grid gap-1.25">
             {[
               ["Asset", focus.asset],
               ["Strategy", focus.strategy],
@@ -67,30 +67,50 @@ export default async function BacktestingLabPage() {
             <StatusChip label="BACKTESTED" />
           </div>
 
-          <div className="mt-4 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-1.25 sm:grid-cols-2 lg:grid-cols-4">
             <KeyValue
               label="Total Return"
               value={formatPercent(focus.totalReturn)}
+              tooltip="Net percentage return produced by the strategy over the full tested period."
             />
             <KeyValue
               label="Annualised"
               value={formatPercent(focus.annualisedReturn)}
+              tooltip="The return rate converted into a yearly equivalent for easier comparison."
             />
-            <KeyValue label="Win Rate" value={formatPercent(focus.winRate)} />
-            <KeyValue label="Sharpe" value={focus.sharpe.toFixed(2)} />
+            <KeyValue
+              label="Win Rate"
+              value={formatPercent(focus.winRate)}
+              tooltip="The share of backtested trades that finished positive."
+            />
+            <KeyValue
+              label="Sharpe"
+              value={focus.sharpe.toFixed(2)}
+              tooltip="Risk-adjusted return. Higher means the strategy earned more per unit of volatility."
+            />
             <KeyValue
               label="Max Drawdown"
               value={formatPercent(focus.maxDrawdown)}
+              tooltip="The worst peak-to-trough equity decline experienced during the test."
             />
             <KeyValue
               label="Profit Factor"
               value={focus.profitFactor.toFixed(2)}
+              tooltip="Gross profits divided by gross losses across all simulated trades."
             />
-            <KeyValue label="Trade Count" value={String(focus.equityCurve.length)} />
-            <KeyValue label="AI Read" value={focus.aiRead} />
+            <KeyValue
+              label="Trade Count"
+              value={String(focus.equityCurve.length)}
+              tooltip="The number of discrete simulated trades in the backtest sample."
+            />
+            <KeyValue
+              label="AI Read"
+              value={focus.aiRead}
+              tooltip="A concise qualitative interpretation of the measured backtest output."
+            />
           </div>
 
-          <div className="mt-4 grid gap-[5px] lg:grid-cols-2">
+          <div className="mt-4 grid gap-1.25 lg:grid-cols-2">
             <div className="signal-surface rounded-[0.46rem] p-3">
               <p className="micro-label">Equity Curve</p>
               <Sparkline data={focus.equityCurve} className="mt-3 h-28 w-full sm:h-36" />

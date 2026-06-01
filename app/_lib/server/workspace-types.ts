@@ -76,13 +76,16 @@ export type PersistedMarketSnapshot = {
 };
 
 export type PersistedWorkspaceData = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   updatedAt: string;
   workspace: {
     id: string;
     name: string;
     createdAt: string;
     updatedAt: string;
+  };
+  syncState: {
+    sparklineCursor: number;
   };
   watchlists: PersistedWatchlist[];
   tradeTickets: PersistedTradeTicket[];

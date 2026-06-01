@@ -69,26 +69,43 @@ export default async function RiskLabPage() {
               label="Account Size"
               value={formatCurrency(accountSize)}
               detail="Prototype capital base"
+              tooltip="The notional account value used to size simulated trades in the workspace."
             />
             <KeyValue
               label="Risk Per Trade"
               value={formatPercent(riskPerTrade)}
               detail="Hard risk budget"
+              tooltip="The maximum percentage of account capital that can be lost if the stop-loss is hit."
             />
-            <KeyValue label="Entry" value={formatCurrency(focus.entry)} />
-            <KeyValue label="Stop-Loss" value={formatCurrency(focus.stopLoss)} />
-            <KeyValue label="Take-Profit" value={formatCurrency(focus.takeProfit)} />
+            <KeyValue
+              label="Entry"
+              value={formatCurrency(focus.entry)}
+              tooltip="The planned fill price used for the current ticket."
+            />
+            <KeyValue
+              label="Stop-Loss"
+              value={formatCurrency(focus.stopLoss)}
+              tooltip="The invalidation price where the position should be exited to protect capital."
+            />
+            <KeyValue
+              label="Take-Profit"
+              value={formatCurrency(focus.takeProfit)}
+              tooltip="The planned first profit objective for the trade."
+            />
             <KeyValue
               label="Position Size"
               value={`${formatNumber(focus.quantity, 0)} units`}
+              tooltip="The number of units allowed while staying inside the defined risk budget."
             />
             <KeyValue
               label="Planned Loss"
               value={formatCurrency(focus.plannedLoss)}
+              tooltip="The expected loss if the position enters and then reaches the stop-loss."
             />
             <KeyValue
               label="Potential Gain"
               value={formatCurrency(focus.potentialGain)}
+              tooltip="The projected profit if price reaches the take-profit target from the planned entry."
             />
           </div>
         </Panel>
