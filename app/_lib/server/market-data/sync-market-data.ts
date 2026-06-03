@@ -9,21 +9,12 @@ import type {
   PersistedWorkspaceData,
 } from "../workspace-types";
 import { getMarketDataAssetDefinition } from "./asset-catalog";
-import { fetchLiveQuoteForSymbol, fetchLiveSeriesForSymbol } from "./twelve-data";
+import { fetchLiveQuoteForSymbol, getConfiguredProviderName } from "./market-data";
 
 const minimumSyncIntervalMs = 65_000;
 
 function getConfiguredProvider() {
-  const provider =
-    process.env.SIGNALIBRIUM_MARKET_DATA_PROVIDER?.trim().toLowerCase() ?? "twelvedata";
-
-  if (provider !== "twelvedata") {
-    throw new Error(
-      `Unsupported market-data provider "${provider}". Signalibrium currently supports "twelvedata" only.`,
-    );
-  }
-
-  return provider;
+  return getConfiguredProviderName();
 }
 
 function formatSyncTimestamp(timestamp: string) {
@@ -191,12 +182,13 @@ function buildMarketSnapshot(
 
 function buildUpdatedAsset(
   asset: PersistedAssetRecord,
-  liveQuote:
-    | Awaited<ReturnType<typeof fetchLiveQuoteForSymbol>>
-    | Awaited<ReturnType<typeof fetchLiveSeriesForSymbol>>,
+  liveQuote: Awaited<ReturnType<typeof fetchLiveQuoteForSymbol>>,
   syncedAt: string,
 ) {
-  const nextSeries = liveQuote.series.length > 1 ? liveQuote.series : asset.sparkline;
+  const nextSeries =
+    liveQuote.series.length > 1
+      ? liveQuote.series
+      : buildRollingSeries(asset.sparkline, liveQuote.price);
   const trailingChange = getSeriesChangePercent(nextSeries);
 
   return {
@@ -212,6 +204,30 @@ function buildUpdatedAsset(
     lastSyncedAt: syncedAt,
     updatedAt: syncedAt,
   };
+}
+
+function buildRollingSeries(existingSeries: number[], latestPrice: number) {
+  const usableSeries = existingSeries.filter(
+    (value) => Number.isFinite(value) && value > 0,
+  );
+
+  if (usableSeries.length === 0) {
+    return [latestPrice];
+  }
+
+  const nextSeries = [...usableSeries];
+  const previousPrice = nextSeries[nextSeries.length - 1];
+  const roundedLatestPrice = Number(latestPrice.toFixed(6));
+
+  if (Math.abs(previousPrice - roundedLatestPrice) < 0.000001) {
+    nextSeries[nextSeries.length - 1] = roundedLatestPrice;
+    return nextSeries;
+  }
+
+  const maxPoints = Math.max(usableSeries.length, 12);
+  nextSeries.push(roundedLatestPrice);
+
+  return nextSeries.slice(-maxPoints);
 }
 
 function buildCachedSyncSummary(
@@ -235,15 +251,6 @@ function buildCachedSyncSummary(
   };
 }
 
-function getSparklineRefreshSymbol(data: PersistedWorkspaceData) {
-  if (data.assets.length === 0) {
-    return null;
-  }
-
-  const cursor = data.syncState.sparklineCursor % data.assets.length;
-  return data.assets[cursor]?.symbol ?? null;
-}
-
 export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   const provider = getConfiguredProvider();
   const syncedAt = new Date().toISOString();
@@ -262,7 +269,7 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
     return buildCachedSyncSummary(
       data,
       provider,
-      `Auto-sync is cooling down to stay inside the free-tier provider limit. Next live refresh window opens in about ${secondsRemaining}s.`,
+      `Auto-sync is cooling down to stay inside the current IG request cadence. The next refresh window opens in about ${secondsRemaining}s.`,
     );
   }
 
@@ -270,13 +277,12 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   const syncedSymbols: string[] = [];
   const skippedSymbols: string[] = [];
   const nextAssets: PersistedAssetRecord[] = [];
-  const sparklineRefreshSymbol = getSparklineRefreshSymbol(data);
 
   const syncResults = await Promise.allSettled(
     data.assets.map(async (asset) => {
       const definition = getMarketDataAssetDefinition(asset.symbol);
 
-      if (!definition?.providerSymbol || !definition.providerType) {
+      if (!definition) {
         skippedSymbols.push(asset.symbol);
         warnings.push({
           symbol: asset.symbol,
@@ -285,10 +291,7 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
         return asset;
       }
 
-      const liveQuote =
-        sparklineRefreshSymbol === asset.symbol
-          ? await fetchLiveSeriesForSymbol(asset.symbol)
-          : await fetchLiveQuoteForSymbol(asset.symbol);
+      const liveQuote = await fetchLiveQuoteForSymbol(asset.symbol);
 
       syncedSymbols.push(asset.symbol);
 
@@ -296,14 +299,6 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
         warnings.push({
           symbol: asset.symbol,
           message: definition.proxyNote,
-        });
-      }
-
-      if (sparklineRefreshSymbol === asset.symbol) {
-        warnings.push({
-          symbol: asset.symbol,
-          message:
-            "Refreshed this asset with a full trailing time series on this sync to keep free-tier sparkline data rotating.",
         });
       }
 
@@ -340,7 +335,7 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
       return buildCachedSyncSummary(
         data,
         provider,
-        "Auto-sync hit the provider credit cap for this minute, so Signalibrium kept the last successful market snapshot and will try again on the next cycle.",
+        "IG declined the latest refresh because the current account allowance is cooling down, so Signalibrium kept the last successful market snapshot and will try again on the next cycle.",
       );
     }
 
@@ -351,10 +346,6 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   }
 
   data.assets = nextAssets;
-  data.syncState.sparklineCursor =
-    data.assets.length > 0
-      ? (data.syncState.sparklineCursor + 1) % data.assets.length
-      : 0;
   data.marketSnapshot = buildMarketSnapshot(data, nextAssets, syncedAt);
 
   const persisted = await writeWorkspaceData(data);

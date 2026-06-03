@@ -1,49 +1,69 @@
 import type { MarketDataAssetDefinition } from "./provider-types";
 
+function readEpicOverride(symbol: string) {
+  return process.env[`SIGNALIBRIUM_IG_EPIC_${symbol}`]?.trim() || null;
+}
+
 const assetCatalog: Record<string, MarketDataAssetDefinition> = {
   LINK: {
     symbol: "LINK",
-    providerSymbol: "LINK/USD",
-    providerType: "Digital Currency",
+    marketDataSource: "coingecko",
+    coingeckoCoinId: "chainlink",
+    igEpic: readEpicOverride("LINK"),
+    searchTerms: ["Chainlink", "LINK"],
   },
   ONDO: {
     symbol: "ONDO",
-    providerSymbol: "ONDO/USD",
-    providerType: "Digital Currency",
+    marketDataSource: "coingecko",
+    coingeckoCoinId: "ondo-finance",
+    igEpic: readEpicOverride("ONDO"),
+    searchTerms: ["Ondo", "ONDO"],
   },
   RENDER: {
     symbol: "RENDER",
-    providerSymbol: "RENDER/USD",
-    providerType: "Digital Currency",
+    marketDataSource: "coingecko",
+    coingeckoCoinId: "render-token",
+    igEpic: readEpicOverride("RENDER"),
+    searchTerms: ["Render", "RENDER"],
   },
   AKT: {
     symbol: "AKT",
-    providerSymbol: "AKT/USD",
-    providerType: "Digital Currency",
+    marketDataSource: "coingecko",
+    coingeckoCoinId: "akash-network",
+    igEpic: readEpicOverride("AKT"),
+    searchTerms: ["Akash Network", "AKT"],
   },
   AINF: {
     symbol: "AINF",
-    providerSymbol: "AIQ",
-    providerType: "ETF",
+    marketDataSource: "yahoo",
+    yahooSymbol: "AIQ",
+    igEpic: readEpicOverride("AINF"),
+    searchTerms: ["AIQ", "AIQ ETF"],
     proxyNote:
       "Using AIQ as a liquid listed proxy for the internal AI Infrastructure Index composite.",
   },
   NUKZ: {
     symbol: "NUKZ",
-    providerSymbol: "NLR",
-    providerType: "ETF",
+    marketDataSource: "yahoo",
+    yahooSymbol: "NLR",
+    igEpic: readEpicOverride("NUKZ"),
+    searchTerms: ["NLR", "NLR ETF"],
     proxyNote:
       "Using NLR as a liquid listed proxy for the internal Nuclear Energy Index composite.",
   },
   URA: {
     symbol: "URA",
-    providerSymbol: "URA",
-    providerType: "ETF",
+    marketDataSource: "yahoo",
+    yahooSymbol: "URA",
+    igEpic: readEpicOverride("URA"),
+    searchTerms: ["URA", "Global X Uranium ETF"],
   },
   TKNX: {
     symbol: "TKNX",
-    providerSymbol: "BLOK",
-    providerType: "ETF",
+    marketDataSource: "yahoo",
+    yahooSymbol: "BLOK",
+    igEpic: readEpicOverride("TKNX"),
+    searchTerms: ["BLOK", "Amplify Transformational Data Sharing ETF"],
     proxyNote:
       "Using BLOK as a liquid listed proxy for the internal Tokenisation Leaders ETF composite.",
   },

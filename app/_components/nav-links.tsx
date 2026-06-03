@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 const links = [
   {
     href: "/",
-    label: "Dashboard",
+    label: "Command Center",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <rect x="2.5" y="2.5" width="6" height="6" rx="1.2" />
@@ -19,7 +19,7 @@ const links = [
   },
   {
     href: "/scanner",
-    label: "Scanner",
+    label: "AI Opportunities",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <circle cx="8.5" cy="8.5" r="4.5" />
@@ -29,7 +29,7 @@ const links = [
   },
   {
     href: "/assets",
-    label: "Assets",
+    label: "Market Charts",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M3 15.5h14" />
@@ -40,38 +40,8 @@ const links = [
     ),
   },
   {
-    href: "/strategy-lab",
-    label: "Strategy Lab",
-    icon: (
-      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M4 15.5h12" />
-        <path d="M6 15.5V7l4-3 4 3v8.5" />
-      </svg>
-    ),
-  },
-  {
-    href: "/backtesting-lab",
-    label: "Backtesting Lab",
-    icon: (
-      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M3 13.5c1.5 0 2-7 3.5-7s2 10 3.5 10 2-12 3.5-12S15 11 17 11" />
-      </svg>
-    ),
-  },
-  {
-    href: "/risk-lab",
-    label: "Risk Lab",
-    icon: (
-      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M10 3 16 15H4L10 3Z" />
-        <path d="M10 7.5v3.5" />
-        <circle cx="10" cy="13.5" r=".8" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
     href: "/trade-tickets",
-    label: "Trade Tickets",
+    label: "Execution",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M3 7.5h14" />
@@ -82,14 +52,11 @@ const links = [
     ),
   },
   {
-    href: "/journal",
-    label: "Journal",
+    href: "/backtesting-lab",
+    label: "Research",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M5 3.5h8a2 2 0 0 1 2 2v11H7a2 2 0 0 0-2 2Z" />
-        <path d="M5 3.5v13a2 2 0 0 1 2-2h8" />
-        <path d="M8 7.5h4.5" />
-        <path d="M8 10.5h4.5" />
+        <path d="M3 13.5c1.5 0 2-7 3.5-7s2 10 3.5 10 2-12 3.5-12S15 11 17 11" />
       </svg>
     ),
   },

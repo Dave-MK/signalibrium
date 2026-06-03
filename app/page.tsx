@@ -1,66 +1,166 @@
 import Link from "next/link";
+import { listAiOpportunities } from "@/app/_lib/server/repositories/ai-opportunities";
 import { listAssets } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
+import { listConfirmationChecks } from "@/app/_lib/server/repositories/confirmation-checks";
 import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
+import { listMarketEvents } from "@/app/_lib/server/repositories/market-events";
 import { getMarketSnapshot } from "@/app/_lib/server/repositories/market-snapshot";
-import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
 import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
 import type {
+  PersistedAiOpportunity,
+  PersistedConfirmationCheck,
   PersistedJournalEntry,
+  PersistedMarketEvent,
   PersistedTradeTicket,
 } from "./_lib/server/workspace-types";
-import {
-  riskWarnings,
-  type Asset,
-} from "./_data/mock-data";
+import type { Asset } from "./_data/mock-data";
 import {
   formatCurrency,
   formatDateLabel,
   formatPercent,
+  formatRiskReward,
 } from "./_lib/format";
 import {
   getDefaultPersistedWatchlist,
   resolveAssetsForWatchlist,
 } from "./_lib/reference-data";
 import { Sparkline } from "./_components/sparkline";
-import { Panel, StatusChip } from "./_components/ui";
-import { MarketProgressPanel } from "./_components/market-progress-panel";
-import { TopRankedSetupsPanel } from "./_components/top-ranked-setups-panel";
-
-const regimeSignals = [
-  { label: "Trend Strength", value: "Strong", tone: "text-cyan-200" },
-  { label: "Market Breadth", value: "Positive", tone: "text-emerald-300" },
-  { label: "Volatility", value: "Moderate", tone: "text-sky-300" },
-  { label: "Liquidity", value: "High", tone: "text-cyan-200" },
-  { label: "Macro Tailwind", value: "Favourable", tone: "text-emerald-300" },
-];
-
-const alertTitles = ["Elevated Volatility", "Correlation Spike", "Liquidity Watch"];
-const benchmarkCurve = [100, 99, 101, 100, 102, 103, 101, 104, 106, 105, 107, 109];
+import { ActionLink, PageHeader, Panel, StatusChip } from "./_components/ui";
 
 function SectionHeader({
   title,
   action,
 }: {
   title: string;
-  action?: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-white">
         {title}
       </h2>
-      {action ? (
-        <button className="text-xs font-medium text-slate-400 transition hover:text-white">
-          {action}
-        </button>
-      ) : null}
+      {action}
     </div>
   );
 }
 
-function WatchlistCard({
+function MetricTile({
+  label,
+  value,
+  detail,
+  tone = "text-white",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+}) {
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <p className="micro-label">{label}</p>
+      <p className={`mt-1.5 text-[1.02rem] font-semibold ${tone}`}>{value}</p>
+      <p className="mt-1 text-[0.76rem] leading-5 text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function RecommendationCard({
+  opportunity,
+}: {
+  opportunity: PersistedAiOpportunity;
+}) {
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-[0.96rem] font-semibold text-white">{opportunity.symbol}</p>
+            <StatusChip label={opportunity.action.toUpperCase()} />
+          </div>
+          <p className="mt-1 text-[0.8rem] text-slate-400">
+            {opportunity.title} · {opportunity.side}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[0.72rem] uppercase tracking-[0.14em] text-slate-500">Confidence</p>
+          <p className="mt-1 text-[1rem] font-semibold text-cyan-200">{opportunity.confidence}</p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[0.82rem] leading-5 text-slate-300">{opportunity.summary}</p>
+
+      <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
+        <MetricTile label="Entry" value={opportunity.entryPlan} detail={opportunity.stopPlan} />
+        <MetricTile label="Target" value={opportunity.targetPlan} detail={opportunity.expectedMove} />
+        <MetricTile label="Confirmation" value={opportunity.action} detail={opportunity.confirmationContext} tone={opportunity.action === "Wait" ? "text-amber-200" : "text-emerald-300"} />
+      </div>
+    </div>
+  );
+}
+
+function MarketEventCard({
+  event,
+}: {
+  event: PersistedMarketEvent;
+}) {
+  const tone =
+    event.bias === "Bullish"
+      ? "text-emerald-300"
+      : event.bias === "Bearish"
+        ? "text-red-300"
+        : event.bias === "Mixed"
+          ? "text-amber-200"
+          : "text-slate-200";
+
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.9rem] font-semibold text-white">{event.title}</p>
+          <p className="mt-0.5 text-[0.76rem] text-slate-400">
+            {event.scope} · {event.sourceLabel}
+          </p>
+        </div>
+        <StatusChip label={event.status.toUpperCase()} />
+      </div>
+      <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{event.summary}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[0.74rem]">
+        <span className={tone}>{event.bias}</span>
+        <span className="text-slate-500">Impact {event.impact}</span>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmationCard({
+  check,
+}: {
+  check: PersistedConfirmationCheck;
+}) {
+  const tone =
+    check.overallStatus === "Confirmed"
+      ? "text-emerald-300"
+      : check.overallStatus === "Rejected"
+        ? "text-red-300"
+        : "text-amber-200";
+
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.9rem] font-semibold text-white">{check.symbol}</p>
+          <p className="mt-0.5 text-[0.76rem] text-slate-400">{check.stance} thesis</p>
+        </div>
+        <p className={`text-[0.86rem] font-semibold ${tone}`}>{check.score}</p>
+      </div>
+      <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{check.summary}</p>
+    </div>
+  );
+}
+
+function AssetStripCard({
   asset,
 }: {
   asset: Asset;
@@ -68,51 +168,24 @@ function WatchlistCard({
   return (
     <Link
       href={`/assets/${asset.symbol}`}
-      className="signal-surface rounded-[0.46rem] p-2.5 transition hover:border-cyan-300/20 hover:bg-white/4"
+      className="signal-surface-soft rounded-[0.4rem] p-3 transition hover:border-cyan-300/18 hover:bg-white/[0.03]"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="signal-accent-surface flex h-8 w-8 items-center justify-center rounded-full text-[0.82rem] font-semibold text-cyan-200">
-            {asset.symbol[0]}
-          </div>
-          <div>
-            <p className="text-[0.92rem] font-semibold text-white">{asset.symbol}</p>
-            <p className="text-[0.68rem] text-slate-400">{asset.name}</p>
-          </div>
+        <div>
+          <p className="text-[0.92rem] font-semibold text-white">{asset.symbol}</p>
+          <p className="mt-0.5 text-[0.76rem] text-slate-400">{asset.name}</p>
         </div>
-        <p
-          className={`text-[0.84rem] font-semibold ${
-            asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"
-          }`}
-        >
+        <p className={`text-[0.82rem] font-semibold ${asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"}`}>
           {formatPercent(asset.change24h, true)}
         </p>
       </div>
-
-      <p className="mt-2 text-[1.18rem] font-semibold tracking-tight text-white sm:text-[1.3rem]">
-        {formatCurrency(asset.price)}
-      </p>
-      <Sparkline data={asset.sparkline} className="mt-1.5 h-9 w-full" />
-
-      <div className="signal-outline-divider mt-2.5 grid grid-cols-2 gap-2.5 pt-2.5">
-        <div>
-          <p className="text-[0.58rem] uppercase tracking-[0.12em] text-slate-500">
-            Score
-          </p>
-          <p className="mt-1 text-[0.82rem] font-semibold text-cyan-200">{asset.score}</p>
-        </div>
-        <div>
-          <p className="text-[0.58rem] uppercase tracking-[0.12em] text-slate-500">
-            Volatility
-          </p>
-          <p className="mt-1 text-[0.82rem] font-semibold text-white">{asset.volatility}</p>
-        </div>
-      </div>
+      <p className="mt-2 text-[1.02rem] font-semibold text-white">{formatCurrency(asset.price)}</p>
+      <Sparkline data={asset.sparkline} className="mt-2 h-10 w-full" />
     </Link>
   );
 }
 
-function TicketMobileCard({
+function TicketCard({
   ticket,
 }: {
   ticket: PersistedTradeTicket;
@@ -122,497 +195,239 @@ function TicketMobileCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[0.92rem] font-semibold text-white">{ticket.symbol}</p>
-          <p className="mt-1 text-[0.82rem] text-slate-400">{ticket.strategy}</p>
+          <p className="mt-0.5 text-[0.76rem] text-slate-400">
+            {ticket.strategy} · {ticket.side}
+          </p>
         </div>
         <StatusChip label={ticket.status.toUpperCase()} />
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 text-[0.82rem]">
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Side</p>
-          <p className={`mt-1.5 ${ticket.side === "Long" ? "text-emerald-300" : "text-red-300"}`}>
-            {ticket.side}
-          </p>
-        </div>
-        <div>
-          <p className="text-[0.65rem] uppercase tracking-[0.16em] text-slate-500">Entry</p>
-          <p className="mt-1.5 text-slate-200">{formatCurrency(ticket.entry)}</p>
-        </div>
+      <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
+        <MetricTile label="Entry" value={formatCurrency(ticket.entry)} detail={`Stop ${formatCurrency(ticket.stopLoss)}`} />
+        <MetricTile label="Target" value={formatCurrency(ticket.takeProfit)} detail={`R/R ${formatRiskReward(ticket.riskReward)}`} />
+        <MetricTile label="Risk" value={formatCurrency(ticket.plannedLoss)} detail={`Potential ${formatCurrency(ticket.potentialGain)}`} />
       </div>
     </div>
   );
 }
 
-function TableBadge({
-  label,
-  tone = "default",
+function MemoryCard({
+  entry,
 }: {
-  label: string;
-  tone?: "default" | "teal" | "gold" | "red";
+  entry: PersistedJournalEntry;
 }) {
-  const classes = {
-    default: "border-white/10 bg-white/[0.04] text-slate-200",
-    gold: "border-amber-300/20 bg-amber-400/10 text-amber-100",
-    red: "border-red-400/20 bg-red-500/10 text-red-100",
-    teal: "border-cyan-300/18 bg-cyan-400/10 text-cyan-100",
-  };
-
   return (
-    <span className={`inline-flex rounded-[0.4rem] border px-2.5 py-[0.3rem] text-[0.68rem] font-medium leading-none ${classes[tone]}`}>
-      {label}
-    </span>
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.9rem] font-semibold text-white">{entry.asset}</p>
+          <p className="mt-0.5 text-[0.76rem] text-slate-400">{formatDateLabel(entry.date)}</p>
+        </div>
+        <StatusChip label={entry.status.toUpperCase()} />
+      </div>
+      <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{entry.aiReview}</p>
+    </div>
   );
 }
 
-function buildReminderTitle(entry: PersistedJournalEntry) {
-  if (entry.notes.trim()) {
-    return entry.notes.trim().slice(0, 54);
-  }
-
-  return `Review ${entry.asset} ${entry.status.toLowerCase()} workflow`;
-}
-
-function buildReminderDetail(entry: PersistedJournalEntry) {
-  if (entry.aiReview.trim()) {
-    return entry.aiReview.trim().slice(0, 88);
-  }
-
-  return "Update journal context and confirm whether execution followed the plan.";
-}
-
-function formatReminderTime(timestamp: string) {
-  return new Date(timestamp).toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 export default async function DashboardPage() {
-  const [watchlists, tradeTickets, journalEntries, assets, scannerResults, backtests, marketSnapshot] =
+  const [watchlists, tradeTickets, journalEntries, assets, backtests, marketSnapshot, aiOpportunities, marketEvents, confirmationChecks] =
     await Promise.all([
-    listWatchlists(),
-    listTradeTickets(),
-    listJournalEntries(),
-    listAssets(),
-    listScannerResults(),
-    listBacktests(),
-    getMarketSnapshot(),
-  ]);
+      listWatchlists(),
+      listTradeTickets(),
+      listJournalEntries(),
+      listAssets(),
+      listBacktests(),
+      getMarketSnapshot(),
+      listAiOpportunities(),
+      listMarketEvents(),
+      listConfirmationChecks(),
+    ]);
 
   const activeWatchlist = getDefaultPersistedWatchlist(watchlists);
-  const topWatchlist = (
+  const watchlistAssets = (
     activeWatchlist
       ? resolveAssetsForWatchlist(activeWatchlist.itemSymbols, assets)
       : assets
-  ).slice(0, 6);
-  const topSetups = scannerResults.slice(0, 6);
-  const backtestFocus = backtests[0] ?? null;
+  ).slice(0, 4);
+  const topOpportunities = aiOpportunities.slice(0, 3);
   const recentTickets = [...tradeTickets]
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
-    .slice(0, 5);
-  const reminderEntries = [...journalEntries]
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     .slice(0, 3);
+  const recentMemories = [...journalEntries]
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .slice(0, 2);
+  const researchFocus = backtests[0] ?? null;
+  const primaryOpportunity = topOpportunities[0] ?? null;
+  const topEvents = marketEvents.slice(0, 2);
+  const topConfirmations = confirmationChecks.slice(0, 2);
 
   return (
-    <div className="grid gap-1.25 xl:grid-cols-[minmax(0,1fr)_286px] 2xl:grid-cols-[minmax(0,1fr)_298px]">
-      <div className="panel-stack-5">
-        <Panel className="p-3 sm:p-3.5">
-          <SectionHeader
-            title="Watchlist Summary"
-            action={activeWatchlist ? activeWatchlist.name : "Edit Watchlist"}
-          />
-          <div className="mt-1.25 grid gap-1.25 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {topWatchlist.length > 0 ? (
-              topWatchlist.map((asset) => (
-                <WatchlistCard key={asset.symbol} asset={asset} />
-              ))
-            ) : (
-              <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300 md:col-span-2 xl:col-span-3 2xl:col-span-4">
-                Create or populate a watchlist in the assets workspace to surface it here.
-              </div>
-            )}
-          </div>
-        </Panel>
+    <div className="panel-stack-5">
+      <PageHeader
+        eyebrow="Command Center"
+        title="One clean read of the market"
+        description="Use this page to understand what the market is doing now, what the AI currently favours, what macro or news drivers matter, and what deserves execution next."
+        action={<ActionLink href="/scanner">Open AI Opportunities</ActionLink>}
+      />
 
-        <TopRankedSetupsPanel initialTradeTickets={tradeTickets} setups={topSetups} />
-
-        <div className="grid gap-1.25 xl:grid-cols-2">
-          <Panel className="p-2.5 sm:p-3">
-            <SectionHeader title="Recent Trade Tickets" />
-            <div className="mt-2.5 space-y-2 md:hidden">
-              {recentTickets.length > 0 ? (
-                recentTickets.map((ticket) => (
-                  <TicketMobileCard key={ticket.id} ticket={ticket} />
-                ))
-              ) : (
-                <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300">
-                  No persisted trade tickets yet.
-                </div>
-              )}
-            </div>
-            <div className="mt-2.5 hidden overflow-x-auto md:block">
-              <table className="data-table data-table--compact min-w-115">
-                <thead>
-                  <tr>
-                    <th>Asset</th>
-                    <th>Side</th>
-                    <th>Strategy</th>
-                    <th>Entry</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentTickets.length > 0 ? (
-                    recentTickets.map((ticket) => (
-                      <tr key={ticket.id}>
-                        <td className="font-semibold text-white">{ticket.symbol}</td>
-                        <td className={ticket.side === "Long" ? "text-emerald-300" : "text-red-300"}>
-                          {ticket.side}
-                        </td>
-                        <td className="text-slate-300">{ticket.strategy}</td>
-                        <td className="text-slate-200">{formatCurrency(ticket.entry)}</td>
-                        <td>
-                          <StatusChip label={ticket.status.toUpperCase()} />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="text-slate-400">
-                        No saved trade tickets yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="signal-outline-divider mt-2 flex justify-center pt-2.5">
-              <Link href="/trade-tickets" className="text-[0.84rem] font-medium text-slate-400 transition hover:text-white">
-                View all trade tickets
-              </Link>
-            </div>
-          </Panel>
-
-          <Panel className="p-2.5 sm:p-3">
-            <SectionHeader title="Journal Reminders / Follow-ups" />
-            <div className="mt-2.5 space-y-2">
-              {reminderEntries.length > 0 ? (
-                reminderEntries.map((entry, index) => (
-                  <div
-                    key={entry.id}
-                    className={`flex flex-col gap-2.5 rounded-[0.4rem] border px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between ${
-                      index === 0
-                        ? "signal-accent-surface"
-                        : "signal-surface-soft"
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      <span
-                        className={`mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[0.22rem] border text-[0.62rem] ${
-                          index === 0
-                            ? "border-cyan-300/25 bg-cyan-300 text-[#04101d]"
-                            : "border-white/12 bg-transparent"
-                        }`}
-                      >
-                        {index === 0 ? "OK" : ""}
-                      </span>
-                      <div>
-                        <p className="text-[0.84rem] font-medium text-white">
-                          {buildReminderTitle(entry)}
-                        </p>
-                        <p className="mt-0.5 text-[0.68rem] text-slate-500">
-                          {buildReminderDetail(entry)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right text-[0.68rem] text-slate-400">
-                      <p>{formatDateLabel(entry.date)}</p>
-                      <p className="mt-1">{formatReminderTime(entry.updatedAt)}</p>
-                    </div>
+      <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="panel-stack-5">
+          <Panel className="p-3 sm:p-3.5">
+            <SectionHeader title="Live Market State" />
+            <div className="mt-3 grid gap-[5px] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+              <div className="signal-surface rounded-[0.46rem] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="micro-label">Current Bias</p>
+                    <h2 className="mt-1.5 text-[1.18rem] font-semibold text-white">{marketSnapshot.state}</h2>
                   </div>
-                ))
-              ) : (
-                <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300">
-                  No persisted journal entries yet.
+                  <StatusChip label={marketSnapshot.breadthScore >= 60 ? "BULLISH" : marketSnapshot.breadthScore <= 40 ? "DEFENSIVE" : "BALANCED"} />
                 </div>
-              )}
-            </div>
-            <div className="signal-outline-divider mt-2 flex justify-center pt-2.5">
-              <Link href="/journal" className="text-[0.84rem] font-medium text-slate-400 transition hover:text-white">
-                View all journal entries
-              </Link>
-            </div>
-          </Panel>
-        </div>
-
-        <Panel className="overflow-hidden p-2.5 sm:p-3">
-          <SectionHeader title="Latest Backtest Results" />
-          {backtestFocus ? (
-          <div className="mt-3 grid gap-3 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[372px_minmax(0,1fr)]">
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h3 className="text-[1.15rem] font-semibold text-white sm:text-[1.3rem]">
-                    {backtestFocus.strategy}
-                  </h3>
-                  <span className="signal-accent-surface rounded-[0.4rem] px-2 py-0.5 text-[0.68rem] font-semibold text-cyan-100">
-                    v2.4
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-400">
-                  Signalibrium backtest focus is prioritising reproducibility,
-                  realistic drawdown, and regime-aware performance rather than hype
-                  metrics.
+                <p className="mt-3 text-[0.84rem] leading-5 text-slate-300">{marketSnapshot.description}</p>
+                <p className="mt-3 text-[0.74rem] text-slate-500">
+                  Last live sync {marketSnapshot.lastRefresh || "awaiting sync"}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-3">
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Total Return
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-emerald-300 sm:text-[1.45rem]">
-                    {formatPercent(backtestFocus.totalReturn, true)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Annualised
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-emerald-300 sm:text-[1.45rem]">
-                    {formatPercent(backtestFocus.annualisedReturn, true)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Win Rate
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-white sm:text-[1.45rem]">
-                    {formatPercent(backtestFocus.winRate)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Profit Factor
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-white sm:text-[1.45rem]">
-                    {backtestFocus.profitFactor.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Max Drawdown
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-red-300 sm:text-[1.45rem]">
-                    {formatPercent(backtestFocus.maxDrawdown)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Trades
-                  </p>
-                  <p className="mt-1 text-[1.28rem] font-semibold text-white sm:text-[1.45rem]">
-                    {backtestFocus.equityCurve.length}
-                  </p>
-                </div>
-              </div>
-
-              <div className="signal-outline-divider grid gap-3 pt-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Test Period
-                  </p>
-                  <p className="mt-1 text-[0.82rem] text-white">Jan 2025 - May 2026</p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Assets
-                  </p>
-                  <p className="mt-1 text-[0.82rem] text-white">Top AI & infra basket</p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Timeframe
-                  </p>
-                  <p className="mt-1 text-[0.82rem] text-white">{backtestFocus.timeframe}</p>
-                </div>
-                <div>
-                  <p className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-500">
-                    Capital
-                  </p>
-                  <p className="mt-1 text-[0.82rem] text-white">
-                    ${backtestFocus.startingCapital.toLocaleString("en-US")}
-                  </p>
-                </div>
+              <div className="grid gap-[5px] sm:grid-cols-2 lg:grid-cols-1">
+                <MetricTile
+                  label="Breadth"
+                  value={`${marketSnapshot.breadthScore}/100`}
+                  detail="Desk confidence in the current market backdrop"
+                  tone="text-cyan-200"
+                />
+                <MetricTile
+                  label="Watchlist Move"
+                  value={formatPercent(marketSnapshot.watchlistMove, true)}
+                  detail="Average live move across the active basket"
+                  tone={marketSnapshot.watchlistMove >= 0 ? "text-emerald-300" : "text-red-300"}
+                />
+                <MetricTile
+                  label="Risk Open"
+                  value={formatPercent(marketSnapshot.openRisk)}
+                  detail={`Desk equity ${formatCurrency(marketSnapshot.simulatedEquity)}`}
+                />
               </div>
             </div>
+          </Panel>
 
-            <div className="signal-surface rounded-[0.46rem] p-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span className="h-0.5 w-5 bg-cyan-300" />
-                    <span>Strategy Equity</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-0.5 w-5 bg-white/35" />
-                    <span>Benchmark</span>
-                  </div>
+          <Panel className="p-3 sm:p-3.5">
+            <SectionHeader
+              title="AI Recommended Orders"
+              action={<Link href="/scanner" className="text-[0.78rem] font-medium text-slate-400 transition hover:text-white">View full feed</Link>}
+            />
+            <div className="mt-3 grid gap-[5px] xl:grid-cols-3">
+              {topOpportunities.length > 0 ? (
+                topOpportunities.map((opportunity) => <RecommendationCard key={opportunity.id} opportunity={opportunity} />)
+              ) : (
+                <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300 xl:col-span-3">
+                  No AI-ranked opportunities are available yet.
                 </div>
-                <div className="flex gap-2 text-xs">
-                  {["1M", "3M", "6M", "1Y", "All"].map((range, index) => (
-                    <button
-                      key={range}
-                      className={`rounded-[0.4rem] border px-2.5 py-1 ${
-                        index === 4
-                          ? "signal-accent-surface text-cyan-100"
-                          : "signal-surface-soft text-slate-400"
-                      }`}
-                    >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="signal-surface signal-grid mt-3 rounded-[0.46rem] px-2.5 py-2.5">
-                <div className="relative h-47.5 sm:h-55">
-                  <div className="absolute inset-y-0 left-0 flex flex-col justify-between text-xs text-slate-500">
-                    <span>60%</span>
-                    <span>30%</span>
-                    <span>0%</span>
-                    <span>-30%</span>
-                  </div>
-                  <div className="ml-12 h-full">
-                    <Sparkline
-                      data={backtestFocus.equityCurve}
-                      className="absolute inset-0 h-full w-full"
-                    />
-                    <Sparkline
-                      data={benchmarkCurve}
-                      className="absolute inset-0 h-full w-full opacity-45"
-                      color="#A1A1AA"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-between gap-2 text-[0.64rem] text-slate-500 sm:text-[0.68rem]">
-                  <span>Jan 25</span>
-                  <span>Apr 25</span>
-                  <span>Jul 25</span>
-                  <span>Oct 25</span>
-                  <span>Jan 26</span>
-                  <span>May 26</span>
-                </div>
-              </div>
+              )}
             </div>
+          </Panel>
+
+          <div className="grid gap-[5px] xl:grid-cols-2">
+            <Panel className="p-3 sm:p-3.5">
+              <SectionHeader
+                title="Live Basket"
+                action={<Link href="/assets" className="text-[0.78rem] font-medium text-slate-400 transition hover:text-white">Open charts</Link>}
+              />
+              <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
+                {watchlistAssets.length > 0 ? (
+                  watchlistAssets.map((asset) => <AssetStripCard key={asset.symbol} asset={asset} />)
+                ) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300 sm:col-span-2">
+                    Add assets to the active watchlist to keep a tighter market view here.
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel className="p-3 sm:p-3.5">
+              <SectionHeader
+                title="Execution Queue"
+                action={<Link href="/trade-tickets" className="text-[0.78rem] font-medium text-slate-400 transition hover:text-white">Open execution</Link>}
+              />
+              <div className="mt-3 grid gap-[5px]">
+                {recentTickets.length > 0 ? (
+                  recentTickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)
+                ) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3 text-[0.84rem] text-slate-300">
+                    No execution plans are currently saved.
+                  </div>
+                )}
+              </div>
+            </Panel>
           </div>
-          ) : (
-            <div className="mt-3 rounded-[0.4rem] bg-white/3 p-3 text-[0.84rem] text-slate-300">
-              No persisted backtest records are available yet.
+        </div>
+
+        <div className="panel-stack-5 xl:sticky xl:top-[5.85rem] xl:self-start">
+          <Panel className="p-3 sm:p-3.5">
+            <SectionHeader title="Current Focus" />
+            <div className="mt-3">
+              <p className="micro-label">Best Next Idea</p>
+              <h2 className="mt-1.5 text-[1.08rem] font-semibold text-white">
+                {primaryOpportunity ? `${primaryOpportunity.symbol} / ${primaryOpportunity.side}` : "Awaiting next opportunity"}
+              </h2>
+              <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
+                {primaryOpportunity
+                  ? primaryOpportunity.summary
+                  : "When the intelligence layer ranks a new idea highly enough, it will appear here."}
+              </p>
             </div>
-          )}
-        </Panel>
-      </div>
 
-      <div className="panel-stack-5 xl:sticky xl:top-[6.85rem] xl:self-start">
-        <MarketProgressPanel
-          assets={topWatchlist.slice(0, 4)}
-          title="Market Progress"
-          description="Follow the active watchlist through a live path view with simple derived indicators."
-        />
-
-        <Panel className="p-2.5 sm:p-3">
-          <div className="flex items-center justify-between gap-3">
-            <SectionHeader title="Market Regime" />
-            <p className="text-xs text-slate-500">{marketSnapshot.lastRefresh}</p>
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-[1.2rem] font-semibold leading-tight text-white sm:text-[1.35rem]">
-                {marketSnapshot.state}
-              </h3>
-              <TableBadge
-                label={
-                  marketSnapshot.breadthScore >= 67
-                    ? "Bullish"
-                    : marketSnapshot.breadthScore <= 38
-                      ? "Defensive"
-                      : "Balanced"
-                }
-                tone={
-                  marketSnapshot.breadthScore >= 67
-                    ? "teal"
-                    : marketSnapshot.breadthScore <= 38
-                      ? "red"
-                      : "default"
-                }
+            <div className="mt-3 grid gap-[5px]">
+              <MetricTile
+                label="Ready Setups"
+                value={String(marketSnapshot.tradeableSetups)}
+                detail="Ideas currently aligned with the desk rules"
+                tone="text-emerald-300"
+              />
+              <MetricTile
+                label="Watch Setups"
+                value={String(marketSnapshot.blockedSetups)}
+                detail="Ideas still waiting for confirmation"
               />
             </div>
-            <p className="mt-2 text-[0.82rem] leading-5 text-slate-400">
-              {marketSnapshot.description}
-            </p>
-            <p className="mt-3 text-[0.82rem] text-slate-400">AI Regime Score</p>
-            <div className="mt-1.5 flex items-end gap-2">
-              <span className="text-[2rem] font-semibold tracking-tight text-cyan-200 sm:text-[2.35rem]">
-                {marketSnapshot.breadthScore}
-              </span>
-              <span className="pb-1.5 text-[0.84rem] text-slate-400">/100</span>
+          </Panel>
+
+          <Panel className="p-3 sm:p-3.5">
+            <SectionHeader
+              title="News And Drivers"
+              action={<Link href="/backtesting-lab" className="text-[0.78rem] font-medium text-slate-400 transition hover:text-white">Open research</Link>}
+            />
+            <div className="mt-3 grid gap-[5px]">
+              {topEvents.map((event) => (
+                <MarketEventCard key={event.id} event={event} />
+              ))}
             </div>
-            <div className="mt-3 h-2 rounded-full bg-white/8">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#00E5FF_0%,#009BFF_50%,#256BFF_100%)]"
-                style={{ width: `${marketSnapshot.breadthScore}%` }}
-              />
+          </Panel>
+
+          <Panel className="p-3 sm:p-3.5">
+            <SectionHeader title="Confirmation Memory" />
+            <div className="mt-3 grid gap-[5px]">
+              {topConfirmations.map((check) => (
+                <ConfirmationCard key={check.id} check={check} />
+              ))}
             </div>
-          </div>
-
-          <div className="signal-outline-divider mt-4 space-y-3 pt-4">
-            {regimeSignals.map((signal) => (
-              <div key={signal.label} className="flex items-center justify-between gap-4">
-                <p className="text-[0.84rem] text-slate-300">{signal.label}</p>
-                <p className={`text-[0.84rem] font-semibold ${signal.tone}`}>{signal.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <p className="signal-outline-divider mt-4 pt-3 text-center text-[0.68rem] text-slate-500">
-            Regime analysis powered by Signalibrium AI
-          </p>
-        </Panel>
-
-        <Panel className="p-2.5 sm:p-3">
-          <div className="flex items-center justify-between gap-3">
-            <SectionHeader title="Risk Warnings" />
-            <span className="signal-warning-surface rounded-full px-2.5 py-0.5 text-[0.68rem] font-semibold text-amber-100">
-              {riskWarnings.length}
-            </span>
-          </div>
-
-          <div className="mt-2.5 space-y-2">
-            {riskWarnings.map((warning, index) => (
-              <div
-                key={warning}
-                className="signal-warning-surface rounded-[0.46rem] p-3"
-              >
-                <div className="flex items-start gap-2.5">
-                  <div className="signal-warning-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base text-amber-200">
-                    {index === 0 ? "!" : index === 1 ? "*" : "~"}
-                  </div>
-                  <div>
-                    <p className="text-[0.84rem] font-semibold text-amber-100">{alertTitles[index]}</p>
-                    <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">{warning}</p>
-                  </div>
+            {researchFocus ? (
+              <div className="mt-3 signal-surface-soft rounded-[0.4rem] p-3">
+                <p className="text-[0.9rem] font-semibold text-white">{researchFocus.strategy}</p>
+                <p className="mt-1 text-[0.76rem] text-slate-400">{researchFocus.asset} · {researchFocus.timeframe}</p>
+                <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
+                  <MetricTile label="Return" value={formatPercent(researchFocus.totalReturn)} detail={`Win rate ${formatPercent(researchFocus.winRate)}`} tone="text-emerald-300" />
+                  <MetricTile label="Drawdown" value={formatPercent(researchFocus.maxDrawdown)} detail={`PF ${researchFocus.profitFactor.toFixed(2)}`} tone="text-red-300" />
                 </div>
               </div>
+            ) : null}
+            {recentMemories.map((entry) => (
+              <div key={entry.id} className="mt-3">
+                <MemoryCard entry={entry} />
+              </div>
             ))}
-          </div>
-
-          <div className="signal-outline-divider mt-2.5 flex justify-center pt-3">
-            <Link href="/risk-lab" className="text-[0.84rem] font-medium text-slate-400 transition hover:text-white">
-              View all risk alerts
-            </Link>
-          </div>
-        </Panel>
+          </Panel>
+        </div>
       </div>
     </div>
   );

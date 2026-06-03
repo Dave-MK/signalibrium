@@ -12,15 +12,21 @@ import {
 } from "../_lib/reference-data";
 import { createTradeTicket } from "../_lib/workspace-api";
 import { ActionLink, PageHeader, Panel, StatusChip } from "../_components/ui";
-import { LabelWithTip } from "../_components/help-tip";
 
-const filterPills = [
-  "Crypto + ETF focus",
-  "4H and 1D",
-  "Minimum score 75",
-  "Tradeable only",
-  "Protected sizing enabled",
-];
+function SetupEvidence({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+      <p className="micro-label">{label}</p>
+      <p className="mt-1.5 text-[0.84rem] font-semibold text-white">{value}</p>
+    </div>
+  );
+}
 
 export default function ScannerPageClient({
   initialTradeTickets,
@@ -60,174 +66,103 @@ export default function ScannerPageClient({
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Scanner"
-        title="Rank setups before emotion gets a vote"
-        description="This shortlist mirrors the handover requirements: asset, strategy, score, risk, regime, entry zone, stop-loss, take-profit target, risk/reward, liquidity, and tradeability all sit on one screen."
-        action={<ActionLink href="/trade-tickets">Prepared Tickets</ActionLink>}
+        eyebrow="AI Opportunities"
+        title="Only show the trades worth acting on"
+        description="This feed is the filtered output of the desk. Every card should answer the same question: is there enough structure, context, and confirmation to justify creating an execution ticket right now?"
+        action={<ActionLink href="/trade-tickets">Open Execution</ActionLink>}
       />
 
       <Panel className="p-3 sm:p-3.5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="micro-label">Filter State</p>
-            <div className="mt-2.5 flex flex-wrap gap-[5px]">
-              {filterPills.map((pill) => (
-                <span
-                  key={pill}
-                  className="signal-surface-soft rounded-full px-3 py-1 text-[0.82rem] text-slate-200"
-                >
-                  {pill}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="signal-surface-soft rounded-[0.4rem] px-3 py-2.5">
-            <p className="micro-label">Persisted Ticket Flow</p>
-            <p className="mt-1.5 text-[1rem] font-semibold text-white">
-              {tradeTickets.length} saved tickets
+        <div className="grid gap-[5px] lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="signal-surface rounded-[0.46rem] p-3">
+            <p className="micro-label">Feed Rules</p>
+            <p className="mt-1.5 text-[0.92rem] font-semibold text-white">
+              Tradeable setups first, watchlist-quality ideas second.
             </p>
+            <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
+              The desk is already filtering for score, structure, timing, and current regime alignment. This page should feel like a shortlist, not a spreadsheet.
+            </p>
+          </div>
+
+          <div className="signal-surface-soft rounded-[0.4rem] p-3">
+            <p className="micro-label">Execution Handoff</p>
+            <p className="mt-1.5 text-[1.15rem] font-semibold text-white">{tradeTickets.length}</p>
             <p className="mt-1 text-[0.8rem] text-slate-400">
-              Scanner actions now write directly into the workspace store.
+              Execution tickets created from the opportunity feed.
             </p>
           </div>
         </div>
         {error ? <p className="mt-3 text-[0.82rem] text-amber-200">{error}</p> : null}
       </Panel>
 
-      <Panel className="p-3 sm:p-3.5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="micro-label">Scanner Results</p>
-            <h2 className="mt-1.5 text-lg font-semibold text-white sm:text-[1.15rem]">
-              Current ranked opportunities
-            </h2>
-          </div>
-          <StatusChip label="BACKTESTED" />
-        </div>
+      <div className="grid gap-[5px]">
+        {scannerResults.map((setup) => {
+          const linkedTicket = getLinkedTicket(setup.id);
 
-        <div className="mt-3 overflow-x-auto">
-          <table className="data-table data-table--compact min-w-[1080px]">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Strategy</th>
-                <th>
-                  <LabelWithTip
-                    label="Score"
-                    tooltip="Internal setup rank score combining structure, timing, and context."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="Risk"
-                    tooltip="Internal risk score. Lower is calmer; higher means more unstable structure."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="Regime"
-                    tooltip="The current market backdrop the setup is being judged against."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="Entry"
-                    tooltip="The preferred entry zone for the setup."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="SL"
-                    tooltip="Stop-loss. The invalidation point that protects downside."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="TP"
-                    tooltip="Take-profit. The first planned target area for the setup."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="R/R"
-                    tooltip="Risk/reward ratio: projected gain divided by planned downside."
-                  />
-                </th>
-                <th>
-                  <LabelWithTip
-                    label="Liquidity"
-                    tooltip="How easy it should be to enter and exit without large slippage."
-                  />
-                </th>
-                <th>Status</th>
-                <th>
-                  <LabelWithTip
-                    label="Flow"
-                    tooltip="Create or open a trade ticket directly from the ranked setup."
-                  />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {scannerResults.map((setup) => {
-                const linkedTicket = getLinkedTicket(setup.id);
+          return (
+            <Panel key={setup.id} className="p-3 sm:p-3.5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-[1rem] font-semibold text-white">{setup.symbol}</h2>
+                    <StatusChip label={setup.tradeability} />
+                    <StatusChip label={setup.regime.toUpperCase()} />
+                  </div>
+                  <p className="mt-1 text-[0.84rem] text-slate-400">
+                    {setup.strategy} · {setup.timeframe} · {setup.assetClass}
+                  </p>
+                  <p className="mt-3 max-w-3xl text-[0.84rem] leading-5 text-slate-300">
+                    {setup.thesis}
+                  </p>
+                </div>
 
-                return (
-                  <tr key={setup.id}>
-                    <td>
-                      <Link
-                        href={`/assets/${setup.symbol}`}
-                        className="font-semibold text-white hover:text-cyan-200"
-                      >
-                        {setup.symbol}
-                      </Link>
-                      <p className="mt-0.5 text-[0.82rem] text-slate-400">{setup.assetClass}</p>
-                    </td>
-                    <td className="text-slate-200">{setup.strategy}</td>
-                    <td className="font-semibold text-white">{setup.score}</td>
-                    <td className="text-slate-300">{setup.riskScore}/100</td>
-                    <td>
-                      <StatusChip label={setup.regime.toUpperCase()} />
-                    </td>
-                    <td className="text-slate-300">{setup.entryZone}</td>
-                    <td className="text-slate-300">{setup.stopLoss}</td>
-                    <td className="text-slate-300">{setup.takeProfit}</td>
-                    <td className="text-slate-300">
-                      {formatRiskReward(setup.riskReward)}
-                    </td>
-                    <td className="text-slate-300">{setup.liquidityStatus}</td>
-                    <td>
-                      <StatusChip label={setup.tradeability} />
-                    </td>
-                    <td>
-                      {linkedTicket ? (
-                        <div className="space-y-2">
-                          <StatusChip label={linkedTicket.status.toUpperCase()} />
-                          <Link
-                            href={`/trade-tickets/${linkedTicket.id}`}
-                            className="inline-flex rounded-[0.4rem] bg-white/[0.04] px-2.25 py-1 text-[0.7rem] font-semibold text-white"
-                          >
-                            Open
-                          </Link>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void handlePrepareTicket(setup)}
-                          disabled={isSaving}
-                          className="signal-button rounded-[0.46rem] px-2.5 py-1.5 text-[0.72rem] font-semibold disabled:opacity-50"
-                        >
-                          Prepare Ticket
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+                <div className="signal-surface-soft rounded-[0.4rem] p-3 lg:w-48">
+                  <p className="micro-label">Desk Score</p>
+                  <p className="mt-1.5 text-[1.2rem] font-semibold text-cyan-200">{setup.score}</p>
+                  <p className="mt-1 text-[0.76rem] text-slate-400">
+                    Risk score {setup.riskScore}/100
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-5">
+                <SetupEvidence label="Entry" value={setup.entryZone} />
+                <SetupEvidence label="Stop Loss" value={setup.stopLoss} />
+                <SetupEvidence label="Take Profit" value={setup.takeProfit} />
+                <SetupEvidence label="Risk / Reward" value={formatRiskReward(setup.riskReward)} />
+                <SetupEvidence label="Liquidity" value={setup.liquidityStatus} />
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-[5px]">
+                <Link
+                  href={`/assets/${setup.symbol}`}
+                  className="signal-surface-soft rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold text-white"
+                >
+                  Open Chart
+                </Link>
+
+                {linkedTicket ? (
+                  <Link
+                    href={`/trade-tickets/${linkedTicket.id}`}
+                    className="signal-accent-surface rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold text-white"
+                  >
+                    Open Execution Ticket
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handlePrepareTicket(setup)}
+                    disabled={isSaving}
+                    className="signal-button rounded-[0.46rem] px-3 py-2 text-[0.78rem] font-semibold disabled:opacity-50"
+                  >
+                    Create Ticket
+                  </button>
+                )}
+              </div>
+            </Panel>
+          );
+        })}
+      </div>
     </div>
   );
 }

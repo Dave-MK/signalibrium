@@ -15,7 +15,7 @@ export default function Loading() {
           <div className="signal-button h-full w-1/2 animate-pulse rounded-full" />
         </div>
         <p className="text-sm text-slate-300">
-          Loading trading intelligence workspace...
+          Loading your AI trading desk...
         </p>
       </div>
     </div>

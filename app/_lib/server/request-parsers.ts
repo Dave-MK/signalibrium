@@ -1,7 +1,10 @@
 import type {
+  PersistedAiOpportunity,
   PersistedAssetRecord,
   PersistedBacktestRecord,
+  PersistedConfirmationCheck,
   PersistedJournalEntry,
+  PersistedMarketEvent,
   PersistedMarketSnapshot,
   PersistedScannerResult,
   PersistedTradeTicket,
@@ -78,6 +81,24 @@ function asGateResults(value: unknown) {
   });
 }
 
+function asConfirmationRows(value: unknown) {
+  if (!Array.isArray(value)) {
+    throw new Error("Invalid checks");
+  }
+
+  return value.map((item) => {
+    if (!isRecord(item)) {
+      throw new Error("Invalid checks");
+    }
+
+    return {
+      label: asString(item.label, "checks.label"),
+      status: asLiteral(item.status, "checks.status", ["Confirmed", "Mixed", "Rejected"] as const),
+      detail: asString(item.detail, "checks.detail"),
+    };
+  });
+}
+
 function asNumberArray(value: unknown, field: string) {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "number" || Number.isNaN(item))) {
     throw new Error(`Invalid ${field}`);
@@ -134,7 +155,9 @@ export function parseCreateTradeTicketInput(body: unknown) {
     symbol: asString(body.symbol, "symbol").toUpperCase(),
     strategy: asString(body.strategy, "strategy"),
     side: asLiteral(body.side, "side", ["Long", "Short"] as const),
-    orderType: asLiteral(body.orderType, "orderType", ["Limit", "Market"] as const),
+    orderType: asLiteral(body.orderType, "orderType", ["Limit", "Market", "Stop Entry"] as const),
+    executionMode: asLiteral(body.executionMode, "executionMode", ["Paper", "IG Demo", "IG Live"] as const),
+    timeInForce: asLiteral(body.timeInForce, "timeInForce", ["DAY", "GTC", "IOC"] as const),
     entry: asNumber(body.entry, "entry"),
     stopLoss: asNumber(body.stopLoss, "stopLoss"),
     takeProfit: asNumber(body.takeProfit, "takeProfit"),
@@ -146,8 +169,33 @@ export function parseCreateTradeTicketInput(body: unknown) {
     status: asLiteral(
       body.status,
       "status",
-      ["Prepared", "Simulated Open", "Closed"] as const,
+      ["Draft", "Ready", "Submitted", "Working", "Filled", "Partially Closed", "Closed", "Cancelled", "Rejected"] as const,
     ),
+    brokerStatus: asLiteral(
+      body.brokerStatus,
+      "brokerStatus",
+      ["Not Sent", "Pending", "Working", "Filled", "Partially Closed", "Closed", "Cancelled", "Rejected"] as const,
+    ),
+    brokerReference: asNullableString(body.brokerReference),
+    submittedAt: asNullableString(body.submittedAt),
+    filledAt: asNullableString(body.filledAt),
+    closedAt: asNullableString(body.closedAt),
+    executedEntry:
+      body.executedEntry === null || body.executedEntry === undefined
+        ? null
+        : asNumber(body.executedEntry, "executedEntry"),
+    executedQuantity:
+      body.executedQuantity === null || body.executedQuantity === undefined
+        ? null
+        : asNumber(body.executedQuantity, "executedQuantity"),
+    realizedPnl:
+      body.realizedPnl === null || body.realizedPnl === undefined
+        ? null
+        : asNumber(body.realizedPnl, "realizedPnl"),
+    unrealizedPnl:
+      body.unrealizedPnl === null || body.unrealizedPnl === undefined
+        ? null
+        : asNumber(body.unrealizedPnl, "unrealizedPnl"),
     rationale: asString(body.rationale, "rationale"),
     gateResults: asGateResults(body.gateResults),
     sourceAssetSymbol: asNullableString(body.sourceAssetSymbol ?? body.symbol),
@@ -167,7 +215,13 @@ export function parseUpdateTradeTicketInput(body: unknown) {
   if ("strategy" in body) next.strategy = asString(body.strategy, "strategy");
   if ("side" in body) next.side = asLiteral(body.side, "side", ["Long", "Short"] as const);
   if ("orderType" in body) {
-    next.orderType = asLiteral(body.orderType, "orderType", ["Limit", "Market"] as const);
+    next.orderType = asLiteral(body.orderType, "orderType", ["Limit", "Market", "Stop Entry"] as const);
+  }
+  if ("executionMode" in body) {
+    next.executionMode = asLiteral(body.executionMode, "executionMode", ["Paper", "IG Demo", "IG Live"] as const);
+  }
+  if ("timeInForce" in body) {
+    next.timeInForce = asLiteral(body.timeInForce, "timeInForce", ["DAY", "GTC", "IOC"] as const);
   }
   if ("entry" in body) next.entry = asNumber(body.entry, "entry");
   if ("stopLoss" in body) next.stopLoss = asNumber(body.stopLoss, "stopLoss");
@@ -181,8 +235,31 @@ export function parseUpdateTradeTicketInput(body: unknown) {
     next.status = asLiteral(
       body.status,
       "status",
-      ["Prepared", "Simulated Open", "Closed"] as const,
+      ["Draft", "Ready", "Submitted", "Working", "Filled", "Partially Closed", "Closed", "Cancelled", "Rejected"] as const,
     );
+  }
+  if ("brokerStatus" in body) {
+    next.brokerStatus = asLiteral(
+      body.brokerStatus,
+      "brokerStatus",
+      ["Not Sent", "Pending", "Working", "Filled", "Partially Closed", "Closed", "Cancelled", "Rejected"] as const,
+    );
+  }
+  if ("brokerReference" in body) next.brokerReference = asNullableString(body.brokerReference);
+  if ("submittedAt" in body) next.submittedAt = asNullableString(body.submittedAt);
+  if ("filledAt" in body) next.filledAt = asNullableString(body.filledAt);
+  if ("closedAt" in body) next.closedAt = asNullableString(body.closedAt);
+  if ("executedEntry" in body) {
+    next.executedEntry = body.executedEntry === null ? null : asNumber(body.executedEntry, "executedEntry");
+  }
+  if ("executedQuantity" in body) {
+    next.executedQuantity = body.executedQuantity === null ? null : asNumber(body.executedQuantity, "executedQuantity");
+  }
+  if ("realizedPnl" in body) {
+    next.realizedPnl = body.realizedPnl === null ? null : asNumber(body.realizedPnl, "realizedPnl");
+  }
+  if ("unrealizedPnl" in body) {
+    next.unrealizedPnl = body.unrealizedPnl === null ? null : asNumber(body.unrealizedPnl, "unrealizedPnl");
   }
   if ("rationale" in body) next.rationale = asString(body.rationale, "rationale");
   if ("gateResults" in body) next.gateResults = asGateResults(body.gateResults);
@@ -459,4 +536,67 @@ export function parseUpdateMarketSnapshotInput(body: unknown) {
   if ("journalReminder" in body) next.journalReminder = asString(body.journalReminder, "journalReminder");
 
   return next;
+}
+
+export function parseCreateMarketEventInput(body: unknown) {
+  if (!isRecord(body)) {
+    throw new Error("Invalid body");
+  }
+
+  return {
+    id: asString(body.id, "id"),
+    title: asString(body.title, "title"),
+    summary: asString(body.summary, "summary"),
+    impact: asLiteral(body.impact, "impact", ["High", "Medium", "Low"] as const),
+    bias: asLiteral(body.bias, "bias", ["Bullish", "Bearish", "Neutral", "Mixed"] as const),
+    scope: asLiteral(body.scope, "scope", ["Macro", "Sector", "Asset", "Liquidity"] as const),
+    relatedSymbols: body.relatedSymbols ? asStringArray(body.relatedSymbols, "relatedSymbols") : [],
+    startsAt: asString(body.startsAt, "startsAt"),
+    sourceLabel: asString(body.sourceLabel, "sourceLabel"),
+    sourceType: asLiteral(body.sourceType, "sourceType", ["News", "Calendar", "Policy", "Flow"] as const),
+    status: asLiteral(body.status, "status", ["Live", "Upcoming", "Recent"] as const),
+  } satisfies Omit<PersistedMarketEvent, "createdAt" | "updatedAt">;
+}
+
+export function parseCreateConfirmationCheckInput(body: unknown) {
+  if (!isRecord(body)) {
+    throw new Error("Invalid body");
+  }
+
+  return {
+    id: asString(body.id, "id"),
+    symbol: asString(body.symbol, "symbol").toUpperCase(),
+    stance: asLiteral(body.stance, "stance", ["Long", "Short", "Neutral"] as const),
+    summary: asString(body.summary, "summary"),
+    score: asNumber(body.score, "score"),
+    overallStatus: asLiteral(body.overallStatus, "overallStatus", ["Confirmed", "Mixed", "Rejected"] as const),
+    linkedScannerResultId: asNullableString(body.linkedScannerResultId),
+    checks: asConfirmationRows(body.checks),
+  } satisfies Omit<PersistedConfirmationCheck, "createdAt" | "updatedAt">;
+}
+
+export function parseCreateAiOpportunityInput(body: unknown) {
+  if (!isRecord(body)) {
+    throw new Error("Invalid body");
+  }
+
+  return {
+    id: asString(body.id, "id"),
+    symbol: asString(body.symbol, "symbol").toUpperCase(),
+    side: asLiteral(body.side, "side", ["Long", "Short"] as const),
+    title: asString(body.title, "title"),
+    summary: asString(body.summary, "summary"),
+    confidence: asNumber(body.confidence, "confidence"),
+    action: asLiteral(body.action, "action", ["Buy", "Sell", "Wait"] as const),
+    entryPlan: asString(body.entryPlan, "entryPlan"),
+    stopPlan: asString(body.stopPlan, "stopPlan"),
+    targetPlan: asString(body.targetPlan, "targetPlan"),
+    expectedMove: asString(body.expectedMove, "expectedMove"),
+    invalidation: asString(body.invalidation, "invalidation"),
+    marketContext: asString(body.marketContext, "marketContext"),
+    newsContext: asString(body.newsContext, "newsContext"),
+    confirmationContext: asString(body.confirmationContext, "confirmationContext"),
+    linkedScannerResultId: asNullableString(body.linkedScannerResultId),
+    linkedBacktestId: asNullableString(body.linkedBacktestId),
+  } satisfies Omit<PersistedAiOpportunity, "createdAt" | "updatedAt">;
 }

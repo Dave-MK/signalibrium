@@ -19,19 +19,19 @@ export default async function RiskLabPage() {
     return (
       <div className="panel-stack-5">
         <PageHeader
-          eyebrow="Risk Lab"
-          title="Risk sizing before ticket approval"
-          description="The lab needs at least one persisted trade ticket before it can compute position sizing and gate results."
+          eyebrow="Risk Command"
+          title="Risk sizing before any trade earns approval"
+          description="Risk command needs at least one execution ticket before it can compute sizing and gate checks."
         />
         <Panel className="p-3 sm:p-3.5">
           <p className="text-[0.84rem] text-slate-300">
-            No saved trade tickets are available yet.
+            No execution tickets are available yet.
           </p>
           <Link
             href="/trade-tickets"
             className="signal-button mt-3 inline-flex rounded-[0.46rem] px-3.5 py-2 text-[0.82rem] font-semibold"
           >
-            Create A Trade Ticket
+            Create An Execution Ticket
           </Link>
         </Panel>
       </div>
@@ -41,9 +41,9 @@ export default async function RiskLabPage() {
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Risk Lab"
-        title="Risk sizing before ticket approval"
-        description="The V1 risk surface focuses on protected decision quality: account size, risk per trade, entry, stop-loss, take-profit, position size, max planned loss, potential gain, and risk gate warnings."
+        eyebrow="Risk Command"
+        title="Risk sizing before any trade earns approval"
+        description="This surface keeps the desk honest: account size, risk budget, invalidation, target, size, planned loss, potential gain, and gate warnings all have to line up."
       />
 
       <Panel className="p-3 sm:p-3.5">
@@ -54,7 +54,7 @@ export default async function RiskLabPage() {
               {focus.symbol} / {focus.strategy}
             </h2>
             <p className="mt-0.5 text-[0.84rem] text-slate-400">
-              Risk lab is now reading from persisted trade tickets.
+              Risk command is reading from your current execution tickets.
             </p>
           </div>
           <StatusChip label={focus.status.toUpperCase()} />
@@ -68,8 +68,8 @@ export default async function RiskLabPage() {
             <KeyValue
               label="Account Size"
               value={formatCurrency(accountSize)}
-              detail="Prototype capital base"
-              tooltip="The notional account value used to size simulated trades in the workspace."
+              detail="Desk capital base"
+              tooltip="The notional account value used to size simulated trades in your desk."
             />
             <KeyValue
               label="Risk Per Trade"
@@ -111,7 +111,7 @@ export default async function RiskLabPage() {
         </Panel>
 
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Decision Layer</p>
+          <p className="micro-label">Risk Read</p>
           <div className="mt-3 panel-stack-5">
             <div className="signal-accent-surface rounded-[0.4rem] p-3">
               <p className="text-[0.9rem] font-semibold text-white">
@@ -146,7 +146,7 @@ export default async function RiskLabPage() {
           <div>
             <p className="micro-label">Risk Gate Checks</p>
             <h2 className="mt-1.5 text-lg font-semibold text-white sm:text-[1.15rem]">
-              Ticket approval logic
+              Approval logic for the current ticket
             </h2>
           </div>
           <StatusChip label="WATCH" />

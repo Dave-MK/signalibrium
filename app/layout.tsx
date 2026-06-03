@@ -5,9 +5,9 @@ import { AppShell } from "./_components/app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Signalibrium",
+  title: "Signalibrium | Personal AI Trading Desk",
   description:
-    "Private AI trading intelligence workstation for setups, backtests, risk control, and protected trade planning.",
+    "Personal AI trading platform for market briefings, watchlists, setup ranking, protected execution planning, and review memory.",
 };
 
 export default async function RootLayout({

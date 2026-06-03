@@ -8,6 +8,7 @@ The app has a shared server-side persistence layer that:
 
 - stores workspace data in a local JSON file
 - exposes route handlers for watchlists, trade tickets, journal entries, assets, scanner results, backtests, and market snapshot
+- exposes route handlers for market events, confirmation checks, and AI opportunities
 - keeps repository boundaries clean enough to swap in a real database later
 - powers live product flows across the dashboard, shell, assets, asset detail, scanner, trade tickets, journal, risk lab, and backtesting lab
 
@@ -35,6 +36,9 @@ The persistence layer is organized around server repositories:
 - `scanner-results`
 - `backtests`
 - `market-snapshot`
+- `market-events`
+- `confirmation-checks`
+- `ai-opportunities`
 
 Those repositories are used by route handlers and server-rendered pages instead of letting UI code talk to the file store directly.
 
@@ -55,6 +59,9 @@ Implemented route handlers:
 - `GET/POST /api/backtests`
 - `GET/PUT/DELETE /api/backtests/[backtestId]`
 - `GET/PUT /api/market-snapshot`
+- `GET/POST /api/market-events`
+- `GET/POST /api/confirmation-checks`
+- `GET/POST /api/ai-opportunities`
 
 Request parsing and validation live in `app/_lib/server/request-parsers.ts`.
 
@@ -91,7 +98,7 @@ Request parsing and validation live in `app/_lib/server/request-parsers.ts`.
 - `/assets` can trigger a manual provider sync through `POST /api/market-data/sync`
 - `/assets/[symbol]` now combines persisted asset, scanner result, backtest, watchlist, ticket, and journal data for symbol-level workspace context
 - the app shell reads the persisted market snapshot and top persisted scanner result in its header/sidebar surfaces
-- live sync currently uses Twelve Data to refresh prices and short trailing series for the MVP watchlist basket
+- live sync now uses IG market snapshots for price refreshes and maintains rolling sparkline context locally between sync cycles
 - internal composite symbols (`AINF`, `NUKZ`, `TKNX`) use listed ETF proxies during sync and return warnings in the sync summary
 
 ### Backtests
@@ -99,6 +106,12 @@ Request parsing and validation live in `app/_lib/server/request-parsers.ts`.
 - `/backtesting-lab` now reads persisted backtest records
 - the dashboard backtest panel is sourced from persisted backtest data
 - backtest records now carry timeframe, date range, capital assumptions, cost assumptions, AI read, and linkage back to scanner results
+
+### Intelligence layer
+
+- the command center now reads persisted `aiOpportunities`, `marketEvents`, and `confirmationChecks`
+- the research workspace now combines backtests, live drivers, confirmation memory, and AI recommendations
+- the new intelligence entities are persisted in the same workspace document, so they can later be swapped to a real database without changing the page contracts first
 
 ## Current Schema
 
@@ -192,14 +205,75 @@ Implemented.
 - `createdAt`
 - `updatedAt`
 
+#### `marketEvents`
+
+Implemented.
+
+- `id`
+- `title`
+- `summary`
+- `impact`
+- `bias`
+- `scope`
+- `relatedSymbols`
+- `startsAt`
+- `sourceLabel`
+- `sourceType`
+- `status`
+- `createdAt`
+- `updatedAt`
+
+#### `confirmationChecks`
+
+Implemented.
+
+- `id`
+- `symbol`
+- `stance`
+- `summary`
+- `score`
+- `overallStatus`
+- `linkedScannerResultId`
+- `checks[]`
+- `createdAt`
+- `updatedAt`
+
+#### `aiOpportunities`
+
+Implemented.
+
+- `id`
+- `symbol`
+- `side`
+- `title`
+- `summary`
+- `confidence`
+- `action`
+- `entryPlan`
+- `stopPlan`
+- `targetPlan`
+- `expectedMove`
+- `invalidation`
+- `marketContext`
+- `newsContext`
+- `confirmationContext`
+- `linkedScannerResultId`
+- `linkedBacktestId`
+- `createdAt`
+- `updatedAt`
+
 ### External ingestion layer
 
 Implemented for MVP manual sync.
 
-- provider: `twelvedata`
+- provider: `ig`
 - env:
-  - `TWELVE_DATA_API_KEY`
-  - `SIGNALIBRIUM_MARKET_DATA_PROVIDER=twelvedata`
+  - `SIGNALIBRIUM_MARKET_DATA_PROVIDER=ig`
+  - `SIGNALIBRIUM_IG_ENVIRONMENT=demo|live`
+  - `SIGNALIBRIUM_IG_API_KEY`
+  - `SIGNALIBRIUM_IG_IDENTIFIER`
+  - `SIGNALIBRIUM_IG_PASSWORD`
+  - `SIGNALIBRIUM_IG_ACCOUNT_ID` (optional but recommended)
 - live sync route:
   - `POST /api/market-data/sync`
 - sync summary returns:
@@ -235,9 +309,15 @@ app/
     journal-entries/
       route.ts
       [entryId]/route.ts
+    market-events/
+      route.ts
     market-data/
       sync/route.ts
     market-snapshot/
+      route.ts
+    confirmation-checks/
+      route.ts
+    ai-opportunities/
       route.ts
     scanner-results/
       route.ts
@@ -273,11 +353,14 @@ app/
         asset-catalog.ts
         provider-types.ts
         sync-market-data.ts
-        twelve-data.ts
+        ig.ts
       repositories/
+        ai-opportunities.ts
         assets.ts
         backtests.ts
+        confirmation-checks.ts
         journal-entries.ts
+        market-events.ts
         market-snapshot.ts
         scanner-results.ts
         trade-tickets.ts
@@ -304,26 +387,63 @@ The file store is a single JSON document containing:
 - `scannerResults`
 - `backtests`
 - `marketSnapshot`
+- `marketEvents`
+- `confirmationChecks`
+- `aiOpportunities`
 - `schemaVersion`
 - `updatedAt`
 
-The store is now on `schemaVersion: 2`, and older workspace files are normalized forward automatically so the newer entity arrays can be introduced without losing saved watchlists, tickets, or journal entries.
+The store is now on `schemaVersion: 4`, and older workspace files are normalized forward automatically so the newer entity arrays can be introduced without losing saved watchlists, tickets, journal entries, or prior market data.
 
 ## External Provider Notes
 
 The current ingestion setup is intentionally conservative:
 
-- it refreshes live prices and a short trailing series for each persisted asset
+- it refreshes live prices from IG market snapshots for each persisted asset
+- it avoids frequent historical-price pulls during routine syncs so the MVP stays inside IG historical-data quotas
+- it seeds full candlestick history on demand for chart views, then live-updates the active candle from fresh market snapshots
 - it updates `assets` and recomputes a persisted `marketSnapshot`
 - it leaves scanner ranking logic and backtest computation as persisted product logic for now
 
-Twelve Data’s official docs indicate:
+IG Labs official docs indicate:
 
-- the `quote` endpoint provides the latest price and percent change for a symbol
-- the `time_series` endpoint provides historical bars for charting and lightweight signal context
-- reference datasets such as `/cryptocurrencies` and `/etf` are available to confirm supported symbols
+- `POST /session` returns CST and X-SECURITY-TOKEN session headers for authenticated API access
+- `GET /markets/{epic}` returns live market snapshot fields such as `bid`, `offer`, and `percentageChange`
+- `GET /prices/{epic}/{resolution}/{numPoints}` returns historical price bars for chart seeding
+- default REST limits include 30 non-trading requests per minute per account and a 10,000 historical-price-point weekly allowance
 
-For public display, review Twelve Data attribution requirements before launch.
+## Provider Mesh Direction
+
+Signalibrium now also has an explicit provider-mesh scaffold for the next stage of the trading engine.
+
+Implemented:
+
+- `app/_lib/server/market-data/provider-architecture.ts`
+- `GET /api/market-data/providers`
+- `docs/market-data-mesh-architecture.md`
+
+This layer does not replace the sync engine yet. It documents and exposes the difference between:
+
+- execution-grade truth
+- confirmation-grade secondary feeds
+- research-only enrichment
+
+That distinction matters because the app currently contains a mix of stronger and weaker market-data sources, and the long-term trading engine should only permit automated execution when a symbol is covered by an official execution-grade provider and that provider is healthy.
+
+In practical terms:
+
+- `IG` is the target source of truth for live executable prices
+- `CoinGecko` is suitable for secondary crypto confirmation and enrichment
+- `Yahoo Finance` should be treated as research/chart support only, not as execution truth
+
+The next build steps on this path are:
+
+1. provider health tracking
+2. source-divergence detection
+3. symbol-level execution gating
+4. degraded-mode UI and order blocking
+5. migration away from weaker feeds in critical trade paths
+
 
 ## Migration Path Later
 
@@ -336,3 +456,5 @@ When the app is ready for a real backend:
 5. deepen the live ingestion layer into scheduled sync, scanner recomputation, and backtest execution services
 
 That should allow the product surfaces to keep most of their existing contracts while the storage engine changes underneath.
+
+

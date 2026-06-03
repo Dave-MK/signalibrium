@@ -6,9 +6,9 @@ export default function StrategyLabPage() {
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Strategy Lab"
-        title="Strategies should explain themselves"
-        description="Signalibrium's strategy layer is designed to stay grounded in deterministic rules. Each playbook shows supported assets, best and worst regimes, historical performance, and the conditions where it should be rejected."
+        eyebrow="Playbooks"
+        title="Your edge should be explicit before it is trusted"
+        description="These playbooks are the rule sets your desk can explain back to you. Each one shows where it fits, when it fails, and what the measured history says about using it."
       />
 
       <div className="grid gap-[5px] xl:grid-cols-3">

@@ -1,5 +1,6 @@
 import type {
   MarketChartResponse,
+  MarketIntelligenceSyncSummary,
   MarketDataSyncSummary,
 } from "./market-data-contract";
 import type {
@@ -119,6 +120,54 @@ export async function deleteTradeTicket(ticketId: string) {
   });
 }
 
+export async function submitTradeTicket(ticketId: string) {
+  const payload = await requestJson<{ tradeTicket: PersistedTradeTicket }>(
+    `/api/trade-tickets/${ticketId}/submit`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.tradeTicket;
+}
+
+export async function fillTradeTicket(ticketId: string) {
+  const payload = await requestJson<{ tradeTicket: PersistedTradeTicket }>(
+    `/api/trade-tickets/${ticketId}/fill`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.tradeTicket;
+}
+
+export async function cancelTradeTicket(ticketId: string) {
+  const payload = await requestJson<{ tradeTicket: PersistedTradeTicket }>(
+    `/api/trade-tickets/${ticketId}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.tradeTicket;
+}
+
+export async function closeTradeTicket(ticketId: string) {
+  const payload = await requestJson<{ tradeTicket: PersistedTradeTicket }>(
+    `/api/trade-tickets/${ticketId}/close`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.tradeTicket;
+}
+
 export type CreateJournalEntryInput = Omit<
   PersistedJournalEntry,
   "id" | "createdAt" | "updatedAt"
@@ -165,6 +214,18 @@ export async function deleteJournalEntry(entryId: string) {
 export async function syncMarketData() {
   const payload = await requestJson<{ summary: MarketDataSyncSummary }>(
     "/api/market-data/sync",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.summary;
+}
+
+export async function syncMarketIntelligence() {
+  const payload = await requestJson<{ summary: MarketIntelligenceSyncSummary }>(
+    "/api/market-intelligence/sync",
     {
       method: "POST",
       body: JSON.stringify({}),

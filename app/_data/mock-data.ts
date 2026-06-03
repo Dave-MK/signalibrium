@@ -75,7 +75,9 @@ export type TradeTicket = {
   symbol: string;
   strategy: string;
   side: "Long" | "Short";
-  orderType: "Limit" | "Market";
+  orderType: "Limit" | "Market" | "Stop Entry";
+  executionMode: "Paper" | "IG Demo" | "IG Live";
+  timeInForce: "DAY" | "GTC" | "IOC";
   entry: number;
   stopLoss: number;
   takeProfit: number;
@@ -84,7 +86,33 @@ export type TradeTicket = {
   plannedLoss: number;
   potentialGain: number;
   riskReward: number;
-  status: "Prepared" | "Simulated Open" | "Closed";
+  status:
+    | "Draft"
+    | "Ready"
+    | "Submitted"
+    | "Working"
+    | "Filled"
+    | "Partially Closed"
+    | "Closed"
+    | "Cancelled"
+    | "Rejected";
+  brokerStatus:
+    | "Not Sent"
+    | "Pending"
+    | "Working"
+    | "Filled"
+    | "Partially Closed"
+    | "Closed"
+    | "Cancelled"
+    | "Rejected";
+  brokerReference: string | null;
+  submittedAt: string | null;
+  filledAt: string | null;
+  closedAt: string | null;
+  executedEntry: number | null;
+  executedQuantity: number | null;
+  realizedPnl: number | null;
+  unrealizedPnl: number | null;
   rationale: string;
   gateResults: {
     label: string;
@@ -513,6 +541,8 @@ export const tradeTickets: TradeTicket[] = [
     strategy: "20-Day Breakout",
     side: "Long",
     orderType: "Limit",
+    executionMode: "Paper",
+    timeInForce: "DAY",
     entry: 10.84,
     stopLoss: 10.04,
     takeProfit: 12.18,
@@ -521,7 +551,16 @@ export const tradeTickets: TradeTicket[] = [
     plannedLoss: 182.4,
     potentialGain: 305.52,
     riskReward: 1.68,
-    status: "Prepared",
+    status: "Ready",
+    brokerStatus: "Not Sent",
+    brokerReference: null,
+    submittedAt: null,
+    filledAt: null,
+    closedAt: null,
+    executedEntry: null,
+    executedQuantity: null,
+    realizedPnl: null,
+    unrealizedPnl: null,
     rationale:
       "Momentum and ranking are strong, but the system is enforcing a measured size because ATR expansion is elevated.",
     gateResults: [
@@ -552,7 +591,9 @@ export const tradeTickets: TradeTicket[] = [
     symbol: "LINK",
     strategy: "50/200 Trend",
     side: "Long",
-    orderType: "Limit",
+    orderType: "Market",
+    executionMode: "Paper",
+    timeInForce: "IOC",
     entry: 18.24,
     stopLoss: 17.28,
     takeProfit: 20.04,
@@ -561,7 +602,16 @@ export const tradeTickets: TradeTicket[] = [
     plannedLoss: 182.4,
     potentialGain: 342,
     riskReward: 1.88,
-    status: "Simulated Open",
+    status: "Filled",
+    brokerStatus: "Filled",
+    brokerReference: "paper-link-002",
+    submittedAt: "2026-05-31T08:10:00.000Z",
+    filledAt: "2026-05-31T08:10:02.000Z",
+    closedAt: null,
+    executedEntry: 18.27,
+    executedQuantity: 190,
+    realizedPnl: null,
+    unrealizedPnl: 104.5,
     rationale:
       "Trend quality is high and market regime confirms continuation, making this a cleaner protected ticket than most pullback signals.",
     gateResults: [

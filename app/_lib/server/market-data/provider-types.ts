@@ -1,14 +1,12 @@
-export type MarketDataProviderName = "twelvedata";
-
-export type SupportedProviderInstrumentType =
-  | "Digital Currency"
-  | "ETF"
-  | "Common Stock";
+export type MarketDataProviderName = "ig" | "coingecko" | "yahoo" | "hybrid";
 
 export type MarketDataAssetDefinition = {
   symbol: string;
-  providerSymbol: string | null;
-  providerType: SupportedProviderInstrumentType | null;
+  marketDataSource?: "ig" | "coingecko" | "yahoo";
+  coingeckoCoinId?: string;
+  yahooSymbol?: string;
+  igEpic?: string | null;
+  searchTerms: string[];
   proxyNote?: string;
 };
 

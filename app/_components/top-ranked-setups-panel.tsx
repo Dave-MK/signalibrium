@@ -169,7 +169,7 @@ export function TopRankedSetupsPanel({
     <Panel className="overflow-hidden p-2.5 sm:p-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-white">
-          Top-Ranked Setups
+          AI-Ranked Setups
         </h2>
       </div>
       {error ? <p className="mt-2 text-[0.82rem] text-amber-200">{error}</p> : null}
@@ -319,7 +319,7 @@ export function TopRankedSetupsPanel({
           href="/scanner"
           className="text-[0.84rem] font-medium text-slate-400 transition hover:text-white"
         >
-          View all setups
+          Open full radar
         </Link>
       </div>
     </Panel>

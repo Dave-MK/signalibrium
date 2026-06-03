@@ -2,23 +2,37 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
 import type {
   PersistedAssetRecord,
   PersistedWatchlist,
 } from "@/app/_lib/server/workspace-types";
 import { Sparkline } from "../_components/sparkline";
-import { PageHeader, Panel, StatusChip } from "../_components/ui";
+import { ActionLink, PageHeader, Panel, StatusChip } from "../_components/ui";
 import { formatCurrency, formatDateTimeLabel, formatPercent } from "../_lib/format";
 import {
   getDefaultPersistedWatchlist,
 } from "../_lib/reference-data";
 import {
   createWatchlist,
-  deleteWatchlist,
   updateWatchlist,
 } from "../_lib/workspace-api";
+
+function AssetMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+      <p className="micro-label">{label}</p>
+      <p className="mt-1.5 text-[0.84rem] font-semibold text-white">{value}</p>
+    </div>
+  );
+}
 
 export default function AssetsPageClient({
   initialWatchlists,
@@ -34,12 +48,7 @@ export default function AssetsPageClient({
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>(
     initialSelectedWatchlist?.id ?? "",
   );
-  const [draftName, setDraftName] = useState(initialSelectedWatchlist?.name ?? "");
-  const [draftDescription, setDraftDescription] = useState(
-    initialSelectedWatchlist?.description ?? "",
-  );
   const [newWatchlistName, setNewWatchlistName] = useState("");
-  const [newWatchlistDescription, setNewWatchlistDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<MarketDataSyncSummary | null>(null);
@@ -82,6 +91,19 @@ export default function AssetsPageClient({
     };
   }, [router]);
 
+  const visibleAssets = useMemo(() => {
+    if (!selectedWatchlist) {
+      return assets;
+    }
+
+    if (selectedWatchlist.itemSymbols.length === 0) {
+      return assets;
+    }
+
+    const selectedSet = new Set(selectedWatchlist.itemSymbols);
+    return assets.filter((asset) => selectedSet.has(asset.symbol));
+  }, [assets, selectedWatchlist]);
+
   async function handleCreateWatchlist() {
     if (!newWatchlistName.trim()) {
       setError("Name is required to create a watchlist.");
@@ -93,92 +115,16 @@ export default function AssetsPageClient({
       setError(null);
       const watchlist = await createWatchlist({
         name: newWatchlistName.trim(),
-        description: newWatchlistDescription.trim(),
+        description: "",
         itemSymbols: [],
         isDefault: watchlists.length === 0,
       });
 
-      const nextWatchlists = [...watchlists, watchlist];
-      setWatchlists(nextWatchlists);
+      setWatchlists((current) => [...current, watchlist]);
       setSelectedWatchlistId(watchlist.id);
-      setDraftName(watchlist.name);
-      setDraftDescription(watchlist.description);
       setNewWatchlistName("");
-      setNewWatchlistDescription("");
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create watchlist");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleSaveWatchlist() {
-    if (!selectedWatchlist) {
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      setError(null);
-      const updated = await updateWatchlist(selectedWatchlist.id, {
-        name: draftName.trim(),
-        description: draftDescription.trim(),
-      });
-
-      setWatchlists((current) =>
-        current.map((watchlist) =>
-          watchlist.id === updated.id ? updated : watchlist,
-        ),
-      );
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save watchlist");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleToggleDefault() {
-    if (!selectedWatchlist) {
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      setError(null);
-      const updates = await Promise.all(
-        watchlists.map((watchlist) =>
-          updateWatchlist(watchlist.id, {
-            isDefault: watchlist.id === selectedWatchlist.id,
-          }),
-        ),
-      );
-      setWatchlists(updates);
-    } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Unable to set default watchlist");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  async function handleDeleteWatchlist() {
-    if (!selectedWatchlist || selectedWatchlist.isDefault) {
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      setError(null);
-      await deleteWatchlist(selectedWatchlist.id);
-      const remaining = watchlists.filter(
-        (watchlist) => watchlist.id !== selectedWatchlist.id,
-      );
-      const fallback = getDefaultPersistedWatchlist(remaining);
-      setWatchlists(remaining);
-      setSelectedWatchlistId(fallback?.id ?? "");
-      setDraftName(fallback?.name ?? "");
-      setDraftDescription(fallback?.description ?? "");
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete watchlist");
     } finally {
       setIsSaving(false);
     }
@@ -206,7 +152,7 @@ export default function AssetsPageClient({
         ),
       );
     } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Unable to update watchlist items");
+      setError(toggleError instanceof Error ? toggleError.message : "Unable to update watchlist");
     } finally {
       setIsSaving(false);
     }
@@ -215,58 +161,23 @@ export default function AssetsPageClient({
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Assets"
-        title="Focused watchlist, not infinite noise"
-        description="The V1 seed universe is intentionally narrow so the scanner, backtester, and risk layers can prove signal quality before scale. Every asset here links into a detail workstation view."
+        eyebrow="Market Charts"
+        title="Live markets with less clutter"
+        description="Keep this page focused on the names that matter. Use it to watch the live basket, jump into full chart workstations, and maintain a clean watchlist instead of scanning noise."
+        action={<ActionLink href={visibleAssets[0] ? `/assets/${visibleAssets[0].symbol}` : "/assets"}>Open First Chart</ActionLink>}
       />
 
-      {syncSummary ? (
-        <Panel className="p-3 sm:p-3.5">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="micro-label">Latest Sync</p>
-              <p className="mt-1.5 text-[0.92rem] font-semibold text-white">
-                {syncSummary.syncedSymbols.length} assets refreshed from {syncSummary.provider}.
-              </p>
-              <p className="mt-1 text-[0.82rem] text-slate-400">
-                Synced at {formatDateTimeLabel(syncSummary.syncedAt)}
-              </p>
-            </div>
-            <div className="text-[0.82rem] text-slate-300">
-              <p>Skipped: {syncSummary.skippedSymbols.length}</p>
-              <p>Warnings: {syncSummary.warnings.length}</p>
-            </div>
-          </div>
-          {syncSummary.warnings.length > 0 ? (
-            <div className="mt-3 grid gap-[5px] lg:grid-cols-2">
-              {syncSummary.warnings.slice(0, 4).map((warning) => (
-                <div key={`${warning.symbol}-${warning.message}`} className="signal-warning-surface rounded-[0.4rem] p-2.5">
-                  <p className="text-[0.76rem] font-semibold text-amber-100">{warning.symbol}</p>
-                  <p className="mt-1 text-[0.78rem] leading-5 text-slate-300">
-                    {warning.message}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </Panel>
-      ) : null}
-
       <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-3">
             <div>
-              <p className="micro-label">Workspace Watchlists</p>
+              <p className="micro-label">Active Watchlists</p>
               <div className="mt-3 flex flex-wrap gap-[5px]">
                 {watchlists.map((watchlist) => (
                   <button
                     key={watchlist.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedWatchlistId(watchlist.id);
-                      setDraftName(watchlist.name);
-                      setDraftDescription(watchlist.description);
-                    }}
+                    onClick={() => setSelectedWatchlistId(watchlist.id)}
                     className={`inline-flex items-center gap-2 rounded-[0.4rem] px-3 py-2 text-[0.8rem] font-semibold transition ${
                       watchlist.id === selectedWatchlistId
                         ? "signal-accent-surface text-white"
@@ -274,68 +185,21 @@ export default function AssetsPageClient({
                     }`}
                   >
                     <span>{watchlist.name}</span>
-                    <span className="text-[0.68rem] text-slate-400">
-                      {watchlist.itemSymbols.length}
-                    </span>
+                    <span className="text-[0.68rem] text-slate-400">{watchlist.itemSymbols.length}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            {selectedWatchlist ? (
+            {syncSummary ? (
               <div className="signal-surface-soft rounded-[0.4rem] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[0.9rem] font-semibold text-white">
-                    Edit selected watchlist
-                  </p>
-                  {selectedWatchlist.isDefault ? (
-                    <StatusChip label="DEFAULT" />
-                  ) : null}
-                </div>
-                <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
-                  <label className="space-y-1">
-                    <span className="micro-label">Name</span>
-                    <input
-                      value={draftName}
-                      onChange={(event) => setDraftName(event.target.value)}
-                      className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="micro-label">Description</span>
-                    <input
-                      value={draftDescription}
-                      onChange={(event) => setDraftDescription(event.target.value)}
-                      className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
-                    />
-                  </label>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-[5px]">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveWatchlist()}
-                    disabled={isSaving}
-                    className="signal-button rounded-[0.46rem] px-3.5 py-2 text-[0.82rem] font-semibold"
-                  >
-                    Save Details
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleDefault()}
-                    disabled={isSaving || selectedWatchlist.isDefault}
-                    className="signal-surface-soft rounded-[0.4rem] px-3.5 py-2 text-[0.82rem] font-semibold text-white disabled:opacity-50"
-                  >
-                    Set Default
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDeleteWatchlist()}
-                    disabled={isSaving || selectedWatchlist.isDefault}
-                    className="signal-warning-surface rounded-[0.4rem] px-3.5 py-2 text-[0.82rem] font-semibold text-amber-100 disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <p className="micro-label">Latest Sync</p>
+                <p className="mt-1.5 text-[0.9rem] font-semibold text-white">
+                  {syncSummary.syncedSymbols.length} symbols refreshed from {syncSummary.provider}
+                </p>
+                <p className="mt-1 text-[0.76rem] text-slate-400">
+                  Synced {formatDateTimeLabel(syncSummary.syncedAt)}
+                </p>
               </div>
             ) : null}
           </div>
@@ -343,24 +207,12 @@ export default function AssetsPageClient({
           <div className="signal-surface-soft rounded-[0.4rem] p-3">
             <p className="micro-label">Create Watchlist</p>
             <div className="mt-3 space-y-2.5">
-              <label className="space-y-1">
-                <span className="micro-label">Name</span>
-                <input
-                  value={newWatchlistName}
-                  onChange={(event) => setNewWatchlistName(event.target.value)}
-                  placeholder="AI Rotation"
-                  className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="micro-label">Description</span>
-                <textarea
-                  value={newWatchlistDescription}
-                  onChange={(event) => setNewWatchlistDescription(event.target.value)}
-                  rows={3}
-                  className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
-                />
-              </label>
+              <input
+                value={newWatchlistName}
+                onChange={(event) => setNewWatchlistName(event.target.value)}
+                placeholder="AI Momentum"
+                className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
+              />
               <button
                 type="button"
                 onClick={() => void handleCreateWatchlist()}
@@ -379,75 +231,65 @@ export default function AssetsPageClient({
       </Panel>
 
       <div className="grid gap-[5px] lg:grid-cols-2">
-        {assets.map((asset) => {
+        {visibleAssets.map((asset) => {
           const inSelectedWatchlist =
             selectedWatchlist?.itemSymbols.includes(asset.symbol) ?? false;
 
           return (
-            <Panel key={asset.symbol} className="h-full p-3 sm:p-3.5">
+            <Panel key={asset.symbol} className="p-3 sm:p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="micro-label">{asset.assetClass}</p>
                   <div className="mt-1.5 flex items-center gap-2">
                     <Link
                       href={`/assets/${asset.symbol}`}
-                      className="text-lg font-semibold text-white transition hover:text-cyan-200 sm:text-[1.15rem]"
+                      className="text-[1rem] font-semibold text-white transition hover:text-cyan-200"
                     >
                       {asset.symbol}
                     </Link>
-                    {inSelectedWatchlist ? <StatusChip label="IN WATCHLIST" /> : null}
+                    {asset.tradeable ? <StatusChip label="TRADEABLE" /> : <StatusChip label="WATCH" />}
                   </div>
-                  <p className="mt-0.5 text-[0.84rem] text-slate-400">{asset.name}</p>
+                  <p className="mt-0.5 text-[0.82rem] text-slate-400">{asset.name}</p>
                 </div>
-                <StatusChip label={asset.tradeable ? "TRADEABLE" : "WATCH"} />
-              </div>
-
-              <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
-                <div>
-                  <p className="text-[1.45rem] font-semibold text-white">
-                    {formatCurrency(asset.price)}
+                <div className="text-right">
+                  <p className="text-[1rem] font-semibold text-white">{formatCurrency(asset.price)}</p>
+                  <p className={`mt-0.5 text-[0.8rem] ${asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    {formatPercent(asset.change24h, true)}
                   </p>
-                  <p
-                    className={`mt-0.5 text-[0.82rem] ${
-                      asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"
-                    }`}
-                  >
-                    {formatPercent(asset.change24h, true)} over the latest session
-                  </p>
-                  <p className="mt-1 text-[0.72rem] text-slate-500">
-                    {asset.source === "sync" ? "Live provider synced" : "Seeded prototype data"} / Last sync{" "}
-                    {formatDateTimeLabel(asset.lastSyncedAt)}
-                  </p>
-                </div>
-                <div className="text-[0.82rem] leading-5 text-slate-300">
-                  <p>Regime: {asset.regime}</p>
-                  <p>Strategy match: {asset.activeStrategy}</p>
-                  <p>Liquidity: {asset.liquidity}</p>
                 </div>
               </div>
 
-              <Sparkline data={asset.sparkline} className="mt-3 h-14 w-full sm:h-16" />
+              <Sparkline data={asset.sparkline} className="mt-3 h-12 w-full" />
+
+              <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
+                <AssetMetric label="Regime" value={asset.regime} />
+                <AssetMetric label="Strategy" value={asset.activeStrategy} />
+                <AssetMetric label="Synced" value={formatDateTimeLabel(asset.lastSyncedAt)} />
+              </div>
 
               <p className="mt-3 text-[0.82rem] leading-5 text-slate-300">{asset.aiBias}</p>
 
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-[0.74rem] text-slate-500">
-                  {selectedWatchlist
-                    ? `${selectedWatchlist.name} contains ${selectedWatchlist.itemSymbols.length} assets`
-                    : "Create a watchlist to begin saving assets."}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void handleToggleAsset(asset.symbol)}
-                  disabled={!selectedWatchlist || isSaving}
-                  className={`rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold transition disabled:opacity-50 ${
-                    inSelectedWatchlist
-                      ? "signal-warning-surface text-amber-100"
-                      : "signal-surface-soft text-white"
-                  }`}
+              <div className="mt-3 flex flex-wrap gap-[5px]">
+                <Link
+                  href={`/assets/${asset.symbol}`}
+                  className="signal-accent-surface rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold text-white"
                 >
-                  {inSelectedWatchlist ? "Remove" : "Add"}
-                </button>
+                  Open Chart Workspace
+                </Link>
+                {selectedWatchlist ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleAsset(asset.symbol)}
+                    disabled={isSaving}
+                    className={`rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold ${
+                      inSelectedWatchlist
+                        ? "signal-warning-surface text-amber-100"
+                        : "signal-surface-soft text-white"
+                    }`}
+                  >
+                    {inSelectedWatchlist ? "Remove From Watchlist" : "Add To Watchlist"}
+                  </button>
+                ) : null}
               </div>
             </Panel>
           );

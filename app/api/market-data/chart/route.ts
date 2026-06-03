@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supportedChartIntervals } from "@/app/_lib/market-data-contract";
-import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/twelve-data";
+import { buildFallbackChart } from "@/app/_lib/server/market-data/fallback-chart";
+import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/market-data";
+import { getAssetBySymbol } from "@/app/_lib/server/repositories/assets";
 import type { SupportedChartInterval } from "@/app/_lib/server/market-data/provider-types";
 
 function resolveInterval(value: string | null): SupportedChartInterval {
@@ -29,6 +31,20 @@ export async function GET(request: Request) {
     const chart = await fetchLiveCandlesForSymbol(symbol, interval, outputsize);
     return NextResponse.json({ chart });
   } catch (error) {
+    const asset = await getAssetBySymbol(symbol);
+
+    if (asset) {
+      const chart = buildFallbackChart(
+        asset.symbol,
+        asset.name,
+        asset.sparkline,
+        asset.lastSyncedAt,
+        interval,
+        `${asset.name} is temporarily showing a reconstructed candle view from the latest synced close series while the live provider allowance cools down.`,
+      );
+      return NextResponse.json({ chart });
+    }
+
     return NextResponse.json(
       {
         error:

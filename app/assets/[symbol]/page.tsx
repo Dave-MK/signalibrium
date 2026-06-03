@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { notFound } from "next/navigation";
 import { getAssetBySymbol } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
@@ -5,8 +7,8 @@ import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entri
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
 import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
-import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/twelve-data";
-import type { LiveCandleSeries } from "@/app/_lib/server/market-data/provider-types";
+import { buildFallbackChart } from "@/app/_lib/server/market-data/fallback-chart";
+import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/market-data";
 import { strategies } from "../../_data/mock-data";
 import {
   formatDateLabel,
@@ -22,46 +24,6 @@ import {
   StatusChip,
 } from "../../_components/ui";
 import { AssetLiveChartPanel } from "../../_components/asset-live-chart-panel";
-
-function buildFallbackChart(symbol: string, name: string, priceSeries: number[], fetchedAt: string) {
-  const usableSeries = priceSeries.filter((value) => Number.isFinite(value) && value > 0);
-  const closes = usableSeries.length >= 2 ? usableSeries : [usableSeries[0] ?? 0, usableSeries[0] ?? 0].filter(Boolean);
-  const endTime = Date.parse(fetchedAt);
-  const safeEndTime = Number.isFinite(endTime) ? endTime : Date.now();
-
-  const candles = closes.map((close, index) => {
-    const previousClose = closes[index - 1] ?? close;
-    const open = previousClose;
-    const spread = Math.max(Math.abs(close - open) * 0.45, close * 0.0035);
-    const high = Math.max(open, close) + spread;
-    const low = Math.max(0.0001, Math.min(open, close) - spread);
-    const timestamp = new Date(
-      safeEndTime - (closes.length - index - 1) * 60 * 60 * 1000,
-    )
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-
-    return {
-      datetime: timestamp,
-      open: Number(open.toFixed(4)),
-      high: Number(high.toFixed(4)),
-      low: Number(low.toFixed(4)),
-      close: Number(close.toFixed(4)),
-      volume: null,
-    };
-  });
-
-  return {
-    symbol,
-    providerSymbol: symbol,
-    interval: "1h",
-    currency: "USD",
-    candles,
-    fetchedAt: new Date(safeEndTime).toISOString(),
-    chartNote: `${name} opened with a locally reconstructed candle view from the synced close series while the next live OHLC refresh warms up.`,
-  } satisfies LiveCandleSeries;
-}
 
 export default async function AssetDetailPage({
   params,
@@ -83,8 +45,15 @@ export default async function AssetDetailPage({
       listScannerResults(),
       listBacktests(),
     ]);
+  const configuredChartVendor =
+    process.env.SIGNALIBRIUM_CHART_VENDOR?.trim().toLowerCase() === "charting_library"
+      ? "charting_library"
+      : "embed";
+  const chartingLibraryAvailable = existsSync(
+    path.join(process.cwd(), "public", "charting_library", "charting_library.js"),
+  );
   const initialChart = await fetchLiveCandlesForSymbol(asset.symbol, "1h", 48).catch(
-    () => buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt),
+    () => buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt, "1h"),
   );
 
   const assetSetups = scannerResults.filter((result) => result.symbol === asset.symbol);
@@ -107,125 +76,125 @@ export default async function AssetDetailPage({
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Asset Detail"
-        title={`${asset.symbol} intelligence view`}
-        description={`${asset.name} currently maps to the ${asset.activeStrategy} playbook. This page combines chart context, active setups, backtest confidence, regime assessment, risk profile, and AI explanation.`}
+        eyebrow="Asset Workstation"
+        title={`${asset.symbol} market map`}
+        description={`${asset.name} currently maps to the ${asset.activeStrategy} playbook. Use this view to follow price, inspect structure, connect live setups, and decide whether the name deserves an execution plan.`}
         action={
           relatedTickets[0] ? (
-            <ActionLink href={`/trade-tickets/${relatedTickets[0].id}`}>Open Linked Ticket</ActionLink>
+            <ActionLink href={`/trade-tickets/${relatedTickets[0].id}`}>Open Execution Plan</ActionLink>
           ) : (
-            <ActionLink href="/scanner">Prepare From Scanner</ActionLink>
+            <ActionLink href="/scanner">Open Opportunity Radar</ActionLink>
           )
         }
       />
 
-      <div className="grid gap-[5px] xl:grid-cols-[1.25fr_0.8fr]">
-        <AssetLiveChartPanel
-          symbol={asset.symbol}
-          name={asset.name}
-          price={asset.price}
-          initialChart={initialChart}
-        />
+      <AssetLiveChartPanel
+        chartVendor={configuredChartVendor}
+        chartingLibraryAvailable={chartingLibraryAvailable}
+        symbol={asset.symbol}
+        name={asset.name}
+        price={asset.price}
+        initialChart={initialChart}
+      />
 
-        <div className="panel-stack-5">
-          <Panel className="p-3 sm:p-3.5">
-            <p className="micro-label">Risk Profile</p>
-            <div className="mt-3 grid gap-[5px]">
-              <KeyValue
-                label="Tradeability"
-                value={asset.tradeable ? "Ticket ready" : "Watchlist only"}
-                detail="Protected sizing is allowed only when regime and liquidity line up."
-                tooltip="Whether the asset currently clears the app's regime and liquidity filters for a prepared trade ticket."
-              />
-              <KeyValue
-                label="Forecast"
-                value={asset.forecast}
-                detail="Scenario framing generated from deterministic structure and regime context."
-                tooltip="A plain-language scenario describing what needs to happen next for the current thesis to stay valid."
-              />
-              <KeyValue
-                label="AI Explanation"
-                value={asset.aiBias}
-                detail="Grounded language, not prediction theatre."
-                tooltip="A concise interpretation layer built from the stored asset state rather than a live predictive model."
-              />
-            </div>
-          </Panel>
+      <div className="grid gap-[5px] xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_minmax(0,0.9fr)]">
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">AI Read</p>
+          <div className="mt-3 grid gap-[5px]">
+            <KeyValue
+              label="Tradeability"
+              value={asset.tradeable ? "Ticket ready" : "Watchlist only"}
+              detail="Protected sizing is allowed only when regime and liquidity line up."
+              tooltip="Whether the asset currently clears the app's regime and liquidity filters for a prepared trade ticket."
+            />
+            <KeyValue
+              label="Forecast"
+              value={asset.forecast}
+              detail="Scenario framing generated from deterministic structure and regime context."
+              tooltip="A plain-language scenario describing what needs to happen next for the current thesis to stay valid."
+            />
+            <KeyValue
+              label="AI Explanation"
+              value={asset.aiBias}
+              detail="Grounded language, not prediction theatre."
+              tooltip="A concise interpretation layer built from the stored asset state rather than a live predictive model."
+            />
+          </div>
+        </Panel>
 
-          <Panel className="p-3 sm:p-3.5">
-            <p className="micro-label">Workspace Context</p>
-            <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
-              <KeyValue
-                label="Watchlists"
-                value={String(containingWatchlists.length)}
-                detail={containingWatchlists[0]?.name ?? "Not currently saved"}
-                tooltip="How many saved workspace watchlists currently include this asset."
-              />
-              <KeyValue
-                label="Trade Tickets"
-                value={String(relatedTickets.length)}
-                detail={relatedTickets[0]?.status ?? "No linked ticket yet"}
-                tooltip="The count of prepared or simulated tickets in the workspace that reference this asset."
-              />
-              <KeyValue
-                label="Journal Entries"
-                value={String(relatedJournalEntries.length)}
-                detail={latestJournalEntry ? formatDateLabel(latestJournalEntry.date) : "No saved review yet"}
-                tooltip="Saved trade reviews or notes that either mention this asset directly or are linked through one of its tickets."
-              />
-            </div>
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Desk Context</p>
+          <div className="mt-3 grid gap-[5px] sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+            <KeyValue
+              label="Watchlists"
+              value={String(containingWatchlists.length)}
+              detail={containingWatchlists[0]?.name ?? "Not currently saved"}
+              tooltip="How many of your saved watchlists currently include this asset."
+            />
+            <KeyValue
+              label="Trade Tickets"
+              value={String(relatedTickets.length)}
+              detail={relatedTickets[0]?.status ?? "No linked ticket yet"}
+              tooltip="The count of prepared or simulated execution plans in your desk that reference this asset."
+            />
+            <KeyValue
+              label="Journal Entries"
+              value={String(relatedJournalEntries.length)}
+              detail={latestJournalEntry ? formatDateLabel(latestJournalEntry.date) : "No saved review yet"}
+              tooltip="Saved trade reviews or notes that either mention this asset directly or are linked through one of its tickets."
+            />
+          </div>
 
-            {relatedTickets.length > 0 ? (
-              <div className="mt-3 panel-stack-5">
-                {relatedTickets.slice(0, 2).map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="signal-surface-soft rounded-[0.4rem] p-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[0.88rem] font-semibold text-white">{ticket.strategy}</p>
-                        <p className="mt-0.5 text-[0.78rem] text-slate-400">
-                          Entry {formatCurrency(ticket.entry)} / Target {formatCurrency(ticket.takeProfit)}
-                        </p>
-                      </div>
-                      <StatusChip label={ticket.status.toUpperCase()} />
+          {relatedTickets.length > 0 ? (
+            <div className="mt-3 panel-stack-5">
+              {relatedTickets.slice(0, 2).map((ticket) => (
+                <div
+                  key={ticket.id}
+                  className="signal-surface-soft rounded-[0.4rem] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[0.88rem] font-semibold text-white">{ticket.strategy}</p>
+                      <p className="mt-0.5 text-[0.78rem] text-slate-400">
+                        Entry {formatCurrency(ticket.entry)} / Target {formatCurrency(ticket.takeProfit)}
+                      </p>
                     </div>
+                    <StatusChip label={ticket.status.toUpperCase()} />
                   </div>
-                ))}
-              </div>
-            ) : null}
-
-            {latestJournalEntry ? (
-              <div className="signal-accent-surface mt-3 rounded-[0.4rem] p-3">
-                <p className="text-[0.84rem] font-semibold text-white">Latest journal read</p>
-                <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-200">
-                  {latestJournalEntry.aiReview}
-                </p>
-              </div>
-            ) : null}
-          </Panel>
-
-          <Panel className="p-3 sm:p-3.5">
-            <p className="micro-label">Strategy Match</p>
-            <h2 className="mt-2.5 text-[1rem] font-semibold text-white sm:text-[1.1rem]">
-              {matchedStrategy?.name}
-            </h2>
-            <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
-              {matchedStrategy?.thesis}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {matchedStrategy?.bestRegimes.map((regime) => (
-                <StatusChip key={regime} label={regime.toUpperCase()} />
+                </div>
               ))}
             </div>
-          </Panel>
-        </div>
+          ) : null}
+
+          {latestJournalEntry ? (
+            <div className="signal-accent-surface mt-3 rounded-[0.4rem] p-3">
+              <p className="text-[0.84rem] font-semibold text-white">Latest review memory</p>
+              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-200">
+                {latestJournalEntry.aiReview}
+              </p>
+            </div>
+          ) : null}
+        </Panel>
+
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Playbook Match</p>
+          <h2 className="mt-2.5 text-[1rem] font-semibold text-white sm:text-[1.1rem]">
+            {matchedStrategy?.name}
+          </h2>
+          <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
+            {matchedStrategy?.thesis}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {matchedStrategy?.bestRegimes.map((regime) => (
+              <StatusChip key={regime} label={regime.toUpperCase()} />
+            ))}
+          </div>
+        </Panel>
       </div>
 
       <div className="grid gap-[5px] xl:grid-cols-[1.1fr_0.9fr]">
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Active Setups</p>
+          <p className="micro-label">Live Setups</p>
           <div className="mt-3 panel-stack-5">
             {assetSetups.map((setup) => (
               <div
@@ -263,7 +232,7 @@ export default async function AssetDetailPage({
         </Panel>
 
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Backtest Summary</p>
+          <p className="micro-label">Edge Replay Summary</p>
           <div className="mt-3 panel-stack-5">
             {relatedBacktests.map((backtest) => (
               <div

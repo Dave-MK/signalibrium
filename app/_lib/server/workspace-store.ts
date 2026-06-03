@@ -1,14 +1,50 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { defaultWorkspaceData } from "./workspace-seed";
-import type { PersistedWorkspaceData } from "./workspace-types";
+import type { PersistedTradeTicket, PersistedWorkspaceData } from "./workspace-types";
 
-const dataDirectory = path.join(process.cwd(), "data");
+const dataDirectory = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 const defaultStorePath = path.join(dataDirectory, "workspace.json");
 let pendingWrite = Promise.resolve();
 
+type LegacyTradeTicket = Omit<PersistedTradeTicket, "status" | "brokerStatus"> & {
+  status?: PersistedTradeTicket["status"] | "Prepared" | "Simulated Open";
+  brokerStatus?: PersistedTradeTicket["brokerStatus"] | null;
+};
+
 function resolveStorePath() {
   return process.env.SIGNALIBRIUM_STORE_PATH ?? defaultStorePath;
+}
+
+function normalizeTradeTicket(ticket: LegacyTradeTicket): PersistedTradeTicket {
+  const normalizedStatus =
+    ticket.status === "Prepared"
+      ? "Ready"
+      : ticket.status === "Simulated Open"
+        ? "Filled"
+        : (ticket.status ?? "Draft");
+
+  return {
+    ...ticket,
+    executionMode: ticket.executionMode ?? "Paper",
+    timeInForce: ticket.timeInForce ?? (ticket.orderType === "Market" ? "IOC" : "DAY"),
+    status: normalizedStatus,
+    brokerStatus:
+      ticket.brokerStatus ??
+      (normalizedStatus === "Closed"
+        ? "Closed"
+        : normalizedStatus === "Filled"
+          ? "Filled"
+        : "Not Sent"),
+    brokerReference: ticket.brokerReference ?? null,
+    submittedAt: ticket.submittedAt ?? null,
+    filledAt: ticket.filledAt ?? null,
+    closedAt: ticket.closedAt ?? null,
+    executedEntry: ticket.executedEntry ?? null,
+    executedQuantity: ticket.executedQuantity ?? null,
+    realizedPnl: ticket.realizedPnl ?? null,
+    unrealizedPnl: ticket.unrealizedPnl ?? null,
+  };
 }
 
 async function ensureStoreFile() {
@@ -28,7 +64,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   const candidate = (raw ?? {}) as Partial<PersistedWorkspaceData>;
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 5,
     updatedAt:
       typeof candidate.updatedAt === "string"
         ? candidate.updatedAt
@@ -46,12 +82,18 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
         typeof candidate.syncState?.sparklineCursor === "number"
           ? candidate.syncState.sparklineCursor
           : defaultWorkspaceData.syncState.sparklineCursor,
+      intelligenceLastSyncedAt:
+        typeof candidate.syncState?.intelligenceLastSyncedAt === "string"
+          ? candidate.syncState.intelligenceLastSyncedAt
+          : defaultWorkspaceData.syncState.intelligenceLastSyncedAt,
     },
     watchlists: Array.isArray(candidate.watchlists)
       ? candidate.watchlists
       : defaultWorkspaceData.watchlists,
     tradeTickets: Array.isArray(candidate.tradeTickets)
-      ? candidate.tradeTickets
+      ? candidate.tradeTickets.map((ticket) =>
+          normalizeTradeTicket(ticket as PersistedTradeTicket),
+        )
       : defaultWorkspaceData.tradeTickets,
     journalEntries: Array.isArray(candidate.journalEntries)
       ? candidate.journalEntries
@@ -67,6 +109,15 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
       : defaultWorkspaceData.backtests,
     marketSnapshot:
       candidate.marketSnapshot ?? defaultWorkspaceData.marketSnapshot,
+    marketEvents: Array.isArray(candidate.marketEvents)
+      ? candidate.marketEvents
+      : defaultWorkspaceData.marketEvents,
+    confirmationChecks: Array.isArray(candidate.confirmationChecks)
+      ? candidate.confirmationChecks
+      : defaultWorkspaceData.confirmationChecks,
+    aiOpportunities: Array.isArray(candidate.aiOpportunities)
+      ? candidate.aiOpportunities
+      : defaultWorkspaceData.aiOpportunities,
   };
 }
 

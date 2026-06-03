@@ -10,9 +10,31 @@ import type {
   PersistedScannerResult,
 } from "@/app/_lib/server/workspace-types";
 import { formatCompactCurrency, formatPercent } from "../_lib/format";
-import { syncMarketData } from "../_lib/workspace-api";
+import { syncMarketData, syncMarketIntelligence } from "../_lib/workspace-api";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
+
+function HeaderMetric({
+  label,
+  value,
+  detail,
+  tone = "text-white",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+}) {
+  return (
+    <div className="signal-toolbar-card px-3 py-2">
+      <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className={`mt-1 text-[0.9rem] font-semibold ${tone}`}>{value}</p>
+      <p className="mt-0.5 text-[0.74rem] text-slate-400">{detail}</p>
+    </div>
+  );
+}
 
 export function AppShell({
   children,
@@ -25,6 +47,7 @@ export function AppShell({
 }) {
   const router = useRouter();
   const autoSyncInFlightRef = useRef(false);
+  const intelligenceSyncInFlightRef = useRef(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -120,6 +143,53 @@ export function AppShell({
     };
   }, [marketSnapshot.updatedAt, router]);
 
+  useEffect(() => {
+    const intelligenceIntervalMs = 12 * 60_000;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    async function runIntelligenceSync() {
+      if (
+        cancelled ||
+        document.visibilityState !== "visible" ||
+        intelligenceSyncInFlightRef.current
+      ) {
+        return;
+      }
+
+      intelligenceSyncInFlightRef.current = true;
+
+      try {
+        await syncMarketIntelligence();
+        router.refresh();
+      } catch {
+        // Keep the shell quiet on background intelligence sync failures.
+      } finally {
+        intelligenceSyncInFlightRef.current = false;
+      }
+    }
+
+    timeoutId = setTimeout(() => {
+      void runIntelligenceSync();
+      intervalId = setInterval(() => {
+        void runIntelligenceSync();
+      }, intelligenceIntervalMs);
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [router]);
+
   return (
     <div className="relative z-10 min-h-screen">
       <div className="flex min-h-screen flex-col lg:flex-row">
@@ -184,7 +254,7 @@ export function AppShell({
               </Link>
             </div>
             <div className="shrink-0 lg:hidden">
-              <StatusChip label="PRIVATE PROTOTYPE" />
+              <StatusChip label="LIVE DESK" />
             </div>
           </div>
 
@@ -193,134 +263,61 @@ export function AppShell({
           </div>
 
           <div className={`mt-4 hidden ${isSidebarCollapsed ? "lg:hidden" : "lg:block"}`}>
-            <div className="signal-accent-surface mt-1.25 rounded-[0.46rem] p-3">
-              <p className="text-[0.84rem] font-semibold text-white">Protected Ticket Focus</p>
+            <div className="signal-accent-surface rounded-[0.46rem] p-3">
+              <p className="text-[0.84rem] font-semibold text-white">Current Focus</p>
               <p className="mt-1.5 text-[0.95rem] font-medium text-cyan-100">
                 {topScannerResult
                   ? `${topScannerResult.symbol} ${topScannerResult.strategy}`
-                  : "Awaiting scanner results"}
+                  : "Awaiting ranked opportunity"}
               </p>
-              <p className="mt-2.5 text-[0.82rem] leading-5 text-slate-300">
-                Best ranked setup remains aligned with the current market state and
-                protected sizing rules.
+              <p className="mt-2 text-[0.8rem] leading-5 text-slate-300">
+                Keep the desk centred on the best current setup instead of chasing every move.
               </p>
-              <button className="signal-button mt-3 inline-flex w-full items-center justify-center rounded-[0.46rem] px-3.5 py-2 text-[0.84rem] font-semibold">
-                Review Ticket
-              </button>
+              <Link
+                href={topScannerResult ? "/scanner" : "/"}
+                className="signal-button mt-3 inline-flex w-full items-center justify-center rounded-[0.46rem] px-3.5 py-2 text-[0.84rem] font-semibold"
+              >
+                Open Focus View
+              </Link>
             </div>
           </div>
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-white/6 bg-[#07111d]/90 backdrop-blur-xl">
-            <div className="flex flex-col gap-1 px-1.25 py-1">
-              <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.15fr)_minmax(220px,0.95fr)]">
-                <div className="signal-toolbar-card px-3 py-1.5">
-                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                    Watchlist Move
-                  </p>
-                  <p className="mt-0.5 text-[0.82rem] font-semibold text-white">
-                    {formatPercent(marketSnapshot.watchlistMove, true)}
-                  </p>
-                  <p className="mt-0.5 text-[0.76rem] text-slate-400">
-                    Average move across the synced workspace basket
-                  </p>
-                </div>
-                <div className="signal-toolbar-card px-3 py-1.5">
-                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                    Tradeable Setups
-                  </p>
-                  <p className="mt-0.5 text-[0.82rem] font-semibold text-white">
-                    {marketSnapshot.tradeableSetups}
-                  </p>
-                  <p className="mt-0.5 text-[0.76rem] text-slate-400">
-                    Ranked setups still inside the current plan
-                  </p>
-                </div>
-                <div className="signal-toolbar-card px-3 py-1.5">
-                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                    Blocked Setups
-                  </p>
-                  <p className="mt-0.5 text-[0.82rem] font-semibold text-white">
-                    {marketSnapshot.blockedSetups}
-                  </p>
-                  <p className="mt-0.5 text-[0.76rem] text-slate-400">
-                    Signals currently filtered by workflow rules
-                  </p>
-                </div>
-                <div className="signal-toolbar-card px-3 py-1.5">
-                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-                    Latest Sync
-                  </p>
-                  <p className="mt-0.5 text-[0.92rem] font-semibold text-cyan-200">
-                    {latestSyncLabel}
-                  </p>
-                  <p className="mt-0.5 text-[0.76rem] text-slate-300">
-                    Provider-backed market snapshot
-                  </p>
-                  <p className="mt-0.5 text-[0.68rem] text-slate-500">
-                    Background refresh runs automatically
-                  </p>
-                </div>
-                <div className="signal-success-surface rounded-[0.46rem] px-3 py-1.5">
-                  <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-emerald-200/70">
-                    System Status
-                  </p>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(34,197,94,0.5)]" />
-                    <p className="text-[0.8rem] font-semibold text-emerald-100">
-                      All systems operational
-                    </p>
-                  </div>
-                  <p className="mt-0.5 text-[0.68rem] text-slate-300">
-                    Current pulse: {marketSnapshot.state}.
-                  </p>
-                </div>
-                <div className="signal-toolbar-card flex items-center justify-between gap-2 px-2.5 py-1.5 sm:col-span-2 xl:col-span-1">
-                  <button className="signal-surface-soft flex h-8 w-8 shrink-0 items-center justify-center text-slate-300 transition hover:text-white">
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M10 3.5a4 4 0 0 1 4 4v2.2c0 .7.2 1.4.6 2l1.2 1.8H4.2l1.2-1.8c.4-.6.6-1.3.6-2V7.5a4 4 0 0 1 4-4Z" />
-                      <path d="M8 15.5a2 2 0 0 0 4 0" />
-                    </svg>
-                  </button>
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-[0.78rem] font-semibold text-white">
-                      AR
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[0.8rem] font-semibold leading-tight text-white">Alex Rivera</p>
-                      <p className="truncate text-[0.64rem] text-slate-400">Pro Member</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="grid gap-1 px-1.25 py-1 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(260px,1.1fr)]">
+              <HeaderMetric
+                label="Live Market"
+                value={marketSnapshot.state}
+                detail={`Auto-sync active · ${latestSyncLabel}`}
+                tone="text-cyan-200"
+              />
+              <HeaderMetric
+                label="Opportunity Feed"
+                value={`${marketSnapshot.tradeableSetups} ready / ${marketSnapshot.blockedSetups} waiting`}
+                detail="AI-ranked setups filtered against current desk conditions"
+              />
+              <HeaderMetric
+                label="Desk Risk"
+                value={`${formatPercent(marketSnapshot.openRisk)} open risk`}
+                detail={`Simulated equity ${formatCompactCurrency(marketSnapshot.simulatedEquity)}`}
+              />
 
-              <div className="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-slate-400 sm:text-[0.78rem]">
-                  <StatusChip label="PRIVATE PROTOTYPE" />
-                  <span>State: {marketSnapshot.state}</span>
-                  <span>Open risk: {formatPercent(marketSnapshot.openRisk)}</span>
-                  <span>Sim equity: {formatCompactCurrency(marketSnapshot.simulatedEquity)}</span>
-                </div>
-
-                <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-1.5 lg:w-[320px] lg:self-auto xl:w-90">
-                  <svg
-                    viewBox="0 0 20 20"
-                    className="h-4 w-4 shrink-0 text-slate-400"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  >
-                    <circle cx="8.5" cy="8.5" r="5.2" />
-                    <path d="m12.5 12.5 4.5 4.5" />
-                  </svg>
-                  <span className="truncate text-[0.78rem] text-slate-400">
-                    Search assets, strategies, or insights...
-                  </span>
-                  <span className="signal-surface-soft ml-auto rounded-[0.34rem] px-1.5 py-0.5 text-[0.64rem] font-semibold text-slate-500">
-                    K
-                  </span>
-                </div>
+              <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
+                <svg
+                  viewBox="0 0 20 20"
+                  className="h-4 w-4 shrink-0 text-slate-400"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                >
+                  <circle cx="8.5" cy="8.5" r="5.2" />
+                  <path d="m12.5 12.5 4.5 4.5" />
+                </svg>
+                <span className="truncate text-[0.78rem] text-slate-400">
+                  Search markets, opportunities, execution plans, or research memory...
+                </span>
+                <StatusChip label="LIVE" />
               </div>
             </div>
           </header>

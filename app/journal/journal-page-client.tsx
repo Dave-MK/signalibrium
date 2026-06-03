@@ -137,9 +137,9 @@ export default function JournalPageClient({
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Journal"
-        title="Trade memory starts with honest review"
-        description="The journal surface holds planned, simulated, taken, skipped, and closed trades alongside notes, emotion tags, and AI review. The goal is not just logging outcomes, but learning whether the process was clean."
+        eyebrow="Review Loop"
+        title="Turn trades into memory, not just history"
+        description="This is where your desk learns. Keep the plan, outcome, emotions, and AI critique together so the next decision benefits from the last one."
       />
 
       <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
@@ -157,7 +157,7 @@ export default function JournalPageClient({
       </div>
 
       <Panel className="p-3 sm:p-3.5">
-        <p className="micro-label">Create Journal Entry</p>
+        <p className="micro-label">New Review Entry</p>
         <div className="mt-3 grid gap-[5px] xl:grid-cols-[repeat(3,minmax(0,1fr))]">
           <label className="space-y-1">
             <span className="micro-label">Date</span>
@@ -290,7 +290,7 @@ export default function JournalPageClient({
       </Panel>
 
       <Panel className="p-3 sm:p-3.5">
-        <p className="micro-label">Recent Entries</p>
+        <p className="micro-label">Recent Reviews</p>
         <div className="mt-4 panel-stack-5">
           {journalEntries.map((entry) => {
             const linkedTicket = getLinkedTicket(entry.ticketId);

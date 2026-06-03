@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.signalibrium-next/
+/.signalibrium-build/
 /out/
 
 # production

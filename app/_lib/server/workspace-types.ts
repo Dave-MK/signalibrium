@@ -75,8 +75,63 @@ export type PersistedMarketSnapshot = {
   updatedAt: string;
 };
 
+export type PersistedMarketEvent = {
+  id: string;
+  title: string;
+  summary: string;
+  impact: "High" | "Medium" | "Low";
+  bias: "Bullish" | "Bearish" | "Neutral" | "Mixed";
+  scope: "Macro" | "Sector" | "Asset" | "Liquidity";
+  relatedSymbols: string[];
+  startsAt: string;
+  sourceLabel: string;
+  sourceType: "News" | "Calendar" | "Policy" | "Flow";
+  status: "Live" | "Upcoming" | "Recent";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PersistedConfirmationCheck = {
+  id: string;
+  symbol: string;
+  stance: "Long" | "Short" | "Neutral";
+  summary: string;
+  score: number;
+  overallStatus: "Confirmed" | "Mixed" | "Rejected";
+  linkedScannerResultId: string | null;
+  checks: Array<{
+    label: string;
+    status: "Confirmed" | "Mixed" | "Rejected";
+    detail: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PersistedAiOpportunity = {
+  id: string;
+  symbol: string;
+  side: "Long" | "Short";
+  title: string;
+  summary: string;
+  confidence: number;
+  action: "Buy" | "Sell" | "Wait";
+  entryPlan: string;
+  stopPlan: string;
+  targetPlan: string;
+  expectedMove: string;
+  invalidation: string;
+  marketContext: string;
+  newsContext: string;
+  confirmationContext: string;
+  linkedScannerResultId: string | null;
+  linkedBacktestId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PersistedWorkspaceData = {
-  schemaVersion: 3;
+  schemaVersion: 5;
   updatedAt: string;
   workspace: {
     id: string;
@@ -86,6 +141,7 @@ export type PersistedWorkspaceData = {
   };
   syncState: {
     sparklineCursor: number;
+    intelligenceLastSyncedAt: string;
   };
   watchlists: PersistedWatchlist[];
   tradeTickets: PersistedTradeTicket[];
@@ -94,4 +150,7 @@ export type PersistedWorkspaceData = {
   scannerResults: PersistedScannerResult[];
   backtests: PersistedBacktestRecord[];
   marketSnapshot: PersistedMarketSnapshot;
+  marketEvents: PersistedMarketEvent[];
+  confirmationChecks: PersistedConfirmationCheck[];
+  aiOpportunities: PersistedAiOpportunity[];
 };
