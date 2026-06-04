@@ -314,7 +314,7 @@ async function createIgSession() {
     headers: {
       Accept: "application/json; charset=UTF-8",
       "Content-Type": "application/json; charset=UTF-8",
-      Version: "1",
+      Version: "2",
       "X-IG-API-KEY": config.apiKey,
     },
     body: JSON.stringify({
@@ -516,7 +516,7 @@ async function fetchIgMarketSnapshot(definition: MarketDataAssetDefinition) {
   const epic = await resolveMarketEpic(definition);
   const response = await fetchIgJson<IgMarketDetailsResponse>(
     `/markets/${encodeURIComponent(epic)}`,
-    { version: "3" },
+    { version: "4" },
   );
   const priceFromBidOffer =
     typeof response.snapshot?.bid === "number" && typeof response.snapshot?.offer === "number"

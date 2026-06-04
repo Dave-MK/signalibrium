@@ -33,14 +33,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
     "**/*.mts",
-    ".signalibrium-next/types/**/*.ts",
-    ".signalibrium-next/dev/types/**/*.ts",
     ".signalibrium-build/types/**/*.ts",
     ".signalibrium-build/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".signalibrium-build"
   ]
 }

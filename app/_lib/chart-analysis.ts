@@ -84,6 +84,52 @@ function computeMacdSeries(values: number[]) {
   };
 }
 
+function computeBollingerBands(values: number[], period = 20, standardDeviations = 2) {
+  const middle: Array<number | null> = Array(values.length).fill(null);
+  const upper: Array<number | null> = Array(values.length).fill(null);
+  const lower: Array<number | null> = Array(values.length).fill(null);
+
+  for (let index = period - 1; index < values.length; index += 1) {
+    const window = values.slice(index - period + 1, index + 1);
+    const average = window.reduce((sum, value) => sum + value, 0) / period;
+    const variance =
+      window.reduce((sum, value) => sum + (value - average) ** 2, 0) / period;
+    const deviation = Math.sqrt(variance);
+
+    middle[index] = average;
+    upper[index] = average + deviation * standardDeviations;
+    lower[index] = average - deviation * standardDeviations;
+  }
+
+  return { lower, middle, upper };
+}
+
+function computeStochasticSeries(candles: LiveCandle[], period = 14) {
+  const series: Array<number | null> = Array(candles.length).fill(null);
+
+  for (let index = period - 1; index < candles.length; index += 1) {
+    const window = candles.slice(index - period + 1, index + 1);
+    const highestHigh = Math.max(...window.map((candle) => candle.high));
+    const lowestLow = Math.min(...window.map((candle) => candle.low));
+    const range = highestHigh - lowestLow;
+
+    series[index] =
+      range <= 0 ? 50 : ((candles[index].close - lowestLow) / range) * 100;
+  }
+
+  return series;
+}
+
+function computeRateOfChangeSeries(values: number[], period = 10) {
+  return values.map((value, index) => {
+    if (index < period || values[index - period] === 0) {
+      return null;
+    }
+
+    return ((value - values[index - period]) / values[index - period]) * 100;
+  });
+}
+
 function getLatestDefinedValue(series: Array<number | null>) {
   for (let index = series.length - 1; index >= 0; index -= 1) {
     const value = series[index];
@@ -185,6 +231,9 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const ema50 = computeEmaSeries(closes, 50);
   const rsi = computeRsiSeries(closes, 14);
   const macdSeries = computeMacdSeries(closes);
+  const bollingerBands = computeBollingerBands(closes, 20, 2);
+  const stochastic = computeStochasticSeries(candles, 14);
+  const roc10 = computeRateOfChangeSeries(closes, 10);
 
   const latestClose = closes.at(-1) ?? 0;
   const latestEma20 = getLatestDefinedValue(ema20);
@@ -193,6 +242,10 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const latestMacd = getLatestDefinedValue(macdSeries.macd);
   const latestSignal = getLatestDefinedValue(macdSeries.signal);
   const latestHistogram = getLatestDefinedValue(macdSeries.histogram);
+  const latestBollingerUpper = getLatestDefinedValue(bollingerBands.upper);
+  const latestBollingerLower = getLatestDefinedValue(bollingerBands.lower);
+  const latestStochastic = getLatestDefinedValue(stochastic);
+  const latestRoc10 = getLatestDefinedValue(roc10);
   const overall = buildOverallRead({
     close: latestClose,
     ema20: latestEma20,
@@ -317,6 +370,92 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
                     : "neutral",
               ),
         value: latestHistogram,
+      },
+      {
+        explanation:
+          latestBollingerUpper === null || latestBollingerLower === null
+            ? "Not enough candles yet."
+            : latestClose >= latestBollingerUpper
+              ? "Price is pressing the upper band and strength is extended."
+              : latestClose <= latestBollingerLower
+                ? "Price is pressing the lower band and weakness is stretched."
+                : "Price is trading inside the Bollinger envelope without an extreme stretch.",
+        label: "Bollinger",
+        signal:
+          latestBollingerUpper === null || latestBollingerLower === null
+            ? "neutral"
+            : latestClose >= latestBollingerUpper
+              ? "bullish"
+              : latestClose <= latestBollingerLower
+                ? "bearish"
+                : "neutral",
+        tone:
+          latestBollingerUpper === null || latestBollingerLower === null
+            ? "Balanced"
+            : formatSignalTone(
+                latestClose >= latestBollingerUpper
+                  ? "bullish"
+                  : latestClose <= latestBollingerLower
+                    ? "bearish"
+                    : "neutral",
+              ),
+        value: latestBollingerUpper ?? latestBollingerLower,
+      },
+      {
+        explanation:
+          latestStochastic === null
+            ? "Not enough candles yet."
+            : latestStochastic >= 70
+              ? "Fast momentum is pushing into the upper range."
+              : latestStochastic <= 30
+                ? "Fast momentum is pressing the lower range."
+                : "Fast momentum is balanced.",
+        label: "Stochastic",
+        signal:
+          latestStochastic === null
+            ? "neutral"
+            : latestStochastic >= 60
+              ? "bullish"
+              : latestStochastic <= 40
+                ? "bearish"
+                : "neutral",
+        tone:
+          latestStochastic === null
+            ? "Balanced"
+            : formatSignalTone(
+                latestStochastic >= 60
+                  ? "bullish"
+                  : latestStochastic <= 40
+                    ? "bearish"
+                    : "neutral",
+              ),
+        value: latestStochastic,
+      },
+      {
+        explanation:
+          latestRoc10 === null
+            ? "Not enough candles yet."
+            : latestRoc10 >= 2.5
+              ? "Ten-bar momentum is expanding positively."
+              : latestRoc10 <= -2.5
+                ? "Ten-bar momentum is deteriorating."
+                : "Ten-bar momentum is near flat.",
+        label: "ROC 10",
+        signal:
+          latestRoc10 === null
+            ? "neutral"
+            : latestRoc10 >= 2
+              ? "bullish"
+              : latestRoc10 <= -2
+                ? "bearish"
+                : "neutral",
+        tone:
+          latestRoc10 === null
+            ? "Balanced"
+            : formatSignalTone(
+                latestRoc10 >= 2 ? "bullish" : latestRoc10 <= -2 ? "bearish" : "neutral",
+              ),
+        value: latestRoc10,
       },
     ] as const,
   };

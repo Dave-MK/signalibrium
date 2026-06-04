@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 const links = [
   {
     href: "/",
-    label: "Command Center",
+    label: "Overview",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <rect x="2.5" y="2.5" width="6" height="6" rx="1.2" />
@@ -19,7 +19,7 @@ const links = [
   },
   {
     href: "/scanner",
-    label: "AI Opportunities",
+    label: "Opportunities",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <circle cx="8.5" cy="8.5" r="4.5" />
@@ -29,7 +29,7 @@ const links = [
   },
   {
     href: "/assets",
-    label: "Market Charts",
+    label: "Charts",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M3 15.5h14" />
@@ -40,23 +40,25 @@ const links = [
     ),
   },
   {
-    href: "/trade-tickets",
-    label: "Execution",
+    href: "/siggi-does-trading",
+    label: "Siggi does trading",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M3 7.5h14" />
-        <path d="M6 4.5h8" />
-        <path d="M5 7.5v8h10v-8" />
-        <path d="m8 11 1.5 1.5L13 9" />
+        <path d="M4 13.5 8 9.5l2.5 2.5L16 6.5" />
+        <path d="M13.5 6.5H16v2.5" />
+        <path d="M3 16.5h14" />
       </svg>
     ),
   },
   {
-    href: "/backtesting-lab",
-    label: "Research",
+    href: "/history",
+    label: "History",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M3 13.5c1.5 0 2-7 3.5-7s2 10 3.5 10 2-12 3.5-12S15 11 17 11" />
+        <path d="M3.5 4.5v11" />
+        <path d="M8.25 8v7.5" />
+        <path d="M13 6v9.5" />
+        <path d="M17 10v5.5" />
       </svg>
     ),
   },

@@ -36,7 +36,9 @@ export type MarketDataMeshSummary = {
     symbol: string;
     currentSource: Exclude<MarketDataProviderName, "hybrid">;
     currentAutomationPolicy: ProviderAutomationPolicy;
-    targetPrimarySource: "ig";
+    targetPrimarySource: "provider_mesh";
+    targetExecutionVenue: "ibkr" | "ig" | "manual";
+    requiresBrokerConfirmation: boolean;
     executionSafeNow: boolean;
     migrationPriority: "high" | "medium";
   }>;
@@ -128,8 +130,22 @@ function getCurrentAutomationPolicy(symbol: string): ProviderAutomationPolicy {
   return providerCatalog[source].automationPolicy;
 }
 
+function getTargetExecutionVenue(symbol: string): "ibkr" | "ig" | "manual" {
+  const source = getCurrentSource(symbol);
+
+  if (source === "ig") {
+    return "ig";
+  }
+
+  return "ibkr";
+}
+
+function requiresBrokerConfirmation(symbol: string) {
+  return getCurrentSource(symbol) !== "ig";
+}
+
 function isExecutionSafeNow(symbol: string) {
-  return getCurrentSource(symbol) === "ig";
+  return !requiresBrokerConfirmation(symbol);
 }
 
 function getMigrationPriority(symbol: string): "high" | "medium" {
@@ -149,7 +165,9 @@ export function getMarketDataMeshSummary(): MarketDataMeshSummary {
     symbol: definition.symbol,
     currentSource: getCurrentSource(definition.symbol),
     currentAutomationPolicy: getCurrentAutomationPolicy(definition.symbol),
-    targetPrimarySource: "ig" as const,
+    targetPrimarySource: "provider_mesh" as const,
+    targetExecutionVenue: getTargetExecutionVenue(definition.symbol),
+    requiresBrokerConfirmation: requiresBrokerConfirmation(definition.symbol),
     executionSafeNow: isExecutionSafeNow(definition.symbol),
     migrationPriority: getMigrationPriority(definition.symbol),
   }));
@@ -161,11 +179,11 @@ export function getMarketDataMeshSummary(): MarketDataMeshSummary {
     symbolPolicies,
     platformPolicy: {
       tradeAutomationRule:
-        "Only permit fully automated order generation and routing when the symbol is priced from an official execution-grade provider and that provider is healthy.",
+        "Use the research mesh to rank and analyse opportunities, but route orders only through a healthy execution venue with broker-confirmed prices and account state.",
       confirmationRule:
-        "Use a secondary official or public API for confidence checks, divergence detection, and market-memory enrichment before upgrading AI opportunities.",
+        "Use secondary sources for divergence checks, breadth, and AI memory, then confirm the final entry, stop, and target against the execution rail before trade placement.",
       degradedModeRule:
-        "If the execution-grade provider fails, switch the platform into research-only mode, keep charts/news alive from lower-trust sources, and require manual confirmation before any trade.",
+        "If the active execution venue fails, keep the research mesh running, switch the desk into broker-confirmation mode, and avoid silently auto-routing from a lower-trust feed.",
       scrapingRule:
         "Do not use scraped website data as a primary live price source, order-routing dependency, or uptime guarantee. If website-derived data is ever used, restrict it to non-critical research enrichment where terms allow it.",
     },

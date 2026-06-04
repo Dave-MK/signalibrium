@@ -107,6 +107,27 @@ function asNumberArray(value: unknown, field: string) {
   return value;
 }
 
+const assetClassOptions = [
+  "Crypto",
+  "ETF",
+  "Equity",
+  "Forex",
+  "Commodity",
+  "Index",
+] as const;
+
+export function parseConnectBrokerConnectionInput(body: unknown) {
+  if (!isRecord(body)) {
+    throw new Error("Invalid body");
+  }
+
+  return {
+    provider: asLiteral(body.provider, "provider", ["IBKR"] as const),
+    environment: asLiteral(body.environment, "environment", ["demo", "live"] as const),
+    label: asOptionalString(body.label),
+  };
+}
+
 export function parseCreateWatchlistInput(body: unknown) {
   if (!isRecord(body)) {
     throw new Error("Invalid body");
@@ -156,7 +177,7 @@ export function parseCreateTradeTicketInput(body: unknown) {
     strategy: asString(body.strategy, "strategy"),
     side: asLiteral(body.side, "side", ["Long", "Short"] as const),
     orderType: asLiteral(body.orderType, "orderType", ["Limit", "Market", "Stop Entry"] as const),
-    executionMode: asLiteral(body.executionMode, "executionMode", ["Paper", "IG Demo", "IG Live"] as const),
+    executionMode: asLiteral(body.executionMode, "executionMode", ["Paper", "IBKR Demo", "IBKR Live"] as const),
     timeInForce: asLiteral(body.timeInForce, "timeInForce", ["DAY", "GTC", "IOC"] as const),
     entry: asNumber(body.entry, "entry"),
     stopLoss: asNumber(body.stopLoss, "stopLoss"),
@@ -177,6 +198,7 @@ export function parseCreateTradeTicketInput(body: unknown) {
       ["Not Sent", "Pending", "Working", "Filled", "Partially Closed", "Closed", "Cancelled", "Rejected"] as const,
     ),
     brokerReference: asNullableString(body.brokerReference),
+    brokerDealId: asNullableString(body.brokerDealId),
     submittedAt: asNullableString(body.submittedAt),
     filledAt: asNullableString(body.filledAt),
     closedAt: asNullableString(body.closedAt),
@@ -218,7 +240,7 @@ export function parseUpdateTradeTicketInput(body: unknown) {
     next.orderType = asLiteral(body.orderType, "orderType", ["Limit", "Market", "Stop Entry"] as const);
   }
   if ("executionMode" in body) {
-    next.executionMode = asLiteral(body.executionMode, "executionMode", ["Paper", "IG Demo", "IG Live"] as const);
+    next.executionMode = asLiteral(body.executionMode, "executionMode", ["Paper", "IBKR Demo", "IBKR Live"] as const);
   }
   if ("timeInForce" in body) {
     next.timeInForce = asLiteral(body.timeInForce, "timeInForce", ["DAY", "GTC", "IOC"] as const);
@@ -246,6 +268,7 @@ export function parseUpdateTradeTicketInput(body: unknown) {
     );
   }
   if ("brokerReference" in body) next.brokerReference = asNullableString(body.brokerReference);
+  if ("brokerDealId" in body) next.brokerDealId = asNullableString(body.brokerDealId);
   if ("submittedAt" in body) next.submittedAt = asNullableString(body.submittedAt);
   if ("filledAt" in body) next.filledAt = asNullableString(body.filledAt);
   if ("closedAt" in body) next.closedAt = asNullableString(body.closedAt);
@@ -340,7 +363,7 @@ export function parseCreateAssetInput(body: unknown) {
   return {
     symbol: asString(body.symbol, "symbol").toUpperCase(),
     name: asString(body.name, "name"),
-    assetClass: asLiteral(body.assetClass, "assetClass", ["Crypto", "ETF", "Equity"] as const),
+    assetClass: asLiteral(body.assetClass, "assetClass", assetClassOptions),
     price: asNumber(body.price, "price"),
     change24h: asNumber(body.change24h, "change24h"),
     regime: asLiteral(body.regime, "regime", ["Risk-On", "Balanced", "Risk-Off"] as const),
@@ -367,7 +390,7 @@ export function parseUpdateAssetInput(body: unknown) {
 
   if ("name" in body) next.name = asString(body.name, "name");
   if ("assetClass" in body) {
-    next.assetClass = asLiteral(body.assetClass, "assetClass", ["Crypto", "ETF", "Equity"] as const);
+    next.assetClass = asLiteral(body.assetClass, "assetClass", assetClassOptions);
   }
   if ("price" in body) next.price = asNumber(body.price, "price");
   if ("change24h" in body) next.change24h = asNumber(body.change24h, "change24h");
@@ -414,10 +437,17 @@ export function parseCreateScannerResultInput(body: unknown) {
     riskReward: asNumber(body.riskReward, "riskReward"),
     liquidityStatus: asLiteral(body.liquidityStatus, "liquidityStatus", ["High", "Moderate", "Thin"] as const),
     tradeability: asLiteral(body.tradeability, "tradeability", ["TRADEABLE", "WATCH", "BLOCKED"] as const),
-    assetClass: asLiteral(body.assetClass, "assetClass", ["Crypto", "ETF", "Equity"] as const),
+    assetClass: asLiteral(body.assetClass, "assetClass", assetClassOptions),
     thesis: asString(body.thesis, "thesis"),
     linkedAssetSymbol: asString(body.linkedAssetSymbol, "linkedAssetSymbol").toUpperCase(),
     linkedBacktestId: asNullableString(body.linkedBacktestId),
+    analysisStatus: asLiteral(
+      body.analysisStatus ?? "Ranked",
+      "analysisStatus",
+      ["Ranked", "Analysing", "Analysed"] as const,
+    ),
+    analysisUpdatedAt: asNullableString(body.analysisUpdatedAt),
+    analysis: body.analysis === null || body.analysis === undefined ? null : (body.analysis as PersistedScannerResult["analysis"]),
   } satisfies Omit<PersistedScannerResult, "createdAt" | "updatedAt">;
 }
 
@@ -447,11 +477,20 @@ export function parseUpdateScannerResultInput(body: unknown) {
     next.tradeability = asLiteral(body.tradeability, "tradeability", ["TRADEABLE", "WATCH", "BLOCKED"] as const);
   }
   if ("assetClass" in body) {
-    next.assetClass = asLiteral(body.assetClass, "assetClass", ["Crypto", "ETF", "Equity"] as const);
+    next.assetClass = asLiteral(body.assetClass, "assetClass", assetClassOptions);
   }
   if ("thesis" in body) next.thesis = asString(body.thesis, "thesis");
   if ("linkedAssetSymbol" in body) next.linkedAssetSymbol = asString(body.linkedAssetSymbol, "linkedAssetSymbol").toUpperCase();
   if ("linkedBacktestId" in body) next.linkedBacktestId = asNullableString(body.linkedBacktestId);
+  if ("analysisStatus" in body) {
+    next.analysisStatus = asLiteral(
+      body.analysisStatus,
+      "analysisStatus",
+      ["Ranked", "Analysing", "Analysed"] as const,
+    );
+  }
+  if ("analysisUpdatedAt" in body) next.analysisUpdatedAt = asNullableString(body.analysisUpdatedAt);
+  if ("analysis" in body) next.analysis = body.analysis === null ? null : (body.analysis as PersistedScannerResult["analysis"]);
 
   return next;
 }

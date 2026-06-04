@@ -96,7 +96,7 @@ body::after {
   z-index: 0;
   border-radius: 9999px;
   filter: blur(80px);
-  opacity: 0.45;
+  opacity: 0.22;
 }
 
 body::before {
@@ -146,11 +146,10 @@ a {
 }
 
 .panel-hover:hover {
-  transform: translateY(-1px);
-  border-color: rgba(0, 229, 255, 0.18);
+  transform: none;
+  border-color: rgba(118, 134, 160, 0.2);
   box-shadow:
-    var(--panel-shadow),
-    0 0 0 1px rgba(0, 229, 255, 0.04);
+    var(--panel-shadow);
 }
 
 .panel::before,
@@ -274,9 +273,9 @@ a {
 
 .micro-label {
   color: var(--signal-gold);
-  font-size: 0.64rem;
+  font-size: 0.61rem;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.15em;
   line-height: 1.2;
   text-transform: uppercase;
 }

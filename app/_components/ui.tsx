@@ -22,8 +22,8 @@ const toneMap = {
   CLOSED: "border border-slate-400/18 bg-slate-400/10 text-slate-100",
   DRAFT: "border border-slate-400/18 bg-slate-400/10 text-slate-100",
   FILLED: "border border-emerald-400/18 bg-emerald-400/10 text-emerald-100",
-  "IG DEMO": "border border-cyan-300/18 bg-cyan-400/10 text-cyan-100",
-  "IG LIVE": "border border-red-500/22 bg-red-500/10 text-red-100",
+  "IBKR DEMO": "border border-cyan-300/18 bg-cyan-400/10 text-cyan-100",
+  "IBKR LIVE": "border border-red-500/22 bg-red-500/10 text-red-100",
   "NOT SENT": "border border-slate-400/18 bg-slate-400/10 text-slate-100",
   PENDING: "border border-amber-300/20 bg-amber-400/10 text-amber-100",
   PAPER: "border border-blue-400/20 bg-blue-500/10 text-blue-100",
@@ -59,23 +59,23 @@ export function PageHeader({
   description,
   action,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description: string;
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 py-1 lg:flex-row lg:items-start lg:justify-between">
-      <div className="max-w-[52rem] space-y-2.5 pl-1 sm:pl-1.5">
-        <p className="micro-label">{eyebrow}</p>
-        <h1 className="text-[1.55rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[1.9rem] lg:text-[2.12rem]">
+    <div className="flex flex-col gap-1 py-0.5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="max-w-[44rem] space-y-1 pl-1 sm:pl-1.5">
+        {eyebrow ? <p className="micro-label">{eyebrow}</p> : null}
+        <h1 className="text-[1.2rem] font-semibold leading-[1.08] tracking-tight text-white sm:text-[1.42rem] lg:text-[1.56rem]">
           {title}
         </h1>
-        <p className="max-w-3xl text-[0.86rem] leading-[1.75rem] text-slate-300 sm:text-[0.9rem]">
+        <p className="max-w-2xl text-[0.78rem] leading-5 text-slate-400 sm:text-[0.82rem]">
           {description}
         </p>
       </div>
-      {action ? <div className="shrink-0 self-start lg:mt-1">{action}</div> : null}
+      {action ? <div className="shrink-0 self-start lg:mt-0.5">{action}</div> : null}
     </div>
   );
 }
@@ -149,14 +149,14 @@ export function KeyValue({
   tooltip?: string;
 }) {
   return (
-    <div className="min-w-0 space-y-1">
+    <div className="min-w-0 space-y-0.5">
       <p className="micro-label">
         {tooltip ? <LabelWithTip label={label} tooltip={tooltip} /> : label}
       </p>
-      <p className="text-[0.95rem] font-semibold leading-tight text-white sm:text-[1rem]">
+      <p className="text-[0.88rem] font-semibold leading-tight text-white sm:text-[0.94rem]">
         {value}
       </p>
-      {detail ? <p className="text-[0.82rem] leading-5 text-slate-400">{detail}</p> : null}
+      {detail ? <p className="text-[0.76rem] leading-5 text-slate-400">{detail}</p> : null}
     </div>
   );
 }

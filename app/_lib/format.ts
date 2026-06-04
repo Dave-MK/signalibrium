@@ -1,7 +1,7 @@
 const currencyFormatter = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
   style: "currency",
-  currency: "USD",
+  currency: "GBP",
 });
 
 export function formatCurrency(value: number) {
@@ -30,7 +30,7 @@ export function formatCompactCurrency(value: number) {
       ? scaledValue.toFixed(0)
       : scaledValue.toFixed(1).replace(/\.0$/, "");
 
-  return `${sign}US$${formattedScaledValue}${selectedUnit.suffix}`;
+  return `${sign}£${formattedScaledValue}${selectedUnit.suffix}`;
 }
 
 export function formatPercent(value: number, signed = false) {
@@ -38,6 +38,10 @@ export function formatPercent(value: number, signed = false) {
     maximumFractionDigits: 1,
     signDisplay: signed ? "always" : "auto",
   }).format(value)}%`;
+}
+
+export function formatWinRate(value: number) {
+  return formatPercent(value <= 1 ? value * 100 : value);
 }
 
 export function formatNumber(value: number, maximumFractionDigits = 2) {

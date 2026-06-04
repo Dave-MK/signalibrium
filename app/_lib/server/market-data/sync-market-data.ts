@@ -1,4 +1,6 @@
 import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
+import { refreshPredictionMemory } from "../prediction-memory";
+import { syncSiggiAccount } from "../siggi-simulation";
 import {
   readWorkspaceData,
   writeWorkspaceData,
@@ -172,7 +174,7 @@ function buildMarketSnapshot(
     openRisk: Number(clamp(1 + fastAssets * 0.35 + elevatedAssets * 0.15, 0.8, 4.2).toFixed(2)),
     lastRefresh: formatSyncTimestamp(syncedAt),
     journalReminder: strongest
-      ? `Review ${strongest.symbol} follow-through after the live data refresh before accepting the next ticket.`
+      ? `Review ${strongest.symbol} follow-through after the live data refresh before acting on the next setup.`
       : data.marketSnapshot.journalReminder,
     updatedAt: syncedAt,
   };
@@ -269,7 +271,7 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
     return buildCachedSyncSummary(
       data,
       provider,
-      `Auto-sync is cooling down to stay inside the current IG request cadence. The next refresh window opens in about ${secondsRemaining}s.`,
+      `Auto-sync is cooling down to stay inside the current provider cadence. The next refresh window opens in about ${secondsRemaining}s.`,
     );
   }
 
@@ -327,15 +329,17 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   }
 
   if (syncedSymbols.length === 0) {
-    const rateLimitWarning = warnings.find((warning) =>
-      warning.message.toLowerCase().includes("api credits"),
+    const rateLimitWarning = warnings.find(
+      (warning) =>
+        warning.message.toLowerCase().includes("allowance") ||
+        warning.message.toLowerCase().includes("rate limit"),
     );
 
     if (rateLimitWarning) {
       return buildCachedSyncSummary(
         data,
         provider,
-        "IG declined the latest refresh because the current account allowance is cooling down, so Signalibrium kept the last successful market snapshot and will try again on the next cycle.",
+        "The live-data providers are cooling down, so Signalibrium kept the last successful market snapshot and will try again on the next cycle.",
       );
     }
 
@@ -347,6 +351,8 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
 
   data.assets = nextAssets;
   data.marketSnapshot = buildMarketSnapshot(data, nextAssets, syncedAt);
+  await refreshPredictionMemory(data, syncedAt);
+  syncSiggiAccount(data, syncedAt);
 
   const persisted = await writeWorkspaceData(data);
 

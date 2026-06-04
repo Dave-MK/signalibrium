@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
+import { summarizePredictionAccuracy } from "./_lib/bot-engine";
+import { getDisplayCurrencyState } from "./_lib/server/currency-preference";
 import { getMarketSnapshot } from "./_lib/server/repositories/market-snapshot";
+import { listPredictionHistory } from "./_lib/server/repositories/prediction-history";
 import { listScannerResults } from "./_lib/server/repositories/scanner-results";
 import { AppShell } from "./_components/app-shell";
+import { DisplayCurrencyProvider } from "./_components/display-currency-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Signalibrium | Personal AI Trading Desk",
+  title: "Signalibrium | Siggi",
   description:
-    "Personal AI trading platform for market briefings, watchlists, setup ranking, protected execution planning, and review memory.",
+    "Siggi monitors markets, weighs event-aware analysis, and helps with visual chart review and short-term trade timing.",
 };
 
 export default async function RootLayout({
@@ -15,20 +19,32 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [marketSnapshot, scannerResults] = await Promise.all([
+  const [displayCurrencyState, marketSnapshot, predictionHistory, scannerResults] = await Promise.all([
+    getDisplayCurrencyState(),
     getMarketSnapshot(),
+    listPredictionHistory(),
     listScannerResults(),
   ]);
+  const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
+  const topScannerResult =
+    [...scannerResults].sort((left, right) => right.score - left.score)[0] ?? null;
 
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
-        <AppShell
-          marketSnapshot={marketSnapshot}
-          topScannerResult={scannerResults[0] ?? null}
+        <DisplayCurrencyProvider
+          currency={displayCurrencyState.currency}
+          rates={displayCurrencyState.rates}
         >
-          {children}
-        </AppShell>
+          <AppShell
+            displayCurrency={displayCurrencyState.currency}
+            marketSnapshot={marketSnapshot}
+            predictionAccuracy={predictionAccuracy}
+            topScannerResult={topScannerResult}
+          >
+            {children}
+          </AppShell>
+        </DisplayCurrencyProvider>
       </body>
     </html>
   );

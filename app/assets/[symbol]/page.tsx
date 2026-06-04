@@ -1,50 +1,49 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { notFound } from "next/navigation";
+import { formatCurrencyForDisplay } from "@/app/_lib/currency";
+import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
+import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getAssetBySymbol } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
-import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
+import { listConfirmationChecks } from "@/app/_lib/server/repositories/confirmation-checks";
+import { listMarketEvents } from "@/app/_lib/server/repositories/market-events";
+import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
-import { listTradeTickets } from "@/app/_lib/server/repositories/trade-tickets";
-import { listWatchlists } from "@/app/_lib/server/repositories/watchlists";
 import { buildFallbackChart } from "@/app/_lib/server/market-data/fallback-chart";
 import { fetchLiveCandlesForSymbol } from "@/app/_lib/server/market-data/market-data";
 import { strategies } from "../../_data/mock-data";
 import {
-  formatDateLabel,
-  formatCurrency,
+  formatDateTimeLabel,
   formatPercent,
-  formatRiskReward,
+  formatWinRate,
 } from "../../_lib/format";
-import {
-  ActionLink,
-  KeyValue,
-  Panel,
-  PageHeader,
-  StatusChip,
-} from "../../_components/ui";
 import { AssetLiveChartPanel } from "../../_components/asset-live-chart-panel";
+import { ActionLink, KeyValue, Panel, PageHeader, StatusChip } from "../../_components/ui";
 
 export default async function AssetDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ symbol: string }>;
+  searchParams?: Promise<{ setup?: string }>;
 }) {
   const { symbol } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const asset = await getAssetBySymbol(symbol);
 
   if (!asset) {
     notFound();
   }
 
-  const [watchlists, tradeTickets, journalEntries, scannerResults, backtests] =
-    await Promise.all([
-      listWatchlists(),
-      listTradeTickets(),
-      listJournalEntries(),
-      listScannerResults(),
-      listBacktests(),
-    ]);
+  const [scannerResults, backtests, confirmationChecks, marketEvents, predictionHistory, displayCurrencyState] = await Promise.all([
+    listScannerResults(),
+    listBacktests(),
+    listConfirmationChecks(),
+    listMarketEvents(),
+    listPredictionHistory(),
+    getDisplayCurrencyState(),
+  ]);
   const configuredChartVendor =
     process.env.SIGNALIBRIUM_CHART_VENDOR?.trim().toLowerCase() === "charting_library"
       ? "charting_library"
@@ -52,218 +51,248 @@ export default async function AssetDetailPage({
   const chartingLibraryAvailable = existsSync(
     path.join(process.cwd(), "public", "charting_library", "charting_library.js"),
   );
-  const initialChart = await fetchLiveCandlesForSymbol(asset.symbol, "1h", 48).catch(
-    () => buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt, "1h"),
+  const initialChart = await fetchLiveCandlesForSymbol(asset.symbol, "1h", 64).catch(() =>
+    buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt, "1h"),
   );
 
-  const assetSetups = scannerResults.filter((result) => result.symbol === asset.symbol);
-  const matchedStrategy = strategies.find(
-    (strategy) => strategy.name === asset.activeStrategy,
+  const assetSetups = scannerResults
+    .filter((result) => result.symbol === asset.symbol)
+    .sort((left, right) => right.score - left.score);
+  const selectedSetup =
+    assetSetups.find((setup) => setup.id === resolvedSearchParams?.setup) ?? assetSetups[0] ?? null;
+  const relatedBacktests = backtests.filter((backtest) => backtest.linkedAssetSymbol === asset.symbol);
+  const relatedChecks = confirmationChecks.filter((check) => check.symbol === asset.symbol);
+  const relatedEvents = marketEvents.filter(
+    (event) => event.relatedSymbols.includes(asset.symbol) || event.scope === "Macro",
   );
-  const relatedBacktests = backtests.filter((backtest) => backtest.asset === asset.symbol);
-  const relatedTickets = tradeTickets.filter((ticket) => ticket.symbol === asset.symbol);
-  const relatedTicketIds = new Set(relatedTickets.map((ticket) => ticket.id));
-  const relatedJournalEntries = journalEntries.filter(
-    (entry) => entry.asset === asset.symbol || (entry.ticketId ? relatedTicketIds.has(entry.ticketId) : false),
-  );
-  const containingWatchlists = watchlists.filter((watchlist) =>
-    watchlist.itemSymbols.includes(asset.symbol),
-  );
-  const latestJournalEntry = [...relatedJournalEntries].sort(
-    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
-  )[0];
+  const selectedView = selectedSetup
+    ? buildBotOpportunityView(
+        selectedSetup,
+        asset,
+        confirmationChecks,
+        marketEvents,
+        backtests,
+        predictionHistory,
+      )
+    : null;
+  const matchedStrategy = strategies.find((strategy) => strategy.name === asset.activeStrategy) ?? null;
+  const formatDisplayPrice = (value: number, digits = 2) =>
+    formatCurrencyForDisplay(
+      value,
+      displayCurrencyState.currency,
+      displayCurrencyState.rates,
+      digits,
+    );
+  const entryZoneLabel =
+    selectedSetup?.analysis
+      ? `${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.low, asset.assetClass === "Forex" ? 4 : 2)} - ${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.high, asset.assetClass === "Forex" ? 4 : 2)}`
+      : selectedView?.entry ?? selectedSetup?.entryZone ?? "Awaiting setup";
+  const discountedEntryLabel =
+    selectedSetup?.analysis
+      ? selectedView?.discountedEntry
+        ? (() => {
+            const [lowRaw, highRaw] = selectedView.discountedEntry.split(" - ").map(Number);
+            return Number.isFinite(lowRaw) && Number.isFinite(highRaw)
+              ? `${formatDisplayPrice(lowRaw, asset.assetClass === "Forex" ? 4 : 2)} - ${formatDisplayPrice(highRaw, asset.assetClass === "Forex" ? 4 : 2)}`
+              : selectedView.discountedEntry;
+          })()
+        : selectedView?.discountedEntry ?? "Awaiting setup"
+      : selectedView?.discountedEntry ?? "Awaiting setup";
+  const stopLabel =
+    selectedSetup?.analysis
+      ? formatDisplayPrice(
+          selectedSetup.analysis.chartAnnotations.stopLevel,
+          asset.assetClass === "Forex" ? 4 : 2,
+        )
+      : selectedView?.stop ?? "Awaiting setup";
+  const targetLabel =
+    selectedSetup?.analysis
+      ? formatDisplayPrice(
+          selectedSetup.analysis.chartAnnotations.targetLevel,
+          asset.assetClass === "Forex" ? 4 : 2,
+        )
+      : selectedView?.target ?? "Awaiting setup";
 
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Asset Workstation"
         title={`${asset.symbol} market map`}
-        description={`${asset.name} currently maps to the ${asset.activeStrategy} playbook. Use this view to follow price, inspect structure, connect live setups, and decide whether the name deserves an execution plan.`}
-        action={
-          relatedTickets[0] ? (
-            <ActionLink href={`/trade-tickets/${relatedTickets[0].id}`}>Open Execution Plan</ActionLink>
-          ) : (
-            <ActionLink href="/scanner">Open Opportunity Radar</ActionLink>
-          )
-        }
+        description={`Track ${asset.name} with the live chart, current setup, and replay context in one place.`}
+        action={<ActionLink href="/scanner">Open Leaderboard</ActionLink>}
       />
 
       <AssetLiveChartPanel
+        analysisOverlay={selectedSetup?.analysis ?? null}
         chartVendor={configuredChartVendor}
         chartingLibraryAvailable={chartingLibraryAvailable}
-        symbol={asset.symbol}
+        initialChart={initialChart}
         name={asset.name}
         price={asset.price}
-        initialChart={initialChart}
+        selectedOpportunityId={selectedSetup?.id ?? null}
+        selectedOpportunityLabel={
+          selectedSetup ? `${selectedSetup.symbol} / ${selectedSetup.strategy}` : null
+        }
+        symbol={asset.symbol}
       />
 
-      <div className="grid gap-[5px] xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.2fr)_minmax(0,0.9fr)]">
+      <div className="grid gap-[5px] xl:grid-cols-[1.08fr_0.92fr]">
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">AI Read</p>
-          <div className="mt-3 grid gap-[5px]">
-            <KeyValue
-              label="Tradeability"
-              value={asset.tradeable ? "Ticket ready" : "Watchlist only"}
-              detail="Protected sizing is allowed only when regime and liquidity line up."
-              tooltip="Whether the asset currently clears the app's regime and liquidity filters for a prepared trade ticket."
-            />
+          <p className="micro-label">Lead setup</p>
+          {selectedSetup && selectedView ? (
+            <>
+              <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[1rem] font-semibold text-white sm:text-[1.08rem]">
+                    {selectedSetup.strategy}
+                  </h2>
+                  <p className="mt-1 text-[0.82rem] leading-5 text-slate-300">
+                    {selectedView.rationale}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <StatusChip label={selectedView.decision.label} />
+                  <StatusChip label={selectedSetup.timeframe} />
+                  <StatusChip label={selectedView.opportunityAction} />
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
+                <KeyValue
+                  label="Trend"
+                  value={selectedView.direction}
+                  detail={`${selectedView.confidence}% confidence`}
+                />
+                <KeyValue
+                  label="Entry zone"
+                  value={entryZoneLabel}
+                  detail="Original analysis band"
+                />
+                <KeyValue
+                  label="Better fill"
+                  value={discountedEntryLabel}
+                  detail={selectedView.discountedEntryDetail}
+                />
+                <KeyValue label="Stop" value={stopLabel} detail="Invalidation level" />
+                <KeyValue label="Target" value={targetLabel} detail="First profit objective" />
+                <KeyValue
+                  label="Action now"
+                  value={selectedView.decision.label}
+                  detail={selectedView.timingWindow}
+                />
+                <KeyValue
+                  label="Event tone"
+                  value={selectedView.eventTone}
+                  detail={selectedView.eventSchedule}
+                />
+                <KeyValue
+                  label="Live replay"
+                  value={selectedView.similarMemorySummary}
+                  detail="Resolved enter-now memory in similar conditions"
+                />
+                <KeyValue
+                  label="Horizon"
+                  value={selectedView.horizon}
+                  detail={`${selectedSetup.timeframe} structure`}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-[0.82rem] text-slate-400">
+              This instrument is synced and chartable, but it does not have a ranked setup attached yet.
+            </p>
+          )}
+        </Panel>
+
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Siggi context</p>
+          <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <KeyValue
               label="Forecast"
               value={asset.forecast}
-              detail="Scenario framing generated from deterministic structure and regime context."
-              tooltip="A plain-language scenario describing what needs to happen next for the current thesis to stay valid."
+              detail="Current short-term scenario"
             />
             <KeyValue
-              label="AI Explanation"
+              label="AI read"
               value={asset.aiBias}
-              detail="Grounded language, not prediction theatre."
-              tooltip="A concise interpretation layer built from the stored asset state rather than a live predictive model."
+              detail="Why this market is being handled this way"
             />
+            <KeyValue
+              label="Liquidity"
+              value={asset.liquidity}
+              detail={asset.volatility}
+            />
+            <KeyValue
+              label="ATR"
+              value={formatDisplayPrice(asset.atr, asset.assetClass === "Forex" ? 4 : 2)}
+              detail={`${asset.tradeable ? "Tradeable" : "Watch only"} / ${asset.regime}`}
+            />
+          </div>
+
+          {matchedStrategy ? (
+            <div className="signal-accent-surface mt-3 rounded-[0.46rem] p-3">
+              <p className="micro-label">Playbook</p>
+              <p className="mt-1.5 text-[0.96rem] font-semibold text-white">{matchedStrategy.name}</p>
+              <p className="mt-1 text-[0.82rem] leading-5 text-slate-200">{matchedStrategy.thesis}</p>
+            </div>
+          ) : null}
+        </Panel>
+      </div>
+
+      <div className="grid gap-[5px] xl:grid-cols-[0.95fr_1.05fr]">
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Event pressure</p>
+          <div className="mt-3 panel-stack-5">
+            {relatedEvents.slice(0, 4).map((event) => (
+              <div key={event.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[0.9rem] font-semibold text-white">{event.title}</p>
+                    <p className="mt-1 text-[0.76rem] text-slate-400">
+                      {event.status} / {event.scope} / {event.sourceLabel} / {formatDateTimeLabel(event.startsAt)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusChip label={event.impact.toUpperCase()} />
+                    <StatusChip label={event.bias.toUpperCase()} />
+                  </div>
+                </div>
+                <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{event.summary}</p>
+              </div>
+            ))}
           </div>
         </Panel>
 
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Desk Context</p>
-          <div className="mt-3 grid gap-[5px] sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-            <KeyValue
-              label="Watchlists"
-              value={String(containingWatchlists.length)}
-              detail={containingWatchlists[0]?.name ?? "Not currently saved"}
-              tooltip="How many of your saved watchlists currently include this asset."
-            />
-            <KeyValue
-              label="Trade Tickets"
-              value={String(relatedTickets.length)}
-              detail={relatedTickets[0]?.status ?? "No linked ticket yet"}
-              tooltip="The count of prepared or simulated execution plans in your desk that reference this asset."
-            />
-            <KeyValue
-              label="Journal Entries"
-              value={String(relatedJournalEntries.length)}
-              detail={latestJournalEntry ? formatDateLabel(latestJournalEntry.date) : "No saved review yet"}
-              tooltip="Saved trade reviews or notes that either mention this asset directly or are linked through one of its tickets."
-            />
-          </div>
-
-          {relatedTickets.length > 0 ? (
-            <div className="mt-3 panel-stack-5">
-              {relatedTickets.slice(0, 2).map((ticket) => (
-                <div
-                  key={ticket.id}
-                  className="signal-surface-soft rounded-[0.4rem] p-3"
-                >
+          <p className="micro-label">Confirmation and replay memory</p>
+          <div className="mt-3 grid gap-[5px] xl:grid-cols-2">
+            <div className="panel-stack-5">
+              {relatedChecks.slice(0, 2).map((check) => (
+                <div key={check.id} className="signal-surface-soft rounded-[0.4rem] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[0.88rem] font-semibold text-white">{ticket.strategy}</p>
-                      <p className="mt-0.5 text-[0.78rem] text-slate-400">
-                        Entry {formatCurrency(ticket.entry)} / Target {formatCurrency(ticket.takeProfit)}
-                      </p>
+                      <p className="text-[0.9rem] font-semibold text-white">{check.symbol}</p>
+                      <p className="mt-1 text-[0.76rem] text-slate-400">{check.stance} setup</p>
                     </div>
-                    <StatusChip label={ticket.status.toUpperCase()} />
+                    <StatusChip label={check.overallStatus.toUpperCase()} />
+                  </div>
+                  <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{check.summary}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="panel-stack-5">
+              {relatedBacktests.slice(0, 2).map((backtest) => (
+                <div key={backtest.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <p className="text-[0.9rem] font-semibold text-white">{backtest.strategy}</p>
+                  <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
+                    <KeyValue label="Win rate" value={formatWinRate(backtest.winRate)} />
+                    <KeyValue label="Profit factor" value={backtest.profitFactor.toFixed(2)} />
+                    <KeyValue label="Return" value={formatPercent(backtest.totalReturn)} />
+                    <KeyValue label="Max DD" value={formatPercent(backtest.maxDrawdown)} />
                   </div>
                 </div>
               ))}
             </div>
-          ) : null}
-
-          {latestJournalEntry ? (
-            <div className="signal-accent-surface mt-3 rounded-[0.4rem] p-3">
-              <p className="text-[0.84rem] font-semibold text-white">Latest review memory</p>
-              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-200">
-                {latestJournalEntry.aiReview}
-              </p>
-            </div>
-          ) : null}
-        </Panel>
-
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Playbook Match</p>
-          <h2 className="mt-2.5 text-[1rem] font-semibold text-white sm:text-[1.1rem]">
-            {matchedStrategy?.name}
-          </h2>
-          <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
-            {matchedStrategy?.thesis}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {matchedStrategy?.bestRegimes.map((regime) => (
-              <StatusChip key={regime} label={regime.toUpperCase()} />
-            ))}
-          </div>
-        </Panel>
-      </div>
-
-      <div className="grid gap-[5px] xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Live Setups</p>
-          <div className="mt-3 panel-stack-5">
-            {assetSetups.map((setup) => (
-              <div
-                key={setup.id}
-                className="signal-surface-soft rounded-[0.4rem] p-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[0.92rem] font-semibold text-white">{setup.strategy}</p>
-                    <p className="text-[0.82rem] text-slate-400">{setup.timeframe}</p>
-                  </div>
-                  <StatusChip label={setup.tradeability} />
-                </div>
-                <div className="mt-3 grid gap-[5px] sm:grid-cols-2 lg:grid-cols-4">
-                  <KeyValue label="Entry" value={setup.entryZone} />
-                  <KeyValue
-                    label="Stop"
-                    value={setup.stopLoss}
-                    tooltip="The price level where the setup is considered invalid and the trade should be exited."
-                  />
-                  <KeyValue
-                    label="Target"
-                    value={setup.takeProfit}
-                    tooltip="The first planned take-profit zone for the setup."
-                  />
-                  <KeyValue
-                    label="Risk/Reward"
-                    value={formatRiskReward(setup.riskReward)}
-                    tooltip="The projected upside divided by the planned downside for the setup."
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Edge Replay Summary</p>
-          <div className="mt-3 panel-stack-5">
-            {relatedBacktests.map((backtest) => (
-              <div
-                key={backtest.id}
-                className="signal-surface-soft rounded-[0.4rem] p-3"
-              >
-                <p className="text-[0.92rem] font-semibold text-white">{backtest.strategy}</p>
-                <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
-                  <KeyValue
-                    label="Total Return"
-                    value={formatPercent(backtest.totalReturn)}
-                    tooltip="Overall percentage gain or loss across the tested period."
-                  />
-                  <KeyValue
-                    label="Max Drawdown"
-                    value={formatPercent(backtest.maxDrawdown)}
-                    tooltip="The deepest peak-to-trough decline experienced during the backtest."
-                  />
-                  <KeyValue
-                    label="Win Rate"
-                    value={formatPercent(backtest.winRate)}
-                    tooltip="The percentage of simulated trades that closed profitable."
-                  />
-                  <KeyValue
-                    label="Profit Factor"
-                    value={backtest.profitFactor.toFixed(2)}
-                    tooltip="Gross profits divided by gross losses. Higher means the strategy kept more of what it made."
-                  />
-                </div>
-              </div>
-            ))}
           </div>
         </Panel>
       </div>

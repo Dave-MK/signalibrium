@@ -8,18 +8,14 @@ import type {
   PersistedAssetRecord,
   PersistedWatchlist,
 } from "@/app/_lib/server/workspace-types";
+import { useDisplayCurrency } from "../_components/display-currency-provider";
 import { Sparkline } from "../_components/sparkline";
 import { ActionLink, PageHeader, Panel, StatusChip } from "../_components/ui";
-import { formatCurrency, formatDateTimeLabel, formatPercent } from "../_lib/format";
-import {
-  getDefaultPersistedWatchlist,
-} from "../_lib/reference-data";
-import {
-  createWatchlist,
-  updateWatchlist,
-} from "../_lib/workspace-api";
+import { formatDateTimeLabel, formatPercent } from "../_lib/format";
+import { getDefaultPersistedWatchlist } from "../_lib/reference-data";
+import { createWatchlist, updateWatchlist } from "../_lib/workspace-api";
 
-function AssetMetric({
+function WatchMetric({
   label,
   value,
 }: {
@@ -29,7 +25,7 @@ function AssetMetric({
   return (
     <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
       <p className="micro-label">{label}</p>
-      <p className="mt-1.5 text-[0.84rem] font-semibold text-white">{value}</p>
+      <p className="mt-1.5 text-[0.82rem] font-semibold text-white">{value}</p>
     </div>
   );
 }
@@ -42,6 +38,7 @@ export default function AssetsPageClient({
   initialAssets: PersistedAssetRecord[];
 }) {
   const router = useRouter();
+  const { formatCurrency } = useDisplayCurrency();
   const initialSelectedWatchlist = getDefaultPersistedWatchlist(initialWatchlists);
   const [watchlists, setWatchlists] = useState<PersistedWatchlist[]>(initialWatchlists);
   const [assets, setAssets] = useState<PersistedAssetRecord[]>(initialAssets);
@@ -92,11 +89,7 @@ export default function AssetsPageClient({
   }, [router]);
 
   const visibleAssets = useMemo(() => {
-    if (!selectedWatchlist) {
-      return assets;
-    }
-
-    if (selectedWatchlist.itemSymbols.length === 0) {
+    if (!selectedWatchlist || selectedWatchlist.itemSymbols.length === 0) {
       return assets;
     }
 
@@ -147,9 +140,7 @@ export default function AssetsPageClient({
       });
 
       setWatchlists((current) =>
-        current.map((watchlist) =>
-          watchlist.id === updated.id ? updated : watchlist,
-        ),
+        current.map((watchlist) => (watchlist.id === updated.id ? updated : watchlist)),
       );
     } catch (toggleError) {
       setError(toggleError instanceof Error ? toggleError.message : "Unable to update watchlist");
@@ -161,56 +152,57 @@ export default function AssetsPageClient({
   return (
     <div className="panel-stack-5">
       <PageHeader
-        eyebrow="Market Charts"
-        title="Live markets with less clutter"
-        description="Keep this page focused on the names that matter. Use it to watch the live basket, jump into full chart workstations, and maintain a clean watchlist instead of scanning noise."
-        action={<ActionLink href={visibleAssets[0] ? `/assets/${visibleAssets[0].symbol}` : "/assets"}>Open First Chart</ActionLink>}
+        title="Watchlist"
+        description="Scan the basket, then open the chart as soon as something sets up."
+        action={
+          <ActionLink href={visibleAssets[0] ? `/assets/${visibleAssets[0].symbol}` : "/assets"}>
+            Open First Chart
+          </ActionLink>
+        }
       />
 
       <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-3">
-            <div>
-              <p className="micro-label">Active Watchlists</p>
-              <div className="mt-3 flex flex-wrap gap-[5px]">
-                {watchlists.map((watchlist) => (
-                  <button
-                    key={watchlist.id}
-                    type="button"
-                    onClick={() => setSelectedWatchlistId(watchlist.id)}
-                    className={`inline-flex items-center gap-2 rounded-[0.4rem] px-3 py-2 text-[0.8rem] font-semibold transition ${
-                      watchlist.id === selectedWatchlistId
-                        ? "signal-accent-surface text-white"
-                        : "signal-surface-soft text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    <span>{watchlist.name}</span>
-                    <span className="text-[0.68rem] text-slate-400">{watchlist.itemSymbols.length}</span>
-                  </button>
-                ))}
-              </div>
+        <div className="grid gap-[5px] xl:grid-cols-[minmax(0,1fr)_240px]">
+          <div>
+            <p className="micro-label">Watchlists</p>
+            <div className="mt-3 flex flex-wrap gap-[5px]">
+              {watchlists.map((watchlist) => (
+                <button
+                  key={watchlist.id}
+                  type="button"
+                  onClick={() => setSelectedWatchlistId(watchlist.id)}
+                  className={`inline-flex items-center gap-2 rounded-[0.4rem] px-3 py-2 text-[0.8rem] font-semibold transition ${
+                    watchlist.id === selectedWatchlistId
+                      ? "signal-accent-surface text-white"
+                      : "signal-surface-soft text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <span>{watchlist.name}</span>
+                  <span className="text-[0.68rem] text-slate-400">{watchlist.itemSymbols.length}</span>
+                </button>
+              ))}
             </div>
 
             {syncSummary ? (
-              <div className="signal-surface-soft rounded-[0.4rem] p-3">
-                <p className="micro-label">Latest Sync</p>
-                <p className="mt-1.5 text-[0.9rem] font-semibold text-white">
-                  {syncSummary.syncedSymbols.length} symbols refreshed from {syncSummary.provider}
+              <div className="signal-surface-soft mt-3 rounded-[0.4rem] p-3">
+                <p className="micro-label">Live Sync</p>
+                <p className="mt-1.5 text-[0.84rem] font-semibold text-white">
+                  {syncSummary.syncedSymbols.length} symbols refreshed
                 </p>
                 <p className="mt-1 text-[0.76rem] text-slate-400">
-                  Synced {formatDateTimeLabel(syncSummary.syncedAt)}
+                  {syncSummary.provider} / {formatDateTimeLabel(syncSummary.syncedAt)}
                 </p>
               </div>
             ) : null}
           </div>
 
           <div className="signal-surface-soft rounded-[0.4rem] p-3">
-            <p className="micro-label">Create Watchlist</p>
+            <p className="micro-label">New Watchlist</p>
             <div className="mt-3 space-y-2.5">
               <input
                 value={newWatchlistName}
                 onChange={(event) => setNewWatchlistName(event.target.value)}
-                placeholder="AI Momentum"
+                placeholder="Momentum"
                 className="signal-surface-soft w-full rounded-[0.4rem] px-3 py-2 text-[0.84rem] text-white outline-none"
               />
               <button
@@ -225,12 +217,10 @@ export default function AssetsPageClient({
           </div>
         </div>
 
-        {error ? (
-          <p className="mt-3 text-[0.82rem] text-amber-200">{error}</p>
-        ) : null}
+        {error ? <p className="mt-3 text-[0.82rem] text-amber-200">{error}</p> : null}
       </Panel>
 
-      <div className="grid gap-[5px] lg:grid-cols-2">
+      <div className="grid gap-[5px] md:grid-cols-2 2xl:grid-cols-3">
         {visibleAssets.map((asset) => {
           const inSelectedWatchlist =
             selectedWatchlist?.itemSymbols.includes(asset.symbol) ?? false;
@@ -249,32 +239,30 @@ export default function AssetsPageClient({
                     </Link>
                     {asset.tradeable ? <StatusChip label="TRADEABLE" /> : <StatusChip label="WATCH" />}
                   </div>
-                  <p className="mt-0.5 text-[0.82rem] text-slate-400">{asset.name}</p>
+                  <p className="mt-0.5 text-[0.8rem] text-slate-400">{asset.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[1rem] font-semibold text-white">{formatCurrency(asset.price)}</p>
+                  <p className="text-[0.98rem] font-semibold text-white">{formatCurrency(asset.price)}</p>
                   <p className={`mt-0.5 text-[0.8rem] ${asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                     {formatPercent(asset.change24h, true)}
                   </p>
                 </div>
               </div>
 
-              <Sparkline data={asset.sparkline} className="mt-3 h-12 w-full" />
+              <Sparkline data={asset.sparkline} className="mt-3 h-10 w-full" />
 
               <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
-                <AssetMetric label="Regime" value={asset.regime} />
-                <AssetMetric label="Strategy" value={asset.activeStrategy} />
-                <AssetMetric label="Synced" value={formatDateTimeLabel(asset.lastSyncedAt)} />
+                <WatchMetric label="Regime" value={asset.regime} />
+                <WatchMetric label="Strategy" value={asset.activeStrategy} />
+                <WatchMetric label="Synced" value={formatDateTimeLabel(asset.lastSyncedAt)} />
               </div>
-
-              <p className="mt-3 text-[0.82rem] leading-5 text-slate-300">{asset.aiBias}</p>
 
               <div className="mt-3 flex flex-wrap gap-[5px]">
                 <Link
                   href={`/assets/${asset.symbol}`}
                   className="signal-accent-surface rounded-[0.4rem] px-3 py-2 text-[0.78rem] font-semibold text-white"
                 >
-                  Open Chart Workspace
+                  Open Chart
                 </Link>
                 {selectedWatchlist ? (
                   <button
@@ -287,7 +275,7 @@ export default function AssetsPageClient({
                         : "signal-surface-soft text-white"
                     }`}
                   >
-                    {inSelectedWatchlist ? "Remove From Watchlist" : "Add To Watchlist"}
+                    {inSelectedWatchlist ? "Remove" : "Add"}
                   </button>
                 ) : null}
               </div>

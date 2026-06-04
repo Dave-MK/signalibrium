@@ -3,16 +3,60 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  startTransition,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import type { PredictionAccuracySummary } from "@/app/_lib/bot-engine";
 import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
 import type {
   PersistedMarketSnapshot,
   PersistedScannerResult,
+  SupportedDisplayCurrency,
 } from "@/app/_lib/server/workspace-types";
-import { formatCompactCurrency, formatPercent } from "../_lib/format";
-import { syncMarketData, syncMarketIntelligence } from "../_lib/workspace-api";
+import { formatPercent } from "../_lib/format";
+import {
+  syncMarketData,
+  syncMarketIntelligence,
+  updateDisplayCurrency,
+} from "../_lib/workspace-api";
+import { useDisplayCurrency } from "./display-currency-provider";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
+
+const sidebarPreferenceStorageKey = "signalibrium.sidebar-collapsed";
+const sidebarPreferenceChangedEvent = "signalibrium:sidebar-preference-changed";
+
+function subscribeToSidebarPreference(callback: () => void) {
+  function handleStorage(event: StorageEvent) {
+    if (event.key === null || event.key === sidebarPreferenceStorageKey) {
+      callback();
+    }
+  }
+
+  function handlePreferenceChanged() {
+    callback();
+  }
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(sidebarPreferenceChangedEvent, handlePreferenceChanged);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(sidebarPreferenceChangedEvent, handlePreferenceChanged);
+  };
+}
+
+function getSidebarPreferenceSnapshot() {
+  return window.localStorage.getItem(sidebarPreferenceStorageKey) === "true";
+}
+
+function getSidebarPreferenceServerSnapshot() {
+  return false;
+}
 
 function HeaderMetric({
   label,
@@ -26,42 +70,38 @@ function HeaderMetric({
   tone?: string;
 }) {
   return (
-    <div className="signal-toolbar-card px-3 py-2">
+    <div className="signal-toolbar-card px-3 py-1.5">
       <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
         {label}
       </p>
-      <p className={`mt-1 text-[0.9rem] font-semibold ${tone}`}>{value}</p>
-      <p className="mt-0.5 text-[0.74rem] text-slate-400">{detail}</p>
+      <p className={`mt-0.5 text-[0.84rem] font-semibold ${tone}`}>{value}</p>
+      <p className="mt-0.5 text-[0.72rem] text-slate-400">{detail}</p>
     </div>
   );
 }
 
 export function AppShell({
   children,
+  displayCurrency,
   marketSnapshot,
+  predictionAccuracy,
   topScannerResult,
 }: {
   children: ReactNode;
+  displayCurrency: SupportedDisplayCurrency;
   marketSnapshot: PersistedMarketSnapshot;
+  predictionAccuracy: PredictionAccuracySummary;
   topScannerResult: PersistedScannerResult | null;
 }) {
   const router = useRouter();
+  const { currency: activeCurrency } = useDisplayCurrency();
   const autoSyncInFlightRef = useRef(false);
   const intelligenceSyncInFlightRef = useRef(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return window.localStorage.getItem("signalibrium.sidebar-collapsed") === "true";
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      "signalibrium.sidebar-collapsed",
-      String(isSidebarCollapsed),
-    );
-  }, [isSidebarCollapsed]);
+  const isSidebarCollapsed = useSyncExternalStore(
+    subscribeToSidebarPreference,
+    getSidebarPreferenceSnapshot,
+    getSidebarPreferenceServerSnapshot,
+  );
 
   const latestSyncLabel = marketSnapshot.lastRefresh || "Awaiting sync";
 
@@ -206,7 +246,12 @@ export function AppShell({
               aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               onClick={() => {
                 startTransition(() => {
-                  setIsSidebarCollapsed((currentValue) => !currentValue);
+                  const nextValue = !isSidebarCollapsed;
+                  window.localStorage.setItem(
+                    sidebarPreferenceStorageKey,
+                    String(nextValue),
+                  );
+                  window.dispatchEvent(new Event(sidebarPreferenceChangedEvent));
                 });
               }}
               className="signal-surface-soft pointer-events-auto ml-auto flex h-9 w-9 translate-x-[1.1rem] items-center justify-center border border-white/8 bg-[#091321]/98 text-slate-300 opacity-0 shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition-[transform,color,opacity] duration-200 hover:text-white group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100 after:absolute after:left-0 after:top-1/2 after:h-5 after:w-px after:-translate-x-full after:-translate-y-1/2 after:bg-white/12"
@@ -254,7 +299,7 @@ export function AppShell({
               </Link>
             </div>
             <div className="shrink-0 lg:hidden">
-              <StatusChip label="LIVE DESK" />
+              <StatusChip label="BOT LIVE" />
             </div>
           </div>
 
@@ -262,30 +307,29 @@ export function AppShell({
             <NavLinks collapsed={isSidebarCollapsed} />
           </div>
 
-          <div className={`mt-4 hidden ${isSidebarCollapsed ? "lg:hidden" : "lg:block"}`}>
-            <div className="signal-accent-surface rounded-[0.46rem] p-3">
-              <p className="text-[0.84rem] font-semibold text-white">Current Focus</p>
-              <p className="mt-1.5 text-[0.95rem] font-medium text-cyan-100">
-                {topScannerResult
-                  ? `${topScannerResult.symbol} ${topScannerResult.strategy}`
-                  : "Awaiting ranked opportunity"}
-              </p>
-              <p className="mt-2 text-[0.8rem] leading-5 text-slate-300">
-                Keep the desk centred on the best current setup instead of chasing every move.
-              </p>
-              <Link
-                href={topScannerResult ? "/scanner" : "/"}
-                className="signal-button mt-3 inline-flex w-full items-center justify-center rounded-[0.46rem] px-3.5 py-2 text-[0.84rem] font-semibold"
-              >
-                Open Focus View
-              </Link>
+          {!isSidebarCollapsed && topScannerResult ? (
+            <div className="mt-4 hidden lg:block">
+              <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                <p className="micro-label">Focus</p>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <p className="truncate text-[0.82rem] font-semibold text-white">
+                    {topScannerResult.symbol} {topScannerResult.strategy}
+                  </p>
+                  <Link
+                    href="/scanner"
+                    className="text-[0.74rem] font-medium text-slate-400 transition hover:text-white"
+                  >
+                    Open
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : null}
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-white/6 bg-[#07111d]/90 backdrop-blur-xl">
-            <div className="grid gap-1 px-1.25 py-1 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_minmax(260px,1.1fr)]">
+            <div className="grid gap-1 px-1.25 py-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]">
               <HeaderMetric
                 label="Live Market"
                 value={marketSnapshot.state}
@@ -293,14 +337,10 @@ export function AppShell({
                 tone="text-cyan-200"
               />
               <HeaderMetric
-                label="Opportunity Feed"
-                value={`${marketSnapshot.tradeableSetups} ready / ${marketSnapshot.blockedSetups} waiting`}
-                detail="AI-ranked setups filtered against current desk conditions"
-              />
-              <HeaderMetric
-                label="Desk Risk"
-                value={`${formatPercent(marketSnapshot.openRisk)} open risk`}
-                detail={`Simulated equity ${formatCompactCurrency(marketSnapshot.simulatedEquity)}`}
+                label="Prediction Accuracy"
+                value={`${predictionAccuracy.overallAccuracy}%`}
+                detail={`${predictionAccuracy.accuratePredictions} of ${predictionAccuracy.resolvedPredictions} resolved calls accurate · recent ${predictionAccuracy.recentAccuracy}%`}
+                tone="text-emerald-300"
               />
 
               <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
@@ -315,8 +355,30 @@ export function AppShell({
                   <path d="m12.5 12.5 4.5 4.5" />
                 </svg>
                 <span className="truncate text-[0.78rem] text-slate-400">
-                  Search markets, opportunities, execution plans, or research memory...
+                  Search markets, opportunities, event intelligence, or chart analysis...
                 </span>
+                <span className="hidden text-[0.72rem] text-slate-500 sm:inline">
+                  {marketSnapshot.tradeableSetups} ready · {formatPercent(marketSnapshot.openRisk)} risk
+                </span>
+                <select
+                  aria-label="Display currency"
+                  defaultValue={displayCurrency}
+                  value={activeCurrency}
+                  onChange={(event) => {
+                    startTransition(() => {
+                      void updateDisplayCurrency(
+                        event.target.value as SupportedDisplayCurrency,
+                      ).then(() => router.refresh());
+                    });
+                  }}
+                  className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.72rem] font-medium text-slate-200 outline-none"
+                >
+                  {(["GBP", "USD", "EUR"] as const).map((currencyOption) => (
+                    <option key={currencyOption} value={currencyOption}>
+                      {currencyOption}
+                    </option>
+                  ))}
+                </select>
                 <StatusChip label="LIVE" />
               </div>
             </div>

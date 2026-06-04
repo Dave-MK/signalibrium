@@ -6,6 +6,7 @@ import {
   type Setup,
 } from "@/app/_data/mock-data";
 import type {
+  OpportunityAnalysisSnapshot,
   PersistedAssetRecord,
   PersistedScannerResult,
   PersistedTradeTicket,
@@ -19,10 +20,30 @@ function parseCurrencyLabel(label: string) {
   return Number(label.replaceAll("$", "").replaceAll(",", "").trim());
 }
 
+function normalizePricePrecision(value: number) {
+  if (value < 2) {
+    return Number(value.toFixed(5));
+  }
+
+  if (value < 10) {
+    return Number(value.toFixed(4));
+  }
+
+  return Number(value.toFixed(2));
+}
+
+function getMinimumPriceDistance(value: number) {
+  if (value < 10) {
+    return 0.0001;
+  }
+
+  return 0.01;
+}
+
 function parseEntryZone(entryZone: string) {
   const [start, end] = entryZone.split("-").map((value) => parseCurrencyLabel(value));
   if (Number.isFinite(start) && Number.isFinite(end)) {
-    return Number(((start + end) / 2).toFixed(2));
+    return normalizePricePrecision((start + end) / 2);
   }
 
   return parseCurrencyLabel(entryZone);
@@ -44,6 +65,17 @@ type SetupLike = Pick<
   | "liquidityStatus"
   | "tradeability"
 >;
+
+function hasOpportunityAnalysis(
+  setup: SetupLike,
+): setup is SetupLike & { analysis: OpportunityAnalysisSnapshot } {
+  return (
+    "analysis" in setup &&
+    typeof setup.analysis === "object" &&
+    setup.analysis !== null &&
+    "chartAnnotations" in setup.analysis
+  );
+}
 
 export function resolveAssetsForWatchlist(
   itemSymbols: string[],
@@ -136,11 +168,22 @@ function buildTradeTicketInputFromSetupLike(
     throw new Error("Asset not found");
   }
 
-  const entry = parseEntryZone(setup.entryZone);
-  const stopLoss = parseCurrencyLabel(setup.stopLoss);
-  const takeProfit = parseCurrencyLabel(setup.takeProfit);
+  const analysisAnnotations = hasOpportunityAnalysis(setup)
+    ? setup.analysis.chartAnnotations
+    : null;
+  const entry = analysisAnnotations
+    ? normalizePricePrecision(
+        (analysisAnnotations.entryZone.low + analysisAnnotations.entryZone.high) / 2,
+      )
+    : parseEntryZone(setup.entryZone);
+  const stopLoss = analysisAnnotations
+    ? normalizePricePrecision(analysisAnnotations.stopLevel)
+    : parseCurrencyLabel(setup.stopLoss);
+  const takeProfit = analysisAnnotations
+    ? normalizePricePrecision(analysisAnnotations.targetLevel)
+    : parseCurrencyLabel(setup.takeProfit);
   const maxRiskCapital = accountSize * riskPerTrade;
-  const perUnitRisk = Math.max(Math.abs(entry - stopLoss), 0.01);
+  const perUnitRisk = Math.max(Math.abs(entry - stopLoss), getMinimumPriceDistance(entry));
   const quantity = Math.max(1, Math.round(maxRiskCapital / perUnitRisk));
   const estimatedValue = Number((quantity * entry).toFixed(2));
   const plannedLoss = Number((quantity * perUnitRisk).toFixed(2));
@@ -165,6 +208,7 @@ function buildTradeTicketInputFromSetupLike(
     status: "Ready",
     brokerStatus: "Not Sent",
     brokerReference: null,
+    brokerDealId: null,
     submittedAt: null,
     filledAt: null,
     closedAt: null,
