@@ -70,6 +70,38 @@ const providerCatalog: Record<
       "If IG is unavailable, the platform should switch to research mode rather than silently auto-trading from a weaker source.",
     ],
   },
+  coinbase: {
+    key: "coinbase",
+    name: "Coinbase Exchange",
+    trustLevel: "official",
+    supportsExecution: false,
+    supportsStreaming: true,
+    supportsHistoricalCandles: true,
+    currentUsage: ["price_confirmation", "charting_enrichment"],
+    targetUsage: ["price_confirmation", "charting_enrichment"],
+    automationPolicy: "manual_confirmation_required",
+    notes: [
+      "Use as the primary crypto market-data rail for public real-time prices and official candles.",
+      "The public WebSocket feed is appropriate for live crypto monitoring and significantly stronger than rate-limited aggregator snapshots.",
+      "This feed improves timing and replay accuracy, but it is still separate from broker execution and should be confirmed before live order routing.",
+    ],
+  },
+  kraken: {
+    key: "kraken",
+    name: "Kraken",
+    trustLevel: "official",
+    supportsExecution: false,
+    supportsStreaming: true,
+    supportsHistoricalCandles: true,
+    currentUsage: ["price_confirmation", "charting_enrichment"],
+    targetUsage: ["price_confirmation", "charting_enrichment"],
+    automationPolicy: "manual_confirmation_required",
+    notes: [
+      "Use as the secondary official crypto market-data rail when Coinbase does not list or cleanly resolve a symbol.",
+      "Kraken's public ticker stream and OHLC endpoints improve long-tail crypto coverage without falling straight to aggregator APIs.",
+      "This improves monitoring resilience, but it still remains a market-data rail rather than the final execution venue.",
+    ],
+  },
   coingecko: {
     key: "coingecko",
     name: "CoinGecko",
@@ -114,6 +146,14 @@ function getProviderCurrentState(
   }
 
   if (provider === "coingecko") {
+    return "enabled";
+  }
+
+  if (provider === "coinbase") {
+    return "enabled";
+  }
+
+  if (provider === "kraken") {
     return "enabled";
   }
 

@@ -2,8 +2,10 @@ import {
   getMarketDataAssetDefinition,
   listMarketDataAssetDefinitions,
 } from "./asset-catalog";
+import * as coinbase from "./coinbase";
 import * as coingecko from "./coingecko";
 import * as ig from "./ig";
+import * as kraken from "./kraken";
 import * as yahoo from "./yahoo";
 import type {
   MarketDataProviderName,
@@ -29,11 +31,55 @@ export function getConfiguredProviderName(): MarketDataProviderName {
     return "hybrid";
   }
 
+  if (sources.has("coinbase")) {
+    return "coinbase";
+  }
+
+  if (sources.has("kraken")) {
+    return "kraken";
+  }
+
   return sources.has("coingecko") ? "coingecko" : "ig";
 }
 
 export async function fetchLiveQuoteForSymbol(symbol: string) {
   const dataSource = resolveDataSource(symbol);
+
+  if (dataSource === "coinbase") {
+    try {
+      return await coinbase.fetchLiveQuoteForSymbol(symbol);
+    } catch (error) {
+      const definition = getMarketDataAssetDefinition(symbol);
+
+      if (definition?.symbol) {
+        try {
+          return await kraken.fetchLiveQuoteForSymbol(symbol);
+        } catch {
+          // Fall through to aggregator fallback below.
+        }
+      }
+
+      if (definition?.coingeckoCoinId) {
+        return coingecko.fetchLiveQuoteForSymbol(symbol);
+      }
+
+      throw error;
+    }
+  }
+
+  if (dataSource === "kraken") {
+    try {
+      return await kraken.fetchLiveQuoteForSymbol(symbol);
+    } catch (error) {
+      const definition = getMarketDataAssetDefinition(symbol);
+
+      if (definition?.coingeckoCoinId) {
+        return coingecko.fetchLiveQuoteForSymbol(symbol);
+      }
+
+      throw error;
+    }
+  }
 
   if (dataSource === "coingecko") {
     return coingecko.fetchLiveQuoteForSymbol(symbol);
@@ -52,6 +98,42 @@ export async function fetchLiveCandlesForSymbol(
   outputsize = 48,
 ) {
   const dataSource = resolveDataSource(symbol);
+
+  if (dataSource === "coinbase") {
+    try {
+      return await coinbase.fetchLiveCandlesForSymbol(symbol, interval, outputsize);
+    } catch (error) {
+      const definition = getMarketDataAssetDefinition(symbol);
+
+      if (definition?.symbol) {
+        try {
+          return await kraken.fetchLiveCandlesForSymbol(symbol, interval, outputsize);
+        } catch {
+          // Fall through to aggregator fallback below.
+        }
+      }
+
+      if (definition?.coingeckoCoinId) {
+        return coingecko.fetchLiveCandlesForSymbol(symbol, interval, outputsize);
+      }
+
+      throw error;
+    }
+  }
+
+  if (dataSource === "kraken") {
+    try {
+      return await kraken.fetchLiveCandlesForSymbol(symbol, interval, outputsize);
+    } catch (error) {
+      const definition = getMarketDataAssetDefinition(symbol);
+
+      if (definition?.coingeckoCoinId) {
+        return coingecko.fetchLiveCandlesForSymbol(symbol, interval, outputsize);
+      }
+
+      throw error;
+    }
+  }
 
   if (dataSource === "coingecko") {
     return coingecko.fetchLiveCandlesForSymbol(symbol, interval, outputsize);

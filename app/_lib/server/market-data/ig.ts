@@ -202,6 +202,16 @@ function getBucketStart(timestampMs: number, interval: SupportedChartInterval) {
   const date = new Date(timestampMs);
 
   switch (interval) {
+    case "1min":
+      return Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        date.getUTCHours(),
+        date.getUTCMinutes(),
+        0,
+        0,
+      );
     case "15min":
       return Date.UTC(
         date.getUTCFullYear(),
@@ -249,6 +259,8 @@ function getBucketStart(timestampMs: number, interval: SupportedChartInterval) {
 
 function getResolutionForInterval(interval: SupportedChartInterval) {
   switch (interval) {
+    case "1min":
+      return "MINUTE";
     case "15min":
       return "MINUTE_15";
     case "1h":

@@ -7,6 +7,8 @@ import type {
   PersistedPredictionHistoryRecord,
   PersistedScannerResult,
   PersistedSiggiAccount,
+  PersistedSiggiActivity,
+  PersistedSiggiEquitySnapshot,
   PersistedSiggiTrade,
   PersistedTradeTicket,
   PersistedWorkspaceData,
@@ -125,13 +127,92 @@ function normalizeScannerResult(result: LegacyScannerResult): PersistedScannerRe
   };
 }
 
+function normalizeScannerSignaturePart(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
+}
+
+function getScannerResultSignature(result: PersistedScannerResult) {
+  return [
+    result.symbol.toUpperCase(),
+    normalizeScannerSignaturePart(result.strategy),
+    normalizeScannerSignaturePart(result.timeframe),
+  ].join("|");
+}
+
+function getTimestampScore(value: string | null | undefined) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function preferScannerResult(
+  current: PersistedScannerResult,
+  candidate: PersistedScannerResult,
+) {
+  const currentAnalysisScore =
+    (current.analysis ? 1 : 0) +
+    (current.analysisStatus === "Analysed" ? 1 : 0);
+  const candidateAnalysisScore =
+    (candidate.analysis ? 1 : 0) +
+    (candidate.analysisStatus === "Analysed" ? 1 : 0);
+
+  if (candidateAnalysisScore !== currentAnalysisScore) {
+    return candidateAnalysisScore > currentAnalysisScore ? candidate : current;
+  }
+
+  if (candidate.score !== current.score) {
+    return candidate.score > current.score ? candidate : current;
+  }
+
+  const candidateTimeScore = Math.max(
+    getTimestampScore(candidate.analysisUpdatedAt),
+    getTimestampScore(candidate.updatedAt),
+    getTimestampScore(candidate.createdAt),
+  );
+  const currentTimeScore = Math.max(
+    getTimestampScore(current.analysisUpdatedAt),
+    getTimestampScore(current.updatedAt),
+    getTimestampScore(current.createdAt),
+  );
+
+  return candidateTimeScore >= currentTimeScore ? candidate : current;
+}
+
+function dedupeScannerResults(results: PersistedScannerResult[]) {
+  const dedupedBySignature = new Map<string, PersistedScannerResult>();
+
+  for (const result of results) {
+    const signature = getScannerResultSignature(result);
+    const current = dedupedBySignature.get(signature);
+
+    dedupedBySignature.set(
+      signature,
+      current ? preferScannerResult(current, result) : result,
+    );
+  }
+
+  return [...dedupedBySignature.values()];
+}
+
 function normalizeBrokerConnection(
   connection: Partial<PersistedBrokerConnection>,
 ): PersistedBrokerConnection {
-  const label =
+  const rawLabel =
     typeof connection.label === "string" && connection.label.trim().length > 0
       ? connection.label.trim()
       : `IBKR ${connection.environment ?? "demo"}`;
+  const label =
+    rawLabel === "IG Demo"
+      ? "IBKR Demo"
+      : rawLabel === "IG Live"
+        ? "IBKR Live"
+        : rawLabel;
 
   return {
     id:
@@ -175,6 +256,46 @@ function normalizePredictionHistoryRecord(
   record: Partial<PersistedPredictionHistoryRecord>,
 ): PersistedPredictionHistoryRecord {
   const now = defaultWorkspaceData.updatedAt;
+  const legacyAmbiguousStop =
+    record.ambiguousResolution === true && record.outcome === "Stopped";
+  const normalizedOutcome =
+    legacyAmbiguousStop
+      ? "Ambiguous"
+      : record.outcome === "Hit Target" ||
+          record.outcome === "Stopped" ||
+          record.outcome === "Ambiguous" ||
+          record.outcome === "Recovered Late" ||
+          record.outcome === "Stayed Flat" ||
+          record.outcome === "Skipped Correctly" ||
+          record.outcome === "Monitoring"
+        ? record.outcome
+        : "Monitoring";
+  const normalizedNarrative =
+    typeof record.narrative === "string"
+      ? legacyAmbiguousStop
+        ? record.narrative
+            .replace(
+              `${record.symbol ?? "This setup"} invalidated the setup and hit the tracked stop after entry was locked.`,
+              `${record.symbol ?? "This setup"} traded through both the tracked stop and target after entry was locked.`,
+            )
+            .replace(
+              "A single candle touched both stop and target, so the bot logged the outcome conservatively as a stop.",
+              "A single candle touched both stop and target, and the candle data could not confirm which level printed first. Siggi logged the outcome as ambiguous rather than assuming the stop was hit first.",
+            )
+            .replace(
+              "A single candle touched both stop and target, so Siggi logged the outcome conservatively as a stop.",
+              "A single candle touched both stop and target, and the candle data could not confirm which level printed first. Siggi logged the outcome as ambiguous rather than assuming the stop was hit first.",
+            )
+        : record.narrative
+      : "Historical replay note unavailable.";
+  const normalizedResolutionEvidence =
+    typeof record.resolutionEvidence === "string" && record.resolutionEvidence.trim().length > 0
+      ? record.resolutionEvidence.trim()
+      : legacyAmbiguousStop
+        ? "Stop and target both printed in the same candle, so order could not be confirmed."
+        : normalizedOutcome === "Monitoring"
+          ? null
+          : null;
 
   return {
     id:
@@ -193,7 +314,10 @@ function normalizePredictionHistoryRecord(
     decisionAtCall: record.decisionAtCall ?? "WAIT",
     confidenceAtCall:
       typeof record.confidenceAtCall === "number" ? record.confidenceAtCall : 50,
-    monitoringStatus: record.monitoringStatus ?? "Resolved",
+    monitoringStatus:
+      normalizedOutcome === "Ambiguous"
+        ? "Resolved"
+        : record.monitoringStatus ?? "Resolved",
     priceAtCall: typeof record.priceAtCall === "number" ? record.priceAtCall : 0,
     entryLowAtCall: typeof record.entryLowAtCall === "number" ? record.entryLowAtCall : 0,
     entryHighAtCall: typeof record.entryHighAtCall === "number" ? record.entryHighAtCall : 0,
@@ -232,12 +356,22 @@ function normalizePredictionHistoryRecord(
     resolvedAt: typeof record.resolvedAt === "string" ? record.resolvedAt : null,
     resolutionMethod:
       record.resolutionMethod === "candle-range" ||
-      record.resolutionMethod === "lower-timeframe-drilldown"
+      record.resolutionMethod === "lower-timeframe-drilldown" ||
+      record.resolutionMethod === "pulse-tape" ||
+      record.resolutionMethod === "sequence-inference"
         ? record.resolutionMethod
         : "snapshot",
-    ambiguousResolution: record.ambiguousResolution ?? false,
-    outcome: record.outcome ?? "Monitoring",
-    outcomeAccuracy: record.outcomeAccuracy ?? "Neutral",
+    ambiguousResolution:
+      normalizedOutcome === "Ambiguous" ? true : record.ambiguousResolution ?? false,
+    outcome: normalizedOutcome,
+    outcomeAccuracy:
+      legacyAmbiguousStop
+        ? "Neutral"
+        : record.outcomeAccuracy === "Accurate" ||
+            record.outcomeAccuracy === "Inaccurate" ||
+            record.outcomeAccuracy === "Neutral"
+          ? record.outcomeAccuracy
+          : "Neutral",
     moveFromCallPct:
       typeof record.moveFromCallPct === "number" ? record.moveFromCallPct : 0,
     maxFavorableExcursionPct:
@@ -248,11 +382,10 @@ function normalizePredictionHistoryRecord(
       typeof record.maxAdverseExcursionPct === "number"
         ? record.maxAdverseExcursionPct
         : 0,
-    accuracyScore: typeof record.accuracyScore === "number" ? record.accuracyScore : 50,
-    narrative:
-      typeof record.narrative === "string"
-        ? record.narrative
-        : "Historical replay note unavailable.",
+    accuracyScore:
+      legacyAmbiguousStop ? 50 : typeof record.accuracyScore === "number" ? record.accuracyScore : 50,
+    resolutionEvidence: normalizedResolutionEvidence,
+    narrative: normalizedNarrative,
     createdAt: typeof record.createdAt === "string" ? record.createdAt : now,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : now,
   };
@@ -281,17 +414,73 @@ function normalizeSiggiTrade(
     entryPrice: typeof trade.entryPrice === "number" ? trade.entryPrice : 0,
     stopPrice: typeof trade.stopPrice === "number" ? trade.stopPrice : 0,
     targetPrice: typeof trade.targetPrice === "number" ? trade.targetPrice : 0,
+    stopMode:
+      trade.stopMode === "Breakeven" || trade.stopMode === "Trailing"
+        ? trade.stopMode
+        : "Initial",
     stakeGbp: typeof trade.stakeGbp === "number" ? trade.stakeGbp : 0,
     stakeUsd: typeof trade.stakeUsd === "number" ? trade.stakeUsd : 0,
     quantity: typeof trade.quantity === "number" ? trade.quantity : 0,
+    currentPriceUsd:
+      typeof trade.currentPriceUsd === "number" ? trade.currentPriceUsd : null,
+    unrealizedPnlGbp:
+      typeof trade.unrealizedPnlGbp === "number" ? trade.unrealizedPnlGbp : null,
+    unrealizedPnlUsd:
+      typeof trade.unrealizedPnlUsd === "number" ? trade.unrealizedPnlUsd : null,
+    peakUnrealizedPnlGbp:
+      typeof trade.peakUnrealizedPnlGbp === "number" ? trade.peakUnrealizedPnlGbp : 0,
     realizedPnlGbp:
       typeof trade.realizedPnlGbp === "number" ? trade.realizedPnlGbp : null,
     realizedPnlUsd:
       typeof trade.realizedPnlUsd === "number" ? trade.realizedPnlUsd : null,
+    lastMarkedAt:
+      typeof trade.lastMarkedAt === "string" ? trade.lastMarkedAt : null,
     narrative:
       typeof trade.narrative === "string" ? trade.narrative : "Siggi trade memory unavailable.",
     createdAt: typeof trade.createdAt === "string" ? trade.createdAt : now,
     updatedAt: typeof trade.updatedAt === "string" ? trade.updatedAt : now,
+  };
+}
+
+function normalizeSiggiEquitySnapshot(
+  snapshot: Partial<PersistedSiggiEquitySnapshot>,
+  now: string,
+): PersistedSiggiEquitySnapshot {
+  return {
+    at: typeof snapshot.at === "string" ? snapshot.at : now,
+    cashBalanceGbp:
+      typeof snapshot.cashBalanceGbp === "number" ? snapshot.cashBalanceGbp : 0,
+    equityGbp: typeof snapshot.equityGbp === "number" ? snapshot.equityGbp : 0,
+    openTrades: typeof snapshot.openTrades === "number" ? snapshot.openTrades : 0,
+  };
+}
+
+function normalizeSiggiActivity(
+  activity: Partial<PersistedSiggiActivity>,
+  now: string,
+): PersistedSiggiActivity {
+  const rawDetail =
+    typeof activity.detail === "string" ? activity.detail : "Siggi activity unavailable.";
+  const detail = rawDetail
+    .replace("Â£50", "£50")
+    .replace("GBP 50 starting capital", "£50 starting capital");
+
+  return {
+    id:
+      typeof activity.id === "string" && activity.id.trim().length > 0
+        ? activity.id
+        : crypto.randomUUID(),
+    at: typeof activity.at === "string" ? activity.at : now,
+    type:
+      activity.type === "Opened" ||
+      activity.type === "Closed" ||
+      activity.type === "Skipped" ||
+      activity.type === "Stop Moved" ||
+      activity.type === "Reset"
+        ? activity.type
+        : "Skipped",
+    symbol: typeof activity.symbol === "string" ? activity.symbol : null,
+    detail,
   };
 }
 
@@ -339,6 +528,14 @@ function normalizeSiggiAccount(
     closedTrades: Array.isArray(candidate?.closedTrades)
       ? candidate.closedTrades.map((trade) => normalizeSiggiTrade(trade, now))
       : seeded.closedTrades,
+    equityCurve: Array.isArray(candidate?.equityCurve)
+      ? candidate.equityCurve.map((snapshot) =>
+          normalizeSiggiEquitySnapshot(snapshot, now),
+        )
+      : seeded.equityCurve,
+    activityLog: Array.isArray(candidate?.activityLog)
+      ? candidate.activityLog.map((activity) => normalizeSiggiActivity(activity, now))
+      : seeded.activityLog,
     lastEvaluatedAt:
       typeof candidate?.lastEvaluatedAt === "string" ? candidate.lastEvaluatedAt : null,
     createdAt:
@@ -408,7 +605,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   const candidate = (raw ?? {}) as Partial<PersistedWorkspaceData>;
 
   return {
-    schemaVersion: 10,
+    schemaVersion: 12,
     updatedAt:
       typeof candidate.updatedAt === "string"
         ? candidate.updatedAt
@@ -430,6 +627,35 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
         typeof candidate.syncState?.intelligenceLastSyncedAt === "string"
           ? candidate.syncState.intelligenceLastSyncedAt
           : defaultWorkspaceData.syncState.intelligenceLastSyncedAt,
+      pricePulseLastSyncedAt:
+        typeof candidate.syncState?.pricePulseLastSyncedAt === "string"
+          ? candidate.syncState.pricePulseLastSyncedAt
+          : defaultWorkspaceData.syncState.pricePulseLastSyncedAt,
+      pricePulseTape:
+        candidate.syncState?.pricePulseTape &&
+        typeof candidate.syncState.pricePulseTape === "object"
+          ? Object.fromEntries(
+              Object.entries(candidate.syncState.pricePulseTape).map(([symbol, points]) => [
+                symbol,
+                Array.isArray(points)
+                  ? points
+                      .filter(
+                        (point) =>
+                          point &&
+                          typeof point === "object" &&
+                          typeof point.at === "string" &&
+                          typeof point.price === "number" &&
+                          Number.isFinite(point.price),
+                      )
+                      .map((point) => ({
+                        at: point.at,
+                        price: point.price,
+                      }))
+                      .slice(-120)
+                  : [],
+              ]),
+            )
+          : defaultWorkspaceData.syncState.pricePulseTape,
     },
     brokerConnections: Array.isArray(candidate.brokerConnections)
       ? candidate.brokerConnections.map((connection) =>
@@ -450,14 +676,16 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
       defaultWorkspaceData.assets,
       (asset) => asset.symbol,
     ),
-    scannerResults: mergeByKey(
-      Array.isArray(candidate.scannerResults)
-        ? candidate.scannerResults.map((result) =>
-            normalizeScannerResult(result as PersistedScannerResult),
-          )
-        : undefined,
-      defaultWorkspaceData.scannerResults,
-      (result) => result.id,
+    scannerResults: dedupeScannerResults(
+      mergeByKey(
+        Array.isArray(candidate.scannerResults)
+          ? candidate.scannerResults.map((result) =>
+              normalizeScannerResult(result as PersistedScannerResult),
+            )
+          : undefined,
+        defaultWorkspaceData.scannerResults,
+        (result) => result.id,
+      ),
     ),
     backtests: mergeByKey(
       Array.isArray(candidate.backtests) ? candidate.backtests : undefined,

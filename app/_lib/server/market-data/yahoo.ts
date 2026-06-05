@@ -197,6 +197,8 @@ function buildCandlesFromResult(
 
 function getChartQuery(interval: SupportedChartInterval, outputsize: number) {
   switch (interval) {
+    case "1min":
+      return { interval: "1m", range: outputsize > 390 ? "5d" : "1d" };
     case "15min":
       return { interval: "15m", range: "5d" };
     case "1h":

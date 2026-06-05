@@ -1,8 +1,10 @@
-export type MarketDataProviderName = "ig" | "coingecko" | "yahoo" | "hybrid";
+export type MarketDataProviderName = "ig" | "coinbase" | "kraken" | "coingecko" | "yahoo" | "hybrid";
 
 export type MarketDataAssetDefinition = {
   symbol: string;
-  marketDataSource?: "ig" | "coingecko" | "yahoo";
+  marketDataSource?: "ig" | "coinbase" | "kraken" | "coingecko" | "yahoo";
+  coinbaseProductId?: string | null;
+  krakenPair?: string | null;
   coingeckoCoinId?: string;
   yahooSymbol?: string;
   igEpic?: string | null;
@@ -21,6 +23,7 @@ export type LiveAssetQuote = {
 };
 
 export type SupportedChartInterval =
+  | "1min"
   | "15min"
   | "1h"
   | "4h"

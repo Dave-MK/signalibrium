@@ -15,6 +15,7 @@ type MetricCardProps = {
 };
 
 const toneMap = {
+  AMBIGUOUS: "border border-amber-200/22 bg-amber-300/10 text-amber-100",
   BLOCKED: "border border-red-500/22 bg-red-500/10 text-red-100",
   FAIL: "border border-red-500/22 bg-red-500/10 text-red-100",
   "HIGH RISK": "border border-red-500/22 bg-red-500/10 text-red-100",

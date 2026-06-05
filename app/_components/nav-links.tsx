@@ -40,8 +40,8 @@ const links = [
     ),
   },
   {
-    href: "/siggi-does-trading",
-    label: "Siggi does trading",
+    href: "/siggis-trades",
+    label: "Siggi's Trades",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M4 13.5 8 9.5l2.5 2.5L16 6.5" />

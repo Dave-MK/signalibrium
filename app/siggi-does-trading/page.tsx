@@ -31,9 +31,14 @@ export default async function SiggiDoesTradingPage() {
     getSiggiAccount(),
     getDisplayCurrencyState(),
   ]);
+  const liveOpenPnlGbp = siggiAccount.openTrades.reduce(
+    (total, trade) => total + (trade.unrealizedPnlGbp ?? 0),
+    0,
+  );
   const totalBalanceGbp =
     siggiAccount.cashBalanceGbp +
-    siggiAccount.openTrades.reduce((total, trade) => total + trade.stakeGbp, 0);
+    siggiAccount.openTrades.reduce((total, trade) => total + trade.stakeGbp, 0) +
+    liveOpenPnlGbp;
   const resolvedTrades = siggiAccount.successfulTrades + siggiAccount.failedTrades;
   const winRate = resolvedTrades
     ? Math.round((siggiAccount.successfulTrades / resolvedTrades) * 1000) / 10
@@ -58,22 +63,31 @@ export default async function SiggiDoesTradingPage() {
       displayCurrencyState.rates,
       digits,
     );
+  const recentEquityCurve = [...siggiAccount.equityCurve]
+    .slice(0, 8)
+    .reverse();
 
   return (
     <div className="panel-stack-5">
       <PageHeader
         eyebrow="Siggi"
-        title="Siggi does trading"
-        description="Siggi runs a self-managed paper account, opens only when a locked enter-now call appears, and then records whether the stop or target was hit so the learning loop stays grounded."
+        title="Siggi's Trades"
+        description="Siggi runs the same bot logic as the main engine, picks only the strongest clean enter-now trades, manages them live, and feeds every win, miss, skip, and reset back into memory."
       />
 
       <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-6">
           <SummaryCard
-            label="Current balance"
+            label="Live equity"
             value={formatGbp(totalBalanceGbp)}
             detail={`${siggiAccount.openTrades.length} open trades / free cash ${formatGbp(siggiAccount.cashBalanceGbp)}`}
             tone="text-cyan-200"
+          />
+          <SummaryCard
+            label="Open P&L"
+            value={`${liveOpenPnlGbp >= 0 ? "+" : ""}${formatGbp(liveOpenPnlGbp)}`}
+            detail="Marked live from the latest synced prices"
+            tone={liveOpenPnlGbp >= 0 ? "text-emerald-300" : "text-red-200"}
           />
           <SummaryCard
             label="High watermark"
@@ -102,7 +116,7 @@ export default async function SiggiDoesTradingPage() {
         </div>
       </Panel>
 
-      <div className="grid gap-[5px] xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-[5px] xl:grid-cols-[1.12fr_0.88fr]">
         <Panel className="p-3 sm:p-3.5">
           <p className="micro-label">Open trades</p>
           <div className="mt-3 panel-stack-5">
@@ -127,10 +141,11 @@ export default async function SiggiDoesTradingPage() {
                     <div className="flex flex-wrap gap-2">
                       <StatusChip label="LIVE" />
                       <StatusChip label={`${trade.confidenceAtOpen}% CONF`} />
+                      <StatusChip label={trade.stopMode.toUpperCase()} />
                     </div>
                   </div>
 
-                  <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-5">
                     <SummaryCard
                       label="Entry"
                       value={formatUsd(trade.entryPrice, trade.symbol.includes("USD") ? 4 : 2)}
@@ -147,9 +162,15 @@ export default async function SiggiDoesTradingPage() {
                       detail="Profit objective being tracked"
                     />
                     <SummaryCard
-                      label="Reserved stake"
-                      value={formatGbp(trade.stakeGbp)}
-                      detail={`${trade.quantity.toFixed(4)} units modeled`}
+                      label="Current price"
+                      value={formatUsd(trade.currentPriceUsd ?? trade.entryPrice, trade.symbol.includes("USD") ? 4 : 2)}
+                      detail="Latest synced mark"
+                    />
+                    <SummaryCard
+                      label="Live P&L"
+                      value={`${(trade.unrealizedPnlGbp ?? 0) >= 0 ? "+" : ""}${formatGbp(trade.unrealizedPnlGbp ?? 0)}`}
+                      detail={`${trade.quantity.toFixed(4)} units / stake ${formatGbp(trade.stakeGbp)}`}
+                      tone={(trade.unrealizedPnlGbp ?? 0) >= 0 ? "text-emerald-300" : "text-red-200"}
                     />
                   </div>
 
@@ -167,26 +188,85 @@ export default async function SiggiDoesTradingPage() {
         </Panel>
 
         <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">How Siggi behaves</p>
+          <p className="micro-label">Siggi account flow</p>
           <div className="mt-3 panel-stack-5">
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
-              <p className="text-[0.9rem] font-semibold text-white">Entry discipline</p>
+              <p className="text-[0.9rem] font-semibold text-white">Autonomous selection</p>
               <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                Siggi only opens a paper trade when the main bot locks an instrument into enter-now status. It uses the same entry, stop, target, event context, and pattern memory that were saved at the moment the call was made.
+                Siggi now cycles the full ranked universe on every sync, filters out weak or event-crowded setups, and only commits to the best clean enter-now trades instead of blindly taking every signal.
+              </p>
+            </div>
+            <div className="signal-surface-soft rounded-[0.4rem] p-3">
+              <p className="text-[0.9rem] font-semibold text-white">Live management</p>
+              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
+                As prices move, Siggi marks each open trade live, can move stops to breakeven or trail them when the move proves itself, and updates live equity rather than waiting until the trade is closed.
               </p>
             </div>
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="text-[0.9rem] font-semibold text-white">Learning loop</p>
               <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                When a trade resolves, Siggi records whether the target or stop was hit and folds that outcome back into prediction memory, event context, multi-timeframe alignment, and confidence calibration for future calls.
+                Every open, skip, stop move, target, stop-out, and reset is written into memory so the bot keeps refining what worked, what failed, and which conditions actually deserve trust.
               </p>
             </div>
-            <div className="signal-surface-soft rounded-[0.4rem] p-3">
-              <p className="text-[0.9rem] font-semibold text-white">Bust handling</p>
-              <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                If the paper account is effectively wiped out, Siggi logs a bust, reloads the account back to {formatGbp(siggiAccount.startingBalanceGbp)}, and starts the climb again with the full memory intact.
-              </p>
-            </div>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid gap-[5px] xl:grid-cols-[0.95fr_1.05fr]">
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Recent equity curve</p>
+          <div className="mt-3 panel-stack-5">
+            {recentEquityCurve.map((snapshot) => (
+              <div key={snapshot.at} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[0.88rem] font-semibold text-white">
+                      {new Intl.DateTimeFormat("en-GB", {
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        month: "short",
+                        timeZone: "Europe/London",
+                      }).format(new Date(snapshot.at))}
+                    </p>
+                    <p className="mt-0.5 text-[0.74rem] text-slate-400">
+                      Cash {formatGbp(snapshot.cashBalanceGbp)} / {snapshot.openTrades} open trades
+                    </p>
+                  </div>
+                  <p className="text-[0.92rem] font-semibold text-cyan-200">
+                    {formatGbp(snapshot.equityGbp)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label">Recent activity</p>
+          <div className="mt-3 panel-stack-5">
+            {siggiAccount.activityLog.slice(0, 10).map((activity) => (
+              <div key={activity.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[0.88rem] font-semibold text-white">
+                      {activity.symbol ? `${activity.symbol} / ${activity.type}` : activity.type}
+                    </p>
+                    <p className="mt-0.5 text-[0.74rem] text-slate-400">
+                      {new Intl.DateTimeFormat("en-GB", {
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        month: "short",
+                        timeZone: "Europe/London",
+                      }).format(new Date(activity.at))}
+                    </p>
+                  </div>
+                  <StatusChip label={activity.type.toUpperCase()} />
+                </div>
+                <p className="mt-2 text-[0.8rem] leading-5 text-slate-300">{activity.detail}</p>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>

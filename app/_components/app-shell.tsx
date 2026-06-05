@@ -11,7 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import type { PredictionAccuracySummary } from "@/app/_lib/bot-engine";
-import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
+import type {
+  MarketDataPulseSummary,
+  MarketDataSyncSummary,
+} from "@/app/_lib/market-data-contract";
 import type {
   PersistedMarketSnapshot,
   PersistedScannerResult,
@@ -19,6 +22,7 @@ import type {
 } from "@/app/_lib/server/workspace-types";
 import { formatPercent } from "../_lib/format";
 import {
+  pulseMarketData,
   syncMarketData,
   syncMarketIntelligence,
   updateDisplayCurrency,
@@ -96,6 +100,7 @@ export function AppShell({
   const router = useRouter();
   const { currency: activeCurrency } = useDisplayCurrency();
   const autoSyncInFlightRef = useRef(false);
+  const livePulseInFlightRef = useRef(false);
   const intelligenceSyncInFlightRef = useRef(false);
   const isSidebarCollapsed = useSyncExternalStore(
     subscribeToSidebarPreference,
@@ -104,6 +109,59 @@ export function AppShell({
   );
 
   const latestSyncLabel = marketSnapshot.lastRefresh || "Awaiting sync";
+
+  useEffect(() => {
+    const pulseIntervalMs = 15_000;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    async function runLivePulse() {
+      if (
+        cancelled ||
+        document.visibilityState !== "visible" ||
+        livePulseInFlightRef.current ||
+        autoSyncInFlightRef.current
+      ) {
+        return;
+      }
+
+      livePulseInFlightRef.current = true;
+
+      try {
+        const summary = await pulseMarketData();
+        window.dispatchEvent(
+          new CustomEvent<MarketDataPulseSummary>("signalibrium:market-data-pulsed", {
+            detail: summary,
+          }),
+        );
+        router.refresh();
+      } catch {
+        // Keep the shell quiet on short-cycle pulse failures.
+      } finally {
+        livePulseInFlightRef.current = false;
+      }
+    }
+
+    timeoutId = setTimeout(() => {
+      void runLivePulse();
+      intervalId = setInterval(() => {
+        void runLivePulse();
+      }, pulseIntervalMs);
+    }, 8_000);
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [router]);
 
   useEffect(() => {
     const syncIntervalMs = 70_000;
@@ -333,13 +391,13 @@ export function AppShell({
               <HeaderMetric
                 label="Live Market"
                 value={marketSnapshot.state}
-                detail={`Auto-sync active · ${latestSyncLabel}`}
+                detail={`Live pulse + auto-sync active / ${latestSyncLabel}`}
                 tone="text-cyan-200"
               />
               <HeaderMetric
                 label="Prediction Accuracy"
                 value={`${predictionAccuracy.overallAccuracy}%`}
-                detail={`${predictionAccuracy.accuratePredictions} of ${predictionAccuracy.resolvedPredictions} resolved calls accurate · recent ${predictionAccuracy.recentAccuracy}%`}
+                detail={`${predictionAccuracy.accuratePredictions} of ${predictionAccuracy.resolvedPredictions} resolved calls accurate / recent ${predictionAccuracy.recentAccuracy}%`}
                 tone="text-emerald-300"
               />
 
@@ -358,7 +416,7 @@ export function AppShell({
                   Search markets, opportunities, event intelligence, or chart analysis...
                 </span>
                 <span className="hidden text-[0.72rem] text-slate-500 sm:inline">
-                  {marketSnapshot.tradeableSetups} ready · {formatPercent(marketSnapshot.openRisk)} risk
+                  {marketSnapshot.tradeableSetups} ready / {formatPercent(marketSnapshot.openRisk)} risk
                 </span>
                 <select
                   aria-label="Display currency"

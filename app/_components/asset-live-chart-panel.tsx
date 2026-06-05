@@ -32,6 +32,7 @@ import { useDisplayCurrency } from "./display-currency-provider";
 import { Panel, StatusChip } from "./ui";
 
 const intervalMap: Record<SupportedChartInterval, string> = {
+  "1min": "1",
   "15min": "15",
   "1h": "60",
   "4h": "240",

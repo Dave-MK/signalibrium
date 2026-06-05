@@ -507,6 +507,12 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
           : outcomeAccuracy === "Inaccurate"
             ? Math.max(24, 58 - Math.round(entry.riskScore * 0.4))
             : 50,
+      resolutionEvidence:
+        outcome === "Hit Target"
+          ? "Resolved from the seeded candle-range replay."
+          : outcome === "Stopped"
+            ? "Resolved from the seeded candle-range replay."
+            : "The seeded replay could not produce a decisive win/loss resolution.",
       narrative:
         outcomeAccuracy === "Accurate"
           ? `${entry.symbol} respected the planned ${entry.timeframe} setup after the call, and the move developed in the forecast direction before invalidation was threatened.`
@@ -519,7 +525,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
   });
 
 export const defaultWorkspaceData: PersistedWorkspaceData = {
-  schemaVersion: 10,
+  schemaVersion: 12,
   updatedAt: seededAt,
   workspace: {
     id: "workspace-signalibrium-mvp",
@@ -530,13 +536,15 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
   syncState: {
     sparklineCursor: 0,
     intelligenceLastSyncedAt: seededAt,
+    pricePulseLastSyncedAt: seededAt,
+    pricePulseTape: {},
   },
   brokerConnections: [],
   watchlists: [
     {
       id: "watchlist-core",
       name: "Core Watchlist",
-      description: "Siggi-ranked universe of 50 live instruments.",
+      description: `Siggi-ranked universe of ${instrumentUniverse.length} live instruments.`,
       itemSymbols: instrumentUniverse.map((entry) => entry.symbol),
       isDefault: true,
       createdAt: seededAt,
@@ -581,6 +589,23 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     failedTrades: 0,
     openTrades: [],
     closedTrades: [],
+    equityCurve: [
+      {
+        at: seededAt,
+        cashBalanceGbp: 50,
+        equityGbp: 50,
+        openTrades: 0,
+      },
+    ],
+    activityLog: [
+      {
+        id: "siggi-seed-log",
+        at: seededAt,
+        type: "Reset",
+        symbol: null,
+        detail: "Siggi paper account initialized with GBP 50 starting capital.",
+      },
+    ],
     lastEvaluatedAt: null,
     createdAt: seededAt,
     updatedAt: seededAt,

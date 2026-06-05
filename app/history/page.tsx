@@ -5,6 +5,14 @@ import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { PageHeader, Panel, StatusChip } from "../_components/ui";
 
+function ResolutionEvidence({ text }: { text: string | null }) {
+  if (!text) {
+    return null;
+  }
+
+  return <p className="mt-1 text-[0.72rem] leading-4 text-cyan-200">{text}</p>;
+}
+
 function SummaryCell({
   label,
   value,
@@ -40,6 +48,7 @@ export default async function HistoryPage() {
   const activeCalls = predictionHistory
     .filter((item) => item.monitoringStatus === "Active")
     .slice(0, 4);
+  const ambiguousCalls = predictionHistory.filter((item) => item.outcome === "Ambiguous");
 
   const formatDisplayPrice = (value: number, digits = 2) =>
     formatCurrencyForDisplay(
@@ -73,7 +82,7 @@ export default async function HistoryPage() {
           <SummaryCell
             label="Tracked predictions"
             value={`${predictionHistory.length}`}
-            detail="Every record shows the original call and the outcome"
+            detail={`${ambiguousCalls.length} same-candle clashes are logged as ambiguous, not counted as wins or losses`}
           />
           <SummaryCell
             label="Purpose"
@@ -98,12 +107,13 @@ export default async function HistoryPage() {
                       <p className="mt-1 text-[0.76rem] text-slate-400">
                         {item.timeframe} / locked {formatDateTimeLabel(item.calledAt)}
                       </p>
-                    </div>
-                    <StatusChip label="LIVE" />
                   </div>
-                  <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
+                  <StatusChip label="LIVE" />
                 </div>
-              ))
+                <ResolutionEvidence text={item.resolutionEvidence} />
+                <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
+              </div>
+            ))
             ) : (
               <div className="signal-surface-soft rounded-[0.4rem] p-3">
                 <p className="text-[0.82rem] leading-5 text-slate-300">
@@ -130,6 +140,7 @@ export default async function HistoryPage() {
                   </div>
                   <StatusChip label={item.outcome.toUpperCase()} />
                 </div>
+                <ResolutionEvidence text={item.resolutionEvidence} />
                 <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
               </div>
             ))}
@@ -152,6 +163,7 @@ export default async function HistoryPage() {
                   </div>
                   <StatusChip label={item.outcome.toUpperCase()} />
                 </div>
+                <ResolutionEvidence text={item.resolutionEvidence} />
                 <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
               </div>
             ))}
@@ -201,6 +213,7 @@ export default async function HistoryPage() {
                 <p className="mt-1 text-[0.74rem] text-slate-400">
                   {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "Still live"}
                 </p>
+                <ResolutionEvidence text={item.resolutionEvidence} />
               </div>
               <div className="text-[0.82rem] font-semibold text-white">
                 {formatPercent(item.moveFromCallPct, true)}

@@ -26,6 +26,16 @@ export type MarketDataSyncSummary = {
   marketSnapshot: PersistedMarketSnapshot;
 };
 
+export type MarketDataPulseSummary = {
+  provider: string;
+  pulsedAt: string;
+  pulsedSymbols: string[];
+  skippedSymbols: string[];
+  warnings: MarketDataSyncWarning[];
+  assets: PersistedAssetRecord[];
+  marketSnapshot: PersistedMarketSnapshot;
+};
+
 export type MarketChartResponse = {
   chart: LiveCandleSeries;
 };

@@ -15,11 +15,18 @@ import type {
 } from "@/app/_lib/server/workspace-types";
 import { ActionLink, PageHeader, Panel, StatusChip } from "../_components/ui";
 
-type MarketTab = "Crypto" | "Forex" | "Stocks" | "ETFs";
+type MarketTab =
+  | "All"
+  | "Crypto"
+  | "Forex"
+  | "Equities"
+  | "ETFs"
+  | "Commodities"
+  | "Indices";
 
 function resolveMarketTab(asset: PersistedAssetRecord | null): MarketTab {
   if (!asset) {
-    return "Stocks";
+    return "Equities";
   }
 
   if (asset.assetClass === "Crypto") {
@@ -34,7 +41,15 @@ function resolveMarketTab(asset: PersistedAssetRecord | null): MarketTab {
     return "ETFs";
   }
 
-  return "Stocks";
+  if (asset.assetClass === "Commodity") {
+    return "Commodities";
+  }
+
+  if (asset.assetClass === "Index") {
+    return "Indices";
+  }
+
+  return "Equities";
 }
 
 function formatRowPrice(
@@ -207,7 +222,7 @@ export default function ScannerPageClient({
   const { formatCurrency } = useDisplayCurrency();
   const [analysisSetupId, setAnalysisSetupId] = useState<string | null>(null);
   const [eventsSetupId, setEventsSetupId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<MarketTab>("Crypto");
+  const [activeTab, setActiveTab] = useState<MarketTab>("All");
 
   useEffect(() => {
     if (!analysisSetupId && !eventsSetupId) {
@@ -259,10 +274,13 @@ export default function ScannerPageClient({
 
   const tabbedRows = useMemo(() => {
     const buckets: Record<MarketTab, typeof rankedViews> = {
+      All: [...rankedViews],
       Crypto: [],
       Forex: [],
-      Stocks: [],
+      Equities: [],
       ETFs: [],
+      Commodities: [],
+      Indices: [],
     };
 
     for (const item of rankedViews) {
@@ -317,7 +335,7 @@ export default function ScannerPageClient({
       <div className="panel-stack-5">
         <PageHeader
           title="Opportunities"
-          description="See the strongest short-term names by market, then open analysis or event context without leaving the board."
+          description="See the strongest cross-market names, then open analysis or event context without leaving the board."
           action={<ActionLink href="/assets">Open Charts</ActionLink>}
         />
 
@@ -341,7 +359,7 @@ export default function ScannerPageClient({
           </div>
 
           <div className="mt-3 flex flex-wrap gap-[5px]">
-            {(["Crypto", "Forex", "Stocks", "ETFs"] as const).map((tab) => (
+            {(["All", "Crypto", "Forex", "Equities", "ETFs", "Commodities", "Indices"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"

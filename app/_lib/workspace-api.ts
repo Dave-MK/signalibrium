@@ -1,6 +1,7 @@
 import type {
   MarketChartResponse,
   MarketIntelligenceSyncSummary,
+  MarketDataPulseSummary,
   MarketDataSyncSummary,
 } from "./market-data-contract";
 import type {
@@ -73,6 +74,18 @@ export async function deleteWatchlist(watchlistId: string) {
 export async function syncMarketData() {
   const payload = await requestJson<{ summary: MarketDataSyncSummary }>(
     "/api/market-data/sync",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+
+  return payload.summary;
+}
+
+export async function pulseMarketData() {
+  const payload = await requestJson<{ summary: MarketDataPulseSummary }>(
+    "/api/market-data/pulse",
     {
       method: "POST",
       body: JSON.stringify({}),

@@ -224,6 +224,11 @@ export type PersistedAiOpportunity = {
 
 export type SupportedDisplayCurrency = "GBP" | "USD" | "EUR";
 
+export type PersistedPricePulsePoint = {
+  at: string;
+  price: number;
+};
+
 export type PersistedSiggiTrade = {
   id: string;
   predictionId: string;
@@ -238,14 +243,35 @@ export type PersistedSiggiTrade = {
   entryPrice: number;
   stopPrice: number;
   targetPrice: number;
+  stopMode: "Initial" | "Breakeven" | "Trailing";
   stakeGbp: number;
   stakeUsd: number;
   quantity: number;
+  currentPriceUsd: number | null;
+  unrealizedPnlGbp: number | null;
+  unrealizedPnlUsd: number | null;
+  peakUnrealizedPnlGbp: number;
   realizedPnlGbp: number | null;
   realizedPnlUsd: number | null;
+  lastMarkedAt: string | null;
   narrative: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PersistedSiggiEquitySnapshot = {
+  at: string;
+  cashBalanceGbp: number;
+  equityGbp: number;
+  openTrades: number;
+};
+
+export type PersistedSiggiActivity = {
+  id: string;
+  at: string;
+  type: "Opened" | "Closed" | "Skipped" | "Stop Moved" | "Reset";
+  symbol: string | null;
+  detail: string;
 };
 
 export type PersistedSiggiAccount = {
@@ -260,6 +286,8 @@ export type PersistedSiggiAccount = {
   failedTrades: number;
   openTrades: PersistedSiggiTrade[];
   closedTrades: PersistedSiggiTrade[];
+  equityCurve: PersistedSiggiEquitySnapshot[];
+  activityLog: PersistedSiggiActivity[];
   lastEvaluatedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -300,21 +328,34 @@ export type PersistedPredictionHistoryRecord = {
   calledAt: string;
   lastCandleCheckAt: string | null;
   resolvedAt: string | null;
-  resolutionMethod: "snapshot" | "candle-range" | "lower-timeframe-drilldown";
+  resolutionMethod:
+    | "snapshot"
+    | "candle-range"
+    | "lower-timeframe-drilldown"
+    | "pulse-tape"
+    | "sequence-inference";
   ambiguousResolution: boolean;
-  outcome: "Hit Target" | "Stopped" | "Recovered Late" | "Stayed Flat" | "Skipped Correctly" | "Monitoring";
+  outcome:
+    | "Hit Target"
+    | "Stopped"
+    | "Ambiguous"
+    | "Recovered Late"
+    | "Stayed Flat"
+    | "Skipped Correctly"
+    | "Monitoring";
   outcomeAccuracy: "Accurate" | "Inaccurate" | "Neutral";
   moveFromCallPct: number;
   maxFavorableExcursionPct: number;
   maxAdverseExcursionPct: number;
   accuracyScore: number;
+  resolutionEvidence: string | null;
   narrative: string;
   createdAt: string;
   updatedAt: string;
 };
 
 export type PersistedWorkspaceData = {
-  schemaVersion: 10;
+  schemaVersion: 12;
   updatedAt: string;
   workspace: {
     id: string;
@@ -325,6 +366,8 @@ export type PersistedWorkspaceData = {
   syncState: {
     sparklineCursor: number;
     intelligenceLastSyncedAt: string;
+    pricePulseLastSyncedAt: string;
+    pricePulseTape: Record<string, PersistedPricePulsePoint[]>;
   };
   brokerConnections: PersistedBrokerConnection[];
   watchlists: PersistedWatchlist[];

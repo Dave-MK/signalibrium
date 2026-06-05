@@ -60,6 +60,16 @@ function getBucketStart(timestampMs: number, interval: SupportedChartInterval) {
   const date = new Date(timestampMs);
 
   switch (interval) {
+    case "1min":
+      return Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        date.getUTCHours(),
+        Math.floor(date.getUTCMinutes() / 5) * 5,
+        0,
+        0,
+      );
     case "15min":
       return Date.UTC(
         date.getUTCFullYear(),
@@ -195,6 +205,8 @@ async function fetchQuoteBatch() {
 
 function getChartRequest(interval: SupportedChartInterval, outputsize: number) {
   switch (interval) {
+    case "1min":
+      return { days: 1 };
     case "15min":
       return { days: 1 };
     case "1h":

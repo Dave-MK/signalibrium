@@ -1,6 +1,12 @@
-import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
+import type {
+  MarketDataPulseSummary,
+  MarketDataSyncSummary,
+} from "@/app/_lib/market-data-contract";
 import { refreshPredictionMemory } from "../prediction-memory";
-import { syncSiggiAccount } from "../siggi-simulation";
+import {
+  syncSiggiAccount,
+  syncSiggiAccountWithOptions,
+} from "../siggi-simulation";
 import {
   readWorkspaceData,
   writeWorkspaceData,
@@ -14,6 +20,7 @@ import { getMarketDataAssetDefinition } from "./asset-catalog";
 import { fetchLiveQuoteForSymbol, getConfiguredProviderName } from "./market-data";
 
 const minimumSyncIntervalMs = 65_000;
+const minimumPulseIntervalMs = 12_000;
 
 function getConfiguredProvider() {
   return getConfiguredProviderName();
@@ -253,6 +260,80 @@ function buildCachedSyncSummary(
   };
 }
 
+function buildCachedPulseSummary(
+  data: PersistedWorkspaceData,
+  provider: string,
+  message: string,
+): MarketDataPulseSummary {
+  return {
+    provider,
+    pulsedAt: data.syncState.pricePulseLastSyncedAt,
+    pulsedSymbols: [],
+    skippedSymbols: [],
+    warnings: [
+      {
+        symbol: "SYSTEM",
+        message,
+      },
+    ],
+    assets: data.assets,
+    marketSnapshot: data.marketSnapshot,
+  };
+}
+
+function recordPricePulsePoints(
+  data: PersistedWorkspaceData,
+  assets: PersistedAssetRecord[],
+  timestamp: string,
+  symbols?: string[],
+) {
+  const symbolFilter = symbols ? new Set(symbols) : null;
+  const nextTape = { ...data.syncState.pricePulseTape };
+
+  for (const asset of assets) {
+    if (symbolFilter && !symbolFilter.has(asset.symbol)) {
+      continue;
+    }
+
+    const currentPoints = nextTape[asset.symbol] ?? [];
+    const lastPoint = currentPoints[currentPoints.length - 1] ?? null;
+
+    if (lastPoint && lastPoint.at === timestamp && Math.abs(lastPoint.price - asset.price) < 0.000001) {
+      continue;
+    }
+
+    nextTape[asset.symbol] = [...currentPoints, { at: timestamp, price: asset.price }].slice(-120);
+  }
+
+  data.syncState.pricePulseTape = nextTape;
+}
+
+function getPulseSymbols(data: PersistedWorkspaceData) {
+  const symbols = new Set<string>();
+
+  for (const trade of data.siggiAccount.openTrades) {
+    symbols.add(trade.symbol);
+  }
+
+  for (const record of data.predictionHistory) {
+    if (record.monitoringStatus === "Active") {
+      symbols.add(record.symbol);
+    }
+  }
+
+  for (const setup of [...data.scannerResults].sort((left, right) => right.score - left.score)) {
+    if (symbols.size >= 12) {
+      break;
+    }
+
+    if (setup.tradeability === "TRADEABLE") {
+      symbols.add(setup.symbol);
+    }
+  }
+
+  return [...symbols];
+}
+
 export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   const provider = getConfiguredProvider();
   const syncedAt = new Date().toISOString();
@@ -351,6 +432,7 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
 
   data.assets = nextAssets;
   data.marketSnapshot = buildMarketSnapshot(data, nextAssets, syncedAt);
+  recordPricePulsePoints(data, nextAssets, syncedAt);
   await refreshPredictionMemory(data, syncedAt);
   syncSiggiAccount(data, syncedAt);
 
@@ -360,6 +442,130 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
     provider,
     syncedAt,
     syncedSymbols,
+    skippedSymbols,
+    warnings,
+    assets: persisted.assets,
+    marketSnapshot: persisted.marketSnapshot,
+  };
+}
+
+export async function pulseExternalMarketData(): Promise<MarketDataPulseSummary> {
+  const provider = getConfiguredProvider();
+  const pulsedAt = new Date().toISOString();
+  const data = await readWorkspaceData();
+  const lastPulseAt = Date.parse(data.syncState.pricePulseLastSyncedAt);
+
+  if (Number.isFinite(lastPulseAt) && Date.now() - lastPulseAt < minimumPulseIntervalMs) {
+    const secondsRemaining = Math.max(
+      1,
+      Math.ceil((minimumPulseIntervalMs - (Date.now() - lastPulseAt)) / 1000),
+    );
+
+    return buildCachedPulseSummary(
+      data,
+      provider,
+      `Live pulse is cooling down for about ${secondsRemaining}s so the app can stay responsive without oversampling providers.`,
+    );
+  }
+
+  const pulsedSymbols = getPulseSymbols(data);
+  const warnings: MarketDataPulseSummary["warnings"] = [];
+  const skippedSymbols: string[] = [];
+
+  if (pulsedSymbols.length === 0) {
+    data.syncState.pricePulseLastSyncedAt = pulsedAt;
+    const persisted = await writeWorkspaceData(data);
+
+    return {
+      provider,
+      pulsedAt,
+      pulsedSymbols: [],
+      skippedSymbols: [],
+      warnings,
+      assets: persisted.assets,
+      marketSnapshot: persisted.marketSnapshot,
+    };
+  }
+
+  const nextAssets = [...data.assets];
+  const assetIndexBySymbol = new Map(
+    nextAssets.map((asset, index) => [asset.symbol, index] as const),
+  );
+  const pulseResults = await Promise.allSettled(
+    pulsedSymbols.map(async (symbol) => {
+      const assetIndex = assetIndexBySymbol.get(symbol);
+
+      if (assetIndex === undefined) {
+        return null;
+      }
+
+      const asset = nextAssets[assetIndex];
+      const definition = getMarketDataAssetDefinition(asset.symbol);
+
+      if (!definition) {
+        skippedSymbols.push(asset.symbol);
+        warnings.push({
+          symbol: asset.symbol,
+          message: "No live market-data symbol mapping is configured for this asset.",
+        });
+        return null;
+      }
+
+      const liveQuote = await fetchLiveQuoteForSymbol(asset.symbol);
+
+      if (definition.proxyNote) {
+        warnings.push({
+          symbol: asset.symbol,
+          message: definition.proxyNote,
+        });
+      }
+
+      return {
+        assetIndex,
+        asset: buildUpdatedAsset(asset, liveQuote, pulsedAt),
+      };
+    }),
+  );
+
+  for (let index = 0; index < pulseResults.length; index += 1) {
+    const result = pulseResults[index];
+    const symbol = pulsedSymbols[index];
+
+    if (result.status === "fulfilled" && result.value) {
+      nextAssets[result.value.assetIndex] = result.value.asset;
+      continue;
+    }
+
+    skippedSymbols.push(symbol);
+
+    if (result.status === "rejected") {
+      warnings.push({
+        symbol,
+        message:
+          result.reason instanceof Error
+            ? result.reason.message
+            : "Live pulse failed for this asset.",
+      });
+    }
+  }
+
+  data.assets = nextAssets;
+  data.marketSnapshot = buildMarketSnapshot(data, nextAssets, pulsedAt);
+  data.syncState.pricePulseLastSyncedAt = pulsedAt;
+  recordPricePulsePoints(data, nextAssets, pulsedAt, pulsedSymbols);
+  await refreshPredictionMemory(data, pulsedAt, {
+    createNewCalls: false,
+    refreshAnalyses: false,
+  });
+  syncSiggiAccountWithOptions(data, pulsedAt, {
+    allowNewTrades: false,
+  });
+  const persisted = await writeWorkspaceData(data);
+
+  return {
+    provider,
+    pulsedAt,
+    pulsedSymbols,
     skippedSymbols,
     warnings,
     assets: persisted.assets,
