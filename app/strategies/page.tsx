@@ -22,6 +22,64 @@ function formatHoldWindow(minimum: number, maximum: number) {
   return `${Math.round(minimum / 24)}-${Math.round(maximum / 24)}d`;
 }
 
+function CandleSketch({ label }: { label: string }) {
+  if (label.includes("Engulfing")) {
+    return (
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+        <path d="M17 8v28" stroke="currentColor" strokeWidth="2" />
+        <rect x="11" y="17" width="12" height="12" rx="1.5" fill="rgba(239,68,68,0.28)" stroke="rgba(248,113,113,0.7)" />
+        <path d="M42 5v34" stroke="currentColor" strokeWidth="2" />
+        <rect x="34" y="10" width="16" height="24" rx="1.5" fill="rgba(34,197,94,0.24)" stroke="rgba(110,231,183,0.78)" />
+      </svg>
+    );
+  }
+
+  if (label.includes("Rejection")) {
+    return (
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+        <path d="M6 31h52" stroke="rgba(217,183,95,0.88)" strokeWidth="2" strokeLinecap="round" />
+        <path d="M49 25 57 31 49 37" stroke="rgba(217,183,95,0.82)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M32 7v33" stroke="currentColor" strokeWidth="2" />
+        <rect x="22" y="12" width="20" height="14" rx="1.5" fill="rgba(0,229,255,0.16)" stroke="rgba(125,211,252,0.78)" />
+        <path d="M28 38h8" stroke="rgba(248,113,113,0.8)" strokeWidth="2" strokeLinecap="round" />
+        <text x="7" y="27" fill="rgba(217,183,95,0.95)" fontSize="6" fontWeight="700">
+          level
+        </text>
+      </svg>
+    );
+  }
+
+  if (label.includes("Doji")) {
+    return (
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+        <path d="M32 4v36" stroke="currentColor" strokeWidth="2" />
+        <path d="M20 22h24" stroke="rgba(217,183,95,0.95)" strokeWidth="3" strokeLinecap="round" />
+        <path d="M14 14h36M14 30h36" stroke="rgba(148,163,184,0.22)" strokeWidth="1" strokeDasharray="3 3" />
+      </svg>
+    );
+  }
+
+  if (label.includes("Displacement")) {
+    return (
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+        <path d="M32 5v35" stroke="currentColor" strokeWidth="2" />
+        <rect x="22" y="7" width="20" height="30" rx="1.5" fill="rgba(34,197,94,0.26)" stroke="rgba(110,231,183,0.85)" />
+        <path d="M48 30 58 20 48 10" stroke="rgba(0,229,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+      <path d="M18 12v24" stroke="rgba(110,231,183,0.75)" strokeWidth="2" />
+      <rect x="12" y="15" width="12" height="16" rx="1.5" fill="rgba(34,197,94,0.2)" stroke="rgba(110,231,183,0.75)" />
+      <path d="M39 4v36" stroke="currentColor" strokeWidth="2" />
+      <rect x="29" y="5" width="20" height="29" rx="1.5" fill="rgba(239,68,68,0.24)" stroke="rgba(248,113,113,0.78)" />
+      <path d="M50 8 57 4M50 31 57 36" stroke="rgba(217,183,95,0.8)" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default async function StrategiesPage() {
   const [assets, scannerResults] = await Promise.all([listAssets(), listScannerResults()]);
   const scannerResultsByStrategy = new Map(
@@ -123,9 +181,8 @@ export default async function StrategiesPage() {
             {candlePatternGuide.map((pattern) => (
               <div key={pattern.label} className="signal-surface-soft p-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="relative h-10 w-8 shrink-0">
-                    <span className="absolute left-1/2 top-0 h-10 w-px -translate-x-1/2 bg-slate-500" />
-                    <span className="absolute left-1/2 top-2 h-6 w-4 -translate-x-1/2 rounded-sm border border-cyan-300/45 bg-cyan-300/12" />
+                  <div className="flex h-13 w-18 shrink-0 items-center justify-center rounded-[0.45rem] border border-white/8 bg-[#07111d]">
+                    <CandleSketch label={pattern.label} />
                   </div>
                   <p className="text-[0.86rem] font-semibold text-white">{pattern.label}</p>
                 </div>

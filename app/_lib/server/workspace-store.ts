@@ -995,7 +995,7 @@ async function ensureStoreFile() {
 
   if (process.env.VERCEL && !shouldUseKvStore() && !process.env.SIGNALIBRIUM_STORE_PATH) {
     throw new Error(
-      "Signalibrium needs Upstash Redis configured in production. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
+      "Signalibrium needs durable storage configured on Vercel. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL and KV_REST_API_TOKEN), then redeploy.",
     );
   }
 

@@ -122,8 +122,13 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ## Deploying to Vercel
 
-The project is prepared for Vercel Git deployments. Connect the GitHub repository
-to Vercel, keep the framework preset as Next.js, and use the default commands:
+The project is prepared for normal Vercel Git deployments.
+
+- Pushes to `main` create a production deployment automatically.
+- Pushes to other branches create preview deployments automatically.
+- If you change environment variables in the Vercel dashboard, redeploy once so the running deployment picks them up.
+
+Use the default project settings:
 
 - install: `npm install`
 - build: `npm run build`
@@ -134,14 +139,22 @@ enable. Start with `SIGNALIBRIUM_CHART_VENDOR=embed`; only set IG credentials if
 you want the IG fallback enabled in production.
 
 For durable workspace persistence on Vercel, connect Upstash Redis from the
-Marketplace and set:
+Marketplace and set one of these supported pairs for the `Production` environment:
 
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+
+or the legacy Vercel KV names:
+
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+
+Optional:
+
 - `SIGNALIBRIUM_KV_WORKSPACE_KEY=signalibrium:workspace`
 
-Without those Redis variables, a Vercel production runtime will fail loudly instead
-of silently storing Siggy state in ephemeral `/tmp` storage.
+Without those Redis/KV variables, a Vercel production runtime will fail loudly
+instead of silently storing Siggi state in ephemeral `/tmp` storage.
 
 ## Notes
 
