@@ -2,6 +2,7 @@ import {
   getMarketDataAssetDefinition,
   listMarketDataAssetDefinitions,
 } from "./asset-catalog";
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import type {
   LiveAssetQuote,
   LiveCandle,
@@ -186,7 +187,7 @@ async function fetchQuoteBatch() {
     const quote = {
       symbol: definition.symbol,
       providerSymbol: coinId,
-      price: Number(quoteEntry.usd.toFixed(6)),
+      price: roundPriceValue(quoteEntry.usd),
       changePercent: Number((quoteEntry.usd_24h_change ?? 0).toFixed(2)),
       currency: "USD",
       series: [],
@@ -293,10 +294,10 @@ function buildCandlesFromPoints(
     .sort((left, right) => left[0] - right[0])
     .map(([, candle]) => ({
       ...candle,
-      open: Number(candle.open.toFixed(6)),
-      high: Number(candle.high.toFixed(6)),
-      low: Number(candle.low.toFixed(6)),
-      close: Number(candle.close.toFixed(6)),
+      open: roundPriceValue(candle.open),
+      high: roundPriceValue(candle.high),
+      low: roundPriceValue(candle.low),
+      close: roundPriceValue(candle.close),
       volume:
         candle.volume !== null && Number.isFinite(candle.volume)
           ? Number(candle.volume.toFixed(0))

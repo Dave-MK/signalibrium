@@ -102,6 +102,38 @@ const providerCatalog: Record<
       "This improves monitoring resilience, but it still remains a market-data rail rather than the final execution venue.",
     ],
   },
+  bybit: {
+    key: "bybit",
+    name: "Bybit",
+    trustLevel: "official",
+    supportsExecution: false,
+    supportsStreaming: true,
+    supportsHistoricalCandles: true,
+    currentUsage: ["price_confirmation", "charting_enrichment"],
+    targetUsage: ["price_confirmation", "charting_enrichment"],
+    automationPolicy: "manual_confirmation_required",
+    notes: [
+      "Use as a narrow tertiary crypto rail only for long-tail spot names that remain uncovered after the Coinbase and Kraken passes.",
+      "Bybit's public spot ticker stream and official klines help keep names like SUI, JUP, PEPE, and ENA on an exchange-native path before dropping to aggregators.",
+      "This is still a confirmation and charting rail, not the final execution venue.",
+    ],
+  },
+  kucoin: {
+    key: "kucoin",
+    name: "KuCoin",
+    trustLevel: "official",
+    supportsExecution: false,
+    supportsStreaming: false,
+    supportsHistoricalCandles: true,
+    currentUsage: ["price_confirmation", "charting_enrichment"],
+    targetUsage: ["price_confirmation", "charting_enrichment"],
+    automationPolicy: "manual_confirmation_required",
+    notes: [
+      "Use as a very narrow fourth crypto rail only for names that are still uncovered after Coinbase, Kraken, and Bybit.",
+      "KuCoin spot tickers and official candles help keep isolated names like AKT on an exchange-native path before dropping to aggregator fallback.",
+      "This remains a confirmation and charting source rather than the final execution venue.",
+    ],
+  },
   coingecko: {
     key: "coingecko",
     name: "CoinGecko",
@@ -154,6 +186,14 @@ function getProviderCurrentState(
   }
 
   if (provider === "kraken") {
+    return "enabled";
+  }
+
+  if (provider === "bybit") {
+    return "enabled";
+  }
+
+  if (provider === "kucoin") {
     return "enabled";
   }
 

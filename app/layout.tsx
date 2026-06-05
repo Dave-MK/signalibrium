@@ -37,7 +37,6 @@ export default async function RootLayout({
           rates={displayCurrencyState.rates}
         >
           <AppShell
-            displayCurrency={displayCurrencyState.currency}
             marketSnapshot={marketSnapshot}
             predictionAccuracy={predictionAccuracy}
             topScannerResult={topScannerResult}

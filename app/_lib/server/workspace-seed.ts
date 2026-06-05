@@ -5,6 +5,7 @@ import {
   instrumentUniverse,
   type InstrumentUniverseEntry,
 } from "@/app/_lib/instrument-universe";
+import { getPriceFractionDigits } from "@/app/_lib/market-prices";
 import type {
   PersistedPredictionHistoryRecord,
   PersistedWorkspaceData,
@@ -25,18 +26,7 @@ function inferRegime(entry: InstrumentUniverseEntry) {
 }
 
 function formatPrice(entry: InstrumentUniverseEntry, value: number) {
-  const decimals =
-    entry.assetClass === "Forex"
-      ? 4
-      : value >= 1000
-        ? 0
-        : value >= 100
-          ? 2
-          : value >= 1
-            ? 2
-            : value >= 0.1
-              ? 4
-              : 8;
+  const decimals = getPriceFractionDigits(value, entry.assetClass);
   const formatted = value.toFixed(decimals);
 
   return entry.assetClass === "Forex" ? formatted : `$${formatted}`;

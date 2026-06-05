@@ -5,6 +5,7 @@ import { AssetLiveChartPanel } from "@/app/_components/asset-live-chart-panel";
 import { useDisplayCurrency } from "@/app/_components/display-currency-provider";
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
 import { formatDateTimeLabel, formatWinRate } from "@/app/_lib/format";
+import { getMarketSession } from "@/app/_lib/market-hours";
 import type {
   PersistedAssetRecord,
   PersistedBacktestRecord,
@@ -54,19 +55,19 @@ function resolveMarketTab(asset: PersistedAssetRecord | null): MarketTab {
 
 function formatRowPrice(
   asset: PersistedAssetRecord | null,
-  formatCurrency: (value: number, maximumFractionDigits?: number) => string,
+  formatPrice: (value: number, assetClass?: PersistedAssetRecord["assetClass"]) => string,
 ) {
   if (!asset) {
     return "N/A";
   }
 
-  return formatCurrency(asset.price, asset.assetClass === "Forex" ? 4 : 2);
+  return formatPrice(asset.price, asset.assetClass);
 }
 
 function formatRangeLabel(
   range: string,
-  formatCurrency: (value: number, maximumFractionDigits?: number) => string,
-  digits: number,
+  formatPrice: (value: number, assetClass?: PersistedAssetRecord["assetClass"]) => string,
+  assetClass?: PersistedAssetRecord["assetClass"],
 ) {
   const [lowRaw, highRaw] = range.split(" - ").map(Number);
 
@@ -74,7 +75,19 @@ function formatRangeLabel(
     return range;
   }
 
-  return `${formatCurrency(lowRaw, digits)} - ${formatCurrency(highRaw, digits)}`;
+  return `${formatPrice(lowRaw, assetClass)} - ${formatPrice(highRaw, assetClass)}`;
+}
+
+function formatMarketSessionLabel(state: ReturnType<typeof getMarketSession>["state"]) {
+  if (state === "Open") {
+    return "MARKET OPEN";
+  }
+
+  if (state === "Closed") {
+    return "MARKET CLOSED";
+  }
+
+  return state;
 }
 
 function FullScreenModal({
@@ -128,25 +141,31 @@ function LeaderboardRow({
   onOpenAnalysis: (setupId: string) => void;
   onOpenEvents: (setupId: string) => void;
 }) {
-  const { formatCurrency } = useDisplayCurrency();
-  const priceDigits = asset?.assetClass === "Forex" ? 4 : 2;
-  const betterEntryLabel = formatRangeLabel(view.discountedEntry, formatCurrency, priceDigits);
+  const { formatPrice } = useDisplayCurrency();
+  const betterEntryLabel = formatRangeLabel(view.discountedEntry, formatPrice, asset?.assetClass);
+  const marketSession = getMarketSession(asset);
   return (
-    <div className="grid gap-[5px] border-b border-white/6 px-3 py-2.5 last:border-b-0 lg:grid-cols-[3.5rem_minmax(0,1.45fr)_0.9fr_0.9fr_0.92fr_1fr_1.15fr_1.25fr_11.5rem] lg:items-center">
+    <div className="grid gap-[5px] border-b border-white/6 px-3 py-2.5 last:border-b-0 lg:grid-cols-[3.3rem_minmax(0,1.32fr)_0.78fr_0.74fr_0.78fr_0.95fr_0.82fr_1.02fr_1.08fr_10rem] lg:items-center">
       <div className="text-[0.8rem] font-semibold text-slate-500">#{rank}</div>
 
       <div className="min-w-0">
         <p className="text-[0.9rem] font-semibold text-white">
           {view.symbol} <span className="text-slate-400">/ {view.instrumentName}</span>
         </p>
-        <p className="mt-0.5 text-[0.75rem] text-slate-400">
-          {view.timeframe} / {view.horizon} / {setup.strategy}
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[0.75rem] text-slate-400">
+            {view.timeframe} / {view.horizon} / {setup.strategy}
+          </span>
+          <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
+        </div>
+        <p className="mt-0.5 text-[0.72rem] text-slate-500">
+          {marketSession.venue} / {marketSession.detail}
         </p>
       </div>
 
       <div className="min-w-0">
         <p className="micro-label">Price</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-white">{formatRowPrice(asset, formatCurrency)}</p>
+        <p className="mt-1 text-[0.82rem] font-semibold text-white">{formatRowPrice(asset, formatPrice)}</p>
       </div>
 
       <div className="min-w-0">
@@ -165,6 +184,11 @@ function LeaderboardRow({
           <StatusChip label={view.decision.label} />
           <span className="text-[0.75rem] text-slate-400">{view.confidence}%</span>
         </div>
+      </div>
+
+      <div className="min-w-0" title={view.tradeSpanDetail}>
+        <p className="micro-label">Trade span</p>
+        <p className="mt-1 text-[0.82rem] font-semibold text-cyan-200">{view.tradeSpan}</p>
       </div>
 
       <div className="min-w-0">
@@ -219,7 +243,7 @@ export default function ScannerPageClient({
   initialScannerResults: PersistedScannerResult[];
   predictionHistory: PersistedPredictionHistoryRecord[];
 }) {
-  const { formatCurrency } = useDisplayCurrency();
+  const { formatPrice } = useDisplayCurrency();
   const [analysisSetupId, setAnalysisSetupId] = useState<string | null>(null);
   const [eventsSetupId, setEventsSetupId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MarketTab>("All");
@@ -315,13 +339,11 @@ export default function ScannerPageClient({
   const selectedEventsAsset = selectedEventsItem
     ? assetsBySymbol.get(selectedEventsItem.setup.symbol) ?? null
     : null;
-  const selectedEventPriceDigits =
-    selectedEventsAsset?.assetClass === "Forex" ? 4 : 2;
   const selectedEventBetterFill = selectedEventsItem
     ? formatRangeLabel(
         selectedEventsItem.view.discountedEntry,
-        formatCurrency,
-        selectedEventPriceDigits,
+        formatPrice,
+        selectedEventsAsset?.assetClass,
       )
     : null;
 
@@ -377,13 +399,14 @@ export default function ScannerPageClient({
         </Panel>
 
         <Panel className="overflow-hidden p-0">
-          <div className="grid gap-[5px] border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.69rem] font-semibold uppercase tracking-[0.16em] text-slate-500 lg:grid-cols-[3.5rem_minmax(0,1.45fr)_0.9fr_0.9fr_0.92fr_1fr_1.15fr_1.25fr_11.5rem]">
+          <div className="grid gap-[5px] border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.69rem] font-semibold uppercase tracking-[0.16em] text-slate-500 lg:grid-cols-[3.3rem_minmax(0,1.32fr)_0.78fr_0.74fr_0.78fr_0.95fr_0.82fr_1.02fr_1.08fr_10rem]">
             <span>Rank</span>
             <span>Instrument</span>
             <span>Price</span>
             <span>Trend</span>
             <span>Bias</span>
             <span>Action</span>
+            <span>Trade span</span>
             <span>Entry</span>
             <span>Timing</span>
             <span className="lg:text-right">Review</span>
@@ -412,6 +435,7 @@ export default function ScannerPageClient({
           onClose={() => setAnalysisSetupId(null)}
         >
           <AssetLiveChartPanel
+            assetClass={selectedAnalysisAsset.assetClass}
             analysisOverlay={selectedAnalysisItem.setup.analysis}
             chartVendor={chartVendor}
             chartingLibraryAvailable={chartingLibraryAvailable}

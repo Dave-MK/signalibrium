@@ -1,10 +1,20 @@
-export type MarketDataProviderName = "ig" | "coinbase" | "kraken" | "coingecko" | "yahoo" | "hybrid";
+export type MarketDataProviderName =
+  | "ig"
+  | "coinbase"
+  | "kraken"
+  | "bybit"
+  | "kucoin"
+  | "coingecko"
+  | "yahoo"
+  | "hybrid";
 
 export type MarketDataAssetDefinition = {
   symbol: string;
-  marketDataSource?: "ig" | "coinbase" | "kraken" | "coingecko" | "yahoo";
+  marketDataSource?: "ig" | "coinbase" | "kraken" | "bybit" | "kucoin" | "coingecko" | "yahoo";
   coinbaseProductId?: string | null;
   krakenPair?: string | null;
+  bybitSymbol?: string | null;
+  kucoinSymbol?: string | null;
   coingeckoCoinId?: string;
   yahooSymbol?: string;
   igEpic?: string | null;

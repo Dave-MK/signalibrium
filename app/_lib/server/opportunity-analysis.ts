@@ -1,4 +1,8 @@
 import { deriveChartAnalysis } from "@/app/_lib/chart-analysis";
+import {
+  getPriceFractionDigits,
+  roundPriceValue,
+} from "@/app/_lib/market-prices";
 import { buildFallbackChart } from "./market-data/fallback-chart";
 import type { LiveCandle, SupportedChartInterval } from "./market-data/provider-types";
 import { fetchLiveCandlesForSymbol } from "./market-data/market-data";
@@ -78,7 +82,7 @@ function getMultiTimeframeIntervals(
 }
 
 function formatPrice(value: number) {
-  const decimals = value >= 100 ? 2 : value >= 1 ? 2 : 4;
+  const decimals = getPriceFractionDigits(value);
   return `$${value.toFixed(decimals)}`;
 }
 
@@ -93,7 +97,7 @@ function scaleSparklineToAssetPrice(series: number[] | undefined, price: number 
     return Array(series.length).fill(price);
   }
 
-  return series.map((value) => Number(((value / last) * price).toFixed(4)));
+  return series.map((value) => roundPriceValue((value / last) * price));
 }
 
 async function fetchAnalysisChart(
@@ -141,18 +145,21 @@ function resolveExecutionPlan(input: {
   }
 
   const entryZone = {
-    low: Number(Math.max(input.demandZone.low, input.currentPrice - input.atr * 0.35).toFixed(4)),
-    high: Number(Math.max(input.demandZone.high, input.currentPrice).toFixed(4)),
+    low: roundPriceValue(Math.max(input.demandZone.low, input.currentPrice - input.atr * 0.35)),
+    high: roundPriceValue(Math.max(input.demandZone.high, input.currentPrice)),
   };
-  const stopLevel = Number(
-    Math.max(0.0001, Math.min(input.demandZone.low, input.supportLevels[0] ?? input.currentPrice) - input.atr * 0.45).toFixed(4),
+  const stopLevel = roundPriceValue(
+    Math.max(
+      0.0000000001,
+      Math.min(input.demandZone.low, input.supportLevels[0] ?? input.currentPrice) - input.atr * 0.45,
+    ),
   );
   const riskUnit = Math.max(entryZone.high - stopLevel, input.atr * 0.8, input.currentPrice * 0.01);
-  const targetLevel = Number(
+  const targetLevel = roundPriceValue(
     Math.max(
       input.resistanceLevels[0] ?? 0,
       entryZone.high + riskUnit * Math.max(1.6, input.scannerResult.riskReward),
-    ).toFixed(4),
+    ),
   );
 
   return {

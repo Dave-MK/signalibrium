@@ -1,3 +1,4 @@
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import type { LiveCandleSeries, SupportedChartInterval } from "./provider-types";
 
 export function buildFallbackChart(
@@ -31,10 +32,10 @@ export function buildFallbackChart(
 
     return {
       datetime: timestamp,
-      open: Number(open.toFixed(4)),
-      high: Number(high.toFixed(4)),
-      low: Number(low.toFixed(4)),
-      close: Number(close.toFixed(4)),
+      open: roundPriceValue(open),
+      high: roundPriceValue(high),
+      low: roundPriceValue(low),
+      close: roundPriceValue(close),
       volume: null,
     };
   });

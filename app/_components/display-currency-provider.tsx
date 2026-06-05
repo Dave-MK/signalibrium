@@ -10,8 +10,10 @@ import {
   convertUsdToDisplayCurrency,
   formatCompactCurrencyForDisplay,
   formatCurrencyForDisplay,
+  formatInstrumentPriceForDisplay,
   type CurrencyRateMap,
 } from "@/app/_lib/currency";
+import type { PricedAssetClass } from "@/app/_lib/market-prices";
 import type { SupportedDisplayCurrency } from "@/app/_lib/server/workspace-types";
 
 type DisplayCurrencyContextValue = {
@@ -20,6 +22,7 @@ type DisplayCurrencyContextValue = {
   convertUsd: (value: number) => number;
   formatCompactCurrency: (value: number) => string;
   formatCurrency: (value: number, maximumFractionDigits?: number) => string;
+  formatPrice: (value: number, assetClass?: PricedAssetClass) => string;
 };
 
 const DisplayCurrencyContext = createContext<DisplayCurrencyContextValue | null>(null);
@@ -42,6 +45,8 @@ export function DisplayCurrencyProvider({
         formatCompactCurrencyForDisplay(amount, currency, rates),
       formatCurrency: (amount, maximumFractionDigits = 2) =>
         formatCurrencyForDisplay(amount, currency, rates, maximumFractionDigits),
+      formatPrice: (amount, assetClass) =>
+        formatInstrumentPriceForDisplay(amount, currency, rates, assetClass),
     }),
     [currency, rates],
   );

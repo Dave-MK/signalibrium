@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
+import { getMarketSession } from "@/app/_lib/market-hours";
 import type {
   PersistedAssetRecord,
   PersistedWatchlist,
@@ -30,6 +31,18 @@ function WatchMetric({
   );
 }
 
+function formatMarketSessionLabel(state: ReturnType<typeof getMarketSession>["state"]) {
+  if (state === "Open") {
+    return "MARKET OPEN";
+  }
+
+  if (state === "Closed") {
+    return "MARKET CLOSED";
+  }
+
+  return state;
+}
+
 export default function AssetsPageClient({
   initialWatchlists,
   initialAssets,
@@ -38,7 +51,7 @@ export default function AssetsPageClient({
   initialAssets: PersistedAssetRecord[];
 }) {
   const router = useRouter();
-  const { formatCurrency } = useDisplayCurrency();
+  const { formatPrice } = useDisplayCurrency();
   const initialSelectedWatchlist = getDefaultPersistedWatchlist(initialWatchlists);
   const [watchlists, setWatchlists] = useState<PersistedWatchlist[]>(initialWatchlists);
   const [assets, setAssets] = useState<PersistedAssetRecord[]>(initialAssets);
@@ -224,6 +237,7 @@ export default function AssetsPageClient({
         {visibleAssets.map((asset) => {
           const inSelectedWatchlist =
             selectedWatchlist?.itemSymbols.includes(asset.symbol) ?? false;
+          const marketSession = getMarketSession(asset);
 
           return (
             <Panel key={asset.symbol} className="p-3 sm:p-3.5">
@@ -238,11 +252,15 @@ export default function AssetsPageClient({
                       {asset.symbol}
                     </Link>
                     {asset.tradeable ? <StatusChip label="TRADEABLE" /> : <StatusChip label="WATCH" />}
+                    <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
                   </div>
                   <p className="mt-0.5 text-[0.8rem] text-slate-400">{asset.name}</p>
+                  <p className="mt-1 text-[0.72rem] text-slate-500">
+                    {marketSession.venue} / {marketSession.detail}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[0.98rem] font-semibold text-white">{formatCurrency(asset.price)}</p>
+                  <p className="text-[0.98rem] font-semibold text-white">{formatPrice(asset.price, asset.assetClass)}</p>
                   <p className={`mt-0.5 text-[0.8rem] ${asset.change24h >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                     {formatPercent(asset.change24h, true)}
                   </p>
@@ -251,9 +269,10 @@ export default function AssetsPageClient({
 
               <Sparkline data={asset.sparkline} className="mt-3 h-10 w-full" />
 
-              <div className="mt-3 grid gap-[5px] sm:grid-cols-3">
+              <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
                 <WatchMetric label="Regime" value={asset.regime} />
                 <WatchMetric label="Strategy" value={asset.activeStrategy} />
+                <WatchMetric label="Market" value={marketSession.state} />
                 <WatchMetric label="Synced" value={formatDateTimeLabel(asset.lastSyncedAt)} />
               </div>
 

@@ -15,7 +15,13 @@ export type InstrumentLiquidity = "High" | "Moderate" | "Thin";
 export type InstrumentVolatility = "Contained" | "Elevated" | "Fast";
 export type InstrumentTradeability = "TRADEABLE" | "WATCH" | "BLOCKED";
 export type InstrumentStance = "Long" | "Short";
-export type InstrumentMarketDataSource = "coinbase" | "coingecko" | "yahoo";
+export type InstrumentMarketDataSource =
+  | "coinbase"
+  | "kraken"
+  | "bybit"
+  | "kucoin"
+  | "coingecko"
+  | "yahoo";
 
 export type InstrumentUniverseEntry = {
   symbol: string;
@@ -113,7 +119,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     symbol: "AKT",
     name: "Akash Network",
     assetClass: "Crypto",
-    marketDataSource: "coinbase",
+    marketDataSource: "kucoin",
     coingeckoCoinId: "akash-network",
     searchTerms: ["Akash Network", "AKT"],
     widgetSymbol: "KUCOIN:AKTUSDT",

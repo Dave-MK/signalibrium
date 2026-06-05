@@ -26,6 +26,20 @@ function SummaryCard({
   );
 }
 
+function formatCompactTimestamp(timestamp: string | null) {
+  if (!timestamp) {
+    return "Awaiting mark";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    timeZone: "Europe/London",
+  }).format(new Date(timestamp));
+}
+
 export default async function SiggiDoesTradingPage() {
   const [siggiAccount, displayCurrencyState] = await Promise.all([
     getSiggiAccount(),
@@ -66,13 +80,18 @@ export default async function SiggiDoesTradingPage() {
   const recentEquityCurve = [...siggiAccount.equityCurve]
     .slice(0, 8)
     .reverse();
+  const latestOpenMarkAt =
+    siggiAccount.openTrades
+      .map((trade) => trade.lastMarkedAt)
+      .filter((value): value is string => typeof value === "string")
+      .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
 
   return (
     <div className="panel-stack-5">
       <PageHeader
         eyebrow="Siggi"
         title="Siggi's Trades"
-        description="Siggi runs the same bot logic as the main engine, picks only the strongest clean enter-now trades, manages them live, and feeds every win, miss, skip, and reset back into memory."
+        description="Siggy treats enter-now calls as execution intent, opens each one while cash and trade slots allow, manages SL/TP live, and feeds every win, miss, skip, and reset back into memory."
       />
 
       <Panel className="p-3 sm:p-3.5">
@@ -86,7 +105,7 @@ export default async function SiggiDoesTradingPage() {
           <SummaryCard
             label="Open P&L"
             value={`${liveOpenPnlGbp >= 0 ? "+" : ""}${formatGbp(liveOpenPnlGbp)}`}
-            detail="Marked live from the latest synced prices"
+            detail={`Marked on live pulse / latest ${formatCompactTimestamp(latestOpenMarkAt)}`}
             tone={liveOpenPnlGbp >= 0 ? "text-emerald-300" : "text-red-200"}
           />
           <SummaryCard
@@ -164,7 +183,7 @@ export default async function SiggiDoesTradingPage() {
                     <SummaryCard
                       label="Current price"
                       value={formatUsd(trade.currentPriceUsd ?? trade.entryPrice, trade.symbol.includes("USD") ? 4 : 2)}
-                      detail="Latest synced mark"
+                      detail={`P&L marked ${formatCompactTimestamp(trade.lastMarkedAt)}`}
                     />
                     <SummaryCard
                       label="Live P&L"
@@ -193,7 +212,7 @@ export default async function SiggiDoesTradingPage() {
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="text-[0.9rem] font-semibold text-white">Autonomous selection</p>
               <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                Siggi now cycles the full ranked universe on every sync, filters out weak or event-crowded setups, and only commits to the best clean enter-now trades instead of blindly taking every signal.
+                Siggy cycles the full ranked universe on every sync and opens every active enter-now setup it can, while still avoiding duplicate instruments and respecting available paper cash.
               </p>
             </div>
             <div className="signal-surface-soft rounded-[0.4rem] p-3">

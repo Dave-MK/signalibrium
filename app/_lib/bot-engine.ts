@@ -6,6 +6,7 @@ import type {
   PersistedPredictionHistoryRecord,
   PersistedScannerResult,
 } from "@/app/_lib/server/workspace-types";
+import { getPriceFractionDigits, roundPriceValue } from "@/app/_lib/market-prices";
 
 export type BotTradeWindow = "Day" | "Week" | "Month";
 
@@ -20,6 +21,10 @@ export type BotScoreBreakdownItem = {
   label: string;
   score: number;
 };
+
+function formatRawPriceLabel(value: number, assetClass?: PersistedAssetRecord["assetClass"]) {
+  return value.toFixed(getPriceFractionDigits(value, assetClass));
+}
 
 export type BotOpportunityView = {
   backtestSummary: string;
@@ -54,6 +59,8 @@ export type BotOpportunityView = {
   target: string;
   timeframe: string;
   timeframeConfirmationSummary: string;
+  tradeSpan: string;
+  tradeSpanDetail: string;
   timingWindow: string;
 };
 
@@ -222,10 +229,18 @@ export function buildPreferredEntryZone(
   const width = Math.max(0.000001, entryZone.high - entryZone.low);
   const outsideOffset = width * 0.18;
   const insideOffset = width * 0.16;
+  const priceStep = 1 / 10 ** getPriceFractionDigits(entryZone.low, setup.assetClass);
+  const minimumPositivePrice = Math.max(priceStep, entryZone.low * 0.35);
 
   if (direction === "Bearish") {
-    const preferredLow = Number((entryZone.high - insideOffset).toFixed(6));
-    const preferredHigh = Number((entryZone.high + outsideOffset).toFixed(6));
+    const preferredLow = roundPriceValue(
+      Math.max(minimumPositivePrice, entryZone.high - insideOffset),
+      setup.assetClass,
+    );
+    const preferredHigh = roundPriceValue(
+      Math.max(preferredLow, entryZone.high + outsideOffset),
+      setup.assetClass,
+    );
 
     return {
       high: preferredHigh,
@@ -234,8 +249,14 @@ export function buildPreferredEntryZone(
     };
   }
 
-  const preferredLow = Number((entryZone.low - outsideOffset).toFixed(6));
-  const preferredHigh = Number((entryZone.low + insideOffset).toFixed(6));
+  const preferredLow = roundPriceValue(
+    Math.max(minimumPositivePrice, entryZone.low - outsideOffset),
+    setup.assetClass,
+  );
+  const preferredHigh = roundPriceValue(
+    Math.max(preferredLow, entryZone.low + insideOffset),
+    setup.assetClass,
+  );
 
   return {
     high: preferredHigh,
@@ -282,6 +303,60 @@ export function resolveTradeWindow(timeframe: string): BotTradeWindow {
   }
 
   return "Week";
+}
+
+function getTradeSpanHours(timeframe: string, horizon: BotTradeWindow) {
+  const upper = timeframe.toUpperCase();
+
+  if (upper.includes("1M")) {
+    return 30 * 24;
+  }
+
+  if (upper.includes("1W")) {
+    return 14 * 24;
+  }
+
+  if (upper.includes("1D")) {
+    return 5 * 24;
+  }
+
+  if (upper.includes("4H")) {
+    return 36;
+  }
+
+  if (upper.includes("1H")) {
+    return 8;
+  }
+
+  if (upper.includes("30M")) {
+    return 4;
+  }
+
+  if (upper.includes("15M")) {
+    return 90 / 60;
+  }
+
+  if (horizon === "Day") {
+    return 8;
+  }
+
+  if (horizon === "Month") {
+    return 14 * 24;
+  }
+
+  return 5 * 24;
+}
+
+function formatTradeSpan(hours: number) {
+  if (hours < 2) {
+    return `${Math.round(hours * 60)} min`;
+  }
+
+  if (hours < 48) {
+    return `${Math.round(hours)} hours`;
+  }
+
+  return `${Math.round(hours / 24)} days`;
 }
 
 export function inferDirection(setup: PersistedScannerResult): "Bullish" | "Bearish" | "Neutral" {
@@ -780,6 +855,7 @@ export function buildBotOpportunityView(
   const timeframeRead = buildTimeframeConfirmationRead(setup);
   const regimeRead = getRegimeScore(asset, setup, direction);
   const horizon = resolveTradeWindow(setup.timeframe);
+  const tradeSpanHours = getTradeSpanHours(setup.timeframe, horizon);
   const decision =
     eventRead.forceWait && baseDecision.label === "ENTER NOW"
       ? {
@@ -907,14 +983,14 @@ export function buildBotOpportunityView(
     currentPrice,
     decision,
     discountedEntry: preferredEntryZone
-      ? `${preferredEntryZone.low.toFixed(2)} - ${preferredEntryZone.high.toFixed(2)}`
+      ? `${formatRawPriceLabel(preferredEntryZone.low, asset?.assetClass)} - ${formatRawPriceLabel(preferredEntryZone.high, asset?.assetClass)}`
       : setup.entryZone,
     discountedEntryDetail:
       preferredEntryZone?.summary ??
       "Siggi is using the original entry band because a fresher chart refinement is not available yet.",
     direction,
     entry: setup.analysis
-      ? `${setup.analysis.chartAnnotations.entryZone.low.toFixed(2)} - ${setup.analysis.chartAnnotations.entryZone.high.toFixed(2)}`
+      ? `${formatRawPriceLabel(setup.analysis.chartAnnotations.entryZone.low, asset?.assetClass)} - ${formatRawPriceLabel(setup.analysis.chartAnnotations.entryZone.high, asset?.assetClass)}`
       : setup.entryZone,
     eventEffect: eventRead.effect,
     eventEntryGuidance: eventRead.entryGuidance,
@@ -935,14 +1011,17 @@ export function buildBotOpportunityView(
     scoreBreakdown,
     similarMemorySummary: memoryRead.detail,
     stop: setup.analysis
-      ? setup.analysis.chartAnnotations.stopLevel.toFixed(2)
+      ? formatRawPriceLabel(setup.analysis.chartAnnotations.stopLevel, asset?.assetClass)
       : setup.stopLoss,
     symbol: setup.symbol,
     target: setup.analysis
-      ? setup.analysis.chartAnnotations.targetLevel.toFixed(2)
+      ? formatRawPriceLabel(setup.analysis.chartAnnotations.targetLevel, asset?.assetClass)
       : setup.takeProfit,
     timeframe: setup.timeframe,
     timeframeConfirmationSummary: timeframeRead.detail,
+    tradeSpan: formatTradeSpan(tradeSpanHours),
+    tradeSpanDetail:
+      "Maximum planned hold before Siggy should re-check or flatten if TP/SL has not resolved it, or if the market turns uncertain mid-entry.",
     timingWindow: getTimingWindow(horizon, readiness, decision, eventRead.tone, eventRead),
   };
 }

@@ -1,4 +1,4 @@
-import { formatCurrencyForDisplay } from "@/app/_lib/currency";
+import { formatInstrumentPriceForDisplay } from "@/app/_lib/currency";
 import { summarizePredictionAccuracy } from "@/app/_lib/bot-engine";
 import { formatDateTimeLabel, formatPercent } from "@/app/_lib/format";
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
@@ -49,14 +49,6 @@ export default async function HistoryPage() {
     .filter((item) => item.monitoringStatus === "Active")
     .slice(0, 4);
   const ambiguousCalls = predictionHistory.filter((item) => item.outcome === "Ambiguous");
-
-  const formatDisplayPrice = (value: number, digits = 2) =>
-    formatCurrencyForDisplay(
-      value,
-      displayCurrencyState.currency,
-      displayCurrencyState.rates,
-      digits,
-    );
 
   return (
     <div className="panel-stack-5">
@@ -203,10 +195,25 @@ export default async function HistoryPage() {
               </div>
               <div className="text-[0.82rem] font-semibold text-white">{item.trendAtCall}</div>
               <div className="text-[0.82rem] font-semibold text-white">
-                {formatDisplayPrice(item.priceAtCall, item.assetClass === "Forex" ? 4 : 2)}
+                {formatInstrumentPriceForDisplay(
+                  item.priceAtCall,
+                  displayCurrencyState.currency,
+                  displayCurrencyState.rates,
+                  item.assetClass,
+                )}
               </div>
               <div className="text-[0.76rem] leading-5 text-slate-300">
-                {`${formatDisplayPrice(item.entryLowAtCall, item.assetClass === "Forex" ? 4 : 2)} - ${formatDisplayPrice(item.entryHighAtCall, item.assetClass === "Forex" ? 4 : 2)}`}
+                {`${formatInstrumentPriceForDisplay(
+                  item.entryLowAtCall,
+                  displayCurrencyState.currency,
+                  displayCurrencyState.rates,
+                  item.assetClass,
+                )} - ${formatInstrumentPriceForDisplay(
+                  item.entryHighAtCall,
+                  displayCurrencyState.currency,
+                  displayCurrencyState.rates,
+                  item.assetClass,
+                )}`}
               </div>
               <div className="min-w-0">
                 <StatusChip label={item.outcome.toUpperCase()} />

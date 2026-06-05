@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { defaultWorkspaceData } from "@/app/_lib/server/workspace-seed";
 import type {
+  PersistedAssetRecord,
   PersistedBrokerConnection,
   OpportunityAnalysisSnapshot,
   PersistedPredictionHistoryRecord,
@@ -28,6 +29,30 @@ type LegacyScannerResult = Partial<PersistedScannerResult> & {
   analysisUpdatedAt?: string | null;
   analysis?: OpportunityAnalysisSnapshot | null;
 };
+
+function getLastPositivePrice(points: number[]) {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const value = points[index];
+
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function normalizeAsset(asset: PersistedAssetRecord): PersistedAssetRecord {
+  const healedPrice =
+    typeof asset.price === "number" && Number.isFinite(asset.price) && asset.price > 0
+      ? asset.price
+      : getLastPositivePrice(asset.sparkline) ?? asset.price;
+
+  return {
+    ...asset,
+    price: healedPrice,
+  };
+}
 
 function normalizeExecutionMode(mode: string | null | undefined) {
   if (mode === "IG Live") {
@@ -672,8 +697,10 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
       ? candidate.journalEntries
       : defaultWorkspaceData.journalEntries,
     assets: mergeByKey(
-      Array.isArray(candidate.assets) ? candidate.assets : undefined,
-      defaultWorkspaceData.assets,
+      Array.isArray(candidate.assets)
+        ? candidate.assets.map((asset) => normalizeAsset(asset as PersistedAssetRecord))
+        : undefined,
+      defaultWorkspaceData.assets.map((asset) => normalizeAsset(asset)),
       (asset) => asset.symbol,
     ),
     scannerResults: dedupeScannerResults(

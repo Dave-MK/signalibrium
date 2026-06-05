@@ -18,6 +18,7 @@ import {
   formatPercent,
 } from "@/app/_lib/format";
 import { analyzeScannerResult, fetchMarketChart } from "@/app/_lib/workspace-api";
+import type { PricedAssetClass } from "@/app/_lib/market-prices";
 import type {
   OpportunityAnalysisSnapshot,
   PersistedScannerResult,
@@ -876,6 +877,7 @@ function TradingViewEmbedWorkspace({
 }
 
 export function AssetLiveChartPanel({
+  assetClass = "Crypto",
   analysisOverlay,
   chartVendor,
   chartingLibraryAvailable,
@@ -886,6 +888,7 @@ export function AssetLiveChartPanel({
   price,
   initialChart,
 }: {
+  assetClass?: PricedAssetClass;
   analysisOverlay?: OpportunityAnalysisSnapshot | null;
   chartVendor: "embed" | "charting_library";
   chartingLibraryAvailable: boolean;
@@ -897,7 +900,7 @@ export function AssetLiveChartPanel({
   initialChart?: LiveCandleSeries | null;
 }) {
   const router = useRouter();
-  const { formatCurrency: formatCurrencyDisplay } = useDisplayCurrency();
+  const { formatPrice: formatCurrencyDisplay } = useDisplayCurrency();
   const [selectedInterval, setSelectedInterval] = useState<SupportedChartInterval>("1h");
   const [chart, setChart] = useState<LiveCandleSeries | null>(initialChart ?? null);
   const [isLoading, setIsLoading] = useState(!initialChart);
@@ -996,13 +999,13 @@ export function AssetLiveChartPanel({
       score: 80,
       riskScore: 30,
       regime: "Balanced",
-      entryZone: `${formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.entryZone.low)} - ${formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.entryZone.high)}`,
-      stopLoss: formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.stopLevel),
-      takeProfit: formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.targetLevel),
+      entryZone: `${formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.entryZone.low, assetClass)} - ${formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.entryZone.high, assetClass)}`,
+      stopLoss: formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.stopLevel, assetClass),
+      takeProfit: formatCurrencyDisplay(liveAnalysisOverlay.chartAnnotations.targetLevel, assetClass),
       riskReward: 2,
       liquidityStatus: "High",
       tradeability: "TRADEABLE",
-      assetClass: "Crypto",
+      assetClass,
       thesis: "",
       linkedAssetSymbol: symbol,
       linkedBacktestId: null,
@@ -1020,10 +1023,11 @@ export function AssetLiveChartPanel({
     return {
       ...decision,
       detail: preferredZone
-        ? `${decision.detail} Better fill pocket: ${formatCurrencyDisplay(preferredZone.low)} - ${formatCurrencyDisplay(preferredZone.high)}.`
+        ? `${decision.detail} Better fill pocket: ${formatCurrencyDisplay(preferredZone.low, assetClass)} - ${formatCurrencyDisplay(preferredZone.high, assetClass)}.`
         : decision.detail,
     };
   }, [
+    assetClass,
     chart,
     formatCurrencyDisplay,
     liveAnalysisOverlay,
@@ -1193,7 +1197,7 @@ export function AssetLiveChartPanel({
                       ? formatNumber(card.value ?? 0, 3)
                       : card.label === "RSI 14"
                         ? formatNumber(card.value ?? 0, 1)
-                        : formatCurrencyDisplay(card.value ?? 0)
+                        : formatCurrencyDisplay(card.value ?? 0, assetClass)
                   }
                   explanation={card.explanation}
                 />
@@ -1239,7 +1243,7 @@ export function AssetLiveChartPanel({
           <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
             <p className="micro-label">Last</p>
             <p className="mt-1.5 text-[1rem] font-semibold text-white">
-              {chartStats ? formatCurrencyDisplay(chartStats.latest.close) : formatCurrencyDisplay(price)}
+              {chartStats ? formatCurrencyDisplay(chartStats.latest.close, assetClass) : formatCurrencyDisplay(price, assetClass)}
             </p>
             <p
               className={`mt-1 text-[0.78rem] font-medium ${
@@ -1252,7 +1256,7 @@ export function AssetLiveChartPanel({
           <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
             <p className="micro-label">Range</p>
             <p className="mt-1.5 text-[0.92rem] font-semibold text-white">
-              {chartStats ? `${formatCurrencyDisplay(chartStats.low)} - ${formatCurrencyDisplay(chartStats.high)}` : "Loading..."}
+              {chartStats ? `${formatCurrencyDisplay(chartStats.low, assetClass)} - ${formatCurrencyDisplay(chartStats.high, assetClass)}` : "Loading..."}
             </p>
             <p className="mt-1 text-[0.74rem] text-slate-400">Visible live range</p>
           </div>

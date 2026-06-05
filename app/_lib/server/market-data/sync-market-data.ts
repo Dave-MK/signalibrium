@@ -16,6 +16,7 @@ import type {
   PersistedMarketSnapshot,
   PersistedWorkspaceData,
 } from "../workspace-types";
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import { getMarketDataAssetDefinition } from "./asset-catalog";
 import { fetchLiveQuoteForSymbol, getConfiguredProviderName } from "./market-data";
 
@@ -198,11 +199,16 @@ function buildUpdatedAsset(
     liveQuote.series.length > 1
       ? liveQuote.series
       : buildRollingSeries(asset.sparkline, liveQuote.price);
+  const resolvedPrice =
+    getLastPositiveValue([liveQuote.price]) ??
+    getLastPositiveValue(nextSeries) ??
+    getLastPositiveValue(asset.sparkline) ??
+    asset.price;
   const trailingChange = getSeriesChangePercent(nextSeries);
 
   return {
     ...asset,
-    price: Number(liveQuote.price.toFixed(asset.assetClass === "Crypto" ? 4 : 2)),
+    price: roundPriceValue(resolvedPrice, asset.assetClass),
     change24h: Number(liveQuote.changePercent.toFixed(2)),
     sparkline: nextSeries,
     atr: buildAtr(nextSeries, asset.atr),
@@ -213,6 +219,18 @@ function buildUpdatedAsset(
     lastSyncedAt: syncedAt,
     updatedAt: syncedAt,
   };
+}
+
+function getLastPositiveValue(values: number[]) {
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    const value = values[index];
+
+    if (Number.isFinite(value) && value > 0) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function buildRollingSeries(existingSeries: number[], latestPrice: number) {
@@ -226,7 +244,7 @@ function buildRollingSeries(existingSeries: number[], latestPrice: number) {
 
   const nextSeries = [...usableSeries];
   const previousPrice = nextSeries[nextSeries.length - 1];
-  const roundedLatestPrice = Number(latestPrice.toFixed(6));
+  const roundedLatestPrice = roundPriceValue(latestPrice);
 
   if (Math.abs(previousPrice - roundedLatestPrice) < 0.000001) {
     nextSeries[nextSeries.length - 1] = roundedLatestPrice;

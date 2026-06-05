@@ -86,13 +86,11 @@ function HeaderMetric({
 
 export function AppShell({
   children,
-  displayCurrency,
   marketSnapshot,
   predictionAccuracy,
   topScannerResult,
 }: {
   children: ReactNode;
-  displayCurrency: SupportedDisplayCurrency;
   marketSnapshot: PersistedMarketSnapshot;
   predictionAccuracy: PredictionAccuracySummary;
   topScannerResult: PersistedScannerResult | null;
@@ -420,7 +418,6 @@ export function AppShell({
                 </span>
                 <select
                   aria-label="Display currency"
-                  defaultValue={displayCurrency}
                   value={activeCurrency}
                   onChange={(event) => {
                     startTransition(() => {

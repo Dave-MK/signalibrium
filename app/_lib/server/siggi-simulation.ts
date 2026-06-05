@@ -10,10 +10,8 @@ import type {
 } from "./workspace-types";
 
 const minimumFreeCashToTradeGbp = 5;
-const maximumConcurrentTrades = 3;
+const maximumConcurrentTrades = 8;
 const bustThresholdGbp = 1;
-const minimumConfidenceToOpen = 70;
-const minimumReadinessToOpen = 78;
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -143,20 +141,12 @@ function shouldOpenTrade(input: {
   record: PersistedPredictionHistoryRecord;
   view: ReturnType<typeof buildBotOpportunityView>;
 }) {
-  if (
-    input.view.decision.label !== "ENTER NOW" ||
-    input.view.opportunityAction === "WAIT" ||
-    input.view.confidence < minimumConfidenceToOpen ||
-    input.view.readiness < minimumReadinessToOpen ||
-    input.view.eventTone === "Headwind" ||
-    input.view.eventTone === "Caution"
-  ) {
+  if (input.view.decision.label !== "ENTER NOW" || input.view.opportunityAction === "WAIT") {
     return {
       allow: false,
       reason:
-        input.view.eventTone === "Headwind" || input.view.eventTone === "Caution"
-          ? input.view.timingWindow
-          : `Confidence ${input.view.confidence}% and readiness ${input.view.readiness}% are not strong enough for Siggi to commit capital yet.`,
+        input.view.timingWindow ||
+        `${input.record.symbol} is not an enter-now setup, so Siggy is waiting instead of forcing a trade.`,
     };
   }
 
@@ -197,6 +187,15 @@ function openSiggiTrade(input: {
     return input.account;
   }
 
+  const openingMarkPrice =
+    Number.isFinite(input.view.currentPrice) && input.view.currentPrice > 0
+      ? input.view.currentPrice
+      : entryPrice;
+  const openingUnrealizedPnlUsd =
+    direction === "SELL"
+      ? (entryPrice - openingMarkPrice) * quantity
+      : (openingMarkPrice - entryPrice) * quantity;
+  const openingUnrealizedPnlGbp = openingUnrealizedPnlUsd * input.usdToGbpRate;
   const trade: PersistedSiggiTrade = {
     id: `siggi-trade-${input.record.id}`,
     predictionId: input.record.id,
@@ -215,10 +214,10 @@ function openSiggiTrade(input: {
     stakeGbp: roundMoney(stakeGbp),
     stakeUsd: roundMoney(stakeUsd),
     quantity: Number(quantity.toFixed(6)),
-    currentPriceUsd: entryPrice,
-    unrealizedPnlGbp: 0,
-    unrealizedPnlUsd: 0,
-    peakUnrealizedPnlGbp: 0,
+    currentPriceUsd: openingMarkPrice,
+    unrealizedPnlGbp: roundMoney(openingUnrealizedPnlGbp),
+    unrealizedPnlUsd: roundMoney(openingUnrealizedPnlUsd),
+    peakUnrealizedPnlGbp: Math.max(0, roundMoney(openingUnrealizedPnlGbp)),
     realizedPnlGbp: null,
     realizedPnlUsd: null,
     lastMarkedAt: input.syncedAt,
@@ -527,6 +526,25 @@ export function syncSiggiAccountWithOptions(
 
     for (const candidate of rankedCandidates) {
       if (account.openTrades.length >= maximumConcurrentTrades) {
+        const alreadyLoggedCapacity = account.activityLog.some(
+          (activity) =>
+            activity.type === "Skipped" &&
+            activity.symbol === null &&
+            activity.detail.includes("maximum active trade slots") &&
+            Date.parse(syncedAt) - Date.parse(activity.at) < 6 * 60 * 60 * 1000,
+        );
+
+        if (!alreadyLoggedCapacity) {
+          account = appendActivity(
+            account,
+            buildActivity({
+              at: syncedAt,
+              detail: `Siggy reached the maximum active trade slots (${maximumConcurrentTrades}), so further enter-now calls will queue until a position closes or free capacity returns.`,
+              symbol: null,
+              type: "Skipped",
+            }),
+          );
+        }
         break;
       }
 

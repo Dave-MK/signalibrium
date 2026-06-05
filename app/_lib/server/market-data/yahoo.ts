@@ -1,3 +1,4 @@
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import { getMarketDataAssetDefinition } from "./asset-catalog";
 import type {
   LiveAssetQuote,
@@ -171,10 +172,10 @@ function buildCandlesFromResult(
 
     candles.push({
       datetime: formatChartTimestamp(timestamp),
-      open: Number(open.toFixed(6)),
-      high: Number(high.toFixed(6)),
-      low: Number(low.toFixed(6)),
-      close: Number(close.toFixed(6)),
+      open: roundPriceValue(open),
+      high: roundPriceValue(high),
+      low: roundPriceValue(low),
+      close: roundPriceValue(close),
       volume: typeof volume === "number" && Number.isFinite(volume) ? volume : null,
     });
   }
@@ -234,11 +235,11 @@ export async function fetchLiveQuoteForSymbol(symbol: string) {
     throw new Error(`Yahoo Finance did not return a usable live quote for ${definition.symbol}.`);
   }
 
-  const dailySeries = getSeriesCloses(dailyResult).slice(-12).map((value) => Number(value.toFixed(6)));
+  const dailySeries = getSeriesCloses(dailyResult).slice(-12).map((value) => roundPriceValue(value));
   const quote = {
     symbol: definition.symbol,
     providerSymbol: yahooSymbol,
-    price: Number(latestPrice.toFixed(6)),
+    price: roundPriceValue(latestPrice),
     changePercent: Number(
       getPriceChangePercent(intradayResult.meta ?? {}, latestPrice).toFixed(2),
     ),

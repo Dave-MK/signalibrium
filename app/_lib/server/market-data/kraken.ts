@@ -1,3 +1,4 @@
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import { getMarketDataAssetDefinition } from "./asset-catalog";
 import type {
   LiveAssetQuote,
@@ -450,10 +451,10 @@ function buildCandlesFromRows(
 
       return {
         datetime: new Date(timestamp * 1000).toISOString().slice(0, 19).replace("T", " "),
-        open: Number(openPrice.toFixed(6)),
-        high: Number(highPrice.toFixed(6)),
-        low: Number(lowPrice.toFixed(6)),
-        close: Number(closePrice.toFixed(6)),
+        open: roundPriceValue(openPrice),
+        high: roundPriceValue(highPrice),
+        low: roundPriceValue(lowPrice),
+        close: roundPriceValue(closePrice),
         volume: Number.isFinite(volumeValue) ? volumeValue : null,
       } satisfies LiveCandle;
     })
@@ -508,7 +509,7 @@ export async function fetchLiveQuoteForSymbol(symbol: string) {
     const quote: LiveAssetQuote = {
       symbol: definition.symbol,
       providerSymbol: streamSymbol,
-      price: Number(streamQuote.price.toFixed(6)),
+      price: roundPriceValue(streamQuote.price),
       changePercent: Number((streamQuote.changePct24h ?? 0).toFixed(2)),
       currency: "USD",
       series: getStreamSeries(streamSymbol).slice(-24),
@@ -548,7 +549,7 @@ export async function fetchLiveQuoteForSymbol(symbol: string) {
   const quote: LiveAssetQuote = {
     symbol: definition.symbol,
     providerSymbol: streamSymbol,
-    price: Number(price.toFixed(6)),
+    price: roundPriceValue(price),
     changePercent: Number(changePercent.toFixed(2)),
     currency: "USD",
     series: [],

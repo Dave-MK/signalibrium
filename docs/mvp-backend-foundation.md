@@ -433,6 +433,7 @@ That distinction matters because the app currently contains a mix of stronger an
 In practical terms:
 
 - `IG` is the target source of truth for live executable prices
+- `Coinbase`, `Kraken`, `Bybit`, and `KuCoin` now form the public crypto exchange mesh before aggregator fallback
 - `CoinGecko` is suitable for secondary crypto confirmation and enrichment
 - `Yahoo Finance` should be treated as research/chart support only, not as execution truth
 

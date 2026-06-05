@@ -1,4 +1,5 @@
 import { getMarketDataAssetDefinition } from "./asset-catalog";
+import { roundPriceValue } from "@/app/_lib/market-prices";
 import type {
   LiveAssetQuote,
   LiveCandle,
@@ -289,7 +290,7 @@ function resolvePricePoint(value: IgPriceValue | undefined) {
       : null;
 
   if (bid !== null && ask !== null) {
-    return Number(((bid + ask) / 2).toFixed(6));
+    return roundPriceValue((bid + ask) / 2);
   }
 
   return bid ?? ask ?? lastTraded;
@@ -543,7 +544,7 @@ async function fetchIgMarketSnapshot(definition: MarketDataAssetDefinition) {
       fetchedAt: new Date().toISOString(),
       marketStatus: response.snapshot?.marketStatus ?? "UNKNOWN",
       name: response.instrument?.name ?? definition.symbol,
-      price: Number(priceFromBidOffer.toFixed(6)),
+      price: roundPriceValue(priceFromBidOffer),
     };
   }
 
@@ -575,7 +576,7 @@ async function fetchIgMarketSnapshot(definition: MarketDataAssetDefinition) {
     fetchedAt,
     marketStatus: response.snapshot?.marketStatus ?? "UNKNOWN",
     name: response.instrument?.name ?? definition.symbol,
-    price: Number(fallbackPrice.toFixed(6)),
+    price: roundPriceValue(fallbackPrice),
   };
 }
 

@@ -62,8 +62,11 @@ Use for:
 
 Current/available examples:
 
-- `CoinGecko` for crypto confirmation and breadth context
-- future official additions such as `Nasdaq Data Link` or other licensed market-data APIs
+- `Coinbase Exchange` as the primary public crypto confirmation rail
+- `Kraken` as the secondary long-tail crypto confirmation rail
+- `Bybit` as the narrow tertiary crypto rail for remaining uncovered spot names
+- `KuCoin` as the final narrow crypto rail for isolated uncovered spot names
+- `CoinGecko` for crypto confirmation and breadth context when exchange-native rails still do not cover a name
 
 Rule:
 
@@ -104,6 +107,10 @@ Responsibilities:
 
 ### Layer B: Confirmation plane
 
+- `Coinbase Exchange` for primary public crypto confirmation
+- `Kraken` for secondary long-tail crypto confirmation
+- `Bybit` for the few remaining uncovered crypto spot names
+- `KuCoin` for isolated uncovered crypto spot names such as AKT
 - `CoinGecko` for crypto cross-checks
 - future official equity/ETF confirmation feed
 - future macro/sector market-data APIs where licensed

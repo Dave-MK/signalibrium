@@ -2,6 +2,10 @@ import type {
   PersistedAssetRecord,
   SupportedDisplayCurrency,
 } from "@/app/_lib/server/workspace-types";
+import {
+  getPriceFractionDigits,
+  type PricedAssetClass,
+} from "@/app/_lib/market-prices";
 
 export const defaultDisplayCurrency: SupportedDisplayCurrency = "GBP";
 export const currencyPreferenceCookieName = "signalibrium.display-currency";
@@ -61,9 +65,13 @@ export function formatCurrencyForDisplay(
   maximumFractionDigits = 2,
 ) {
   const converted = convertUsdToDisplayCurrency(value, currency, rates);
+  const resolvedMaximumFractionDigits = Math.max(
+    maximumFractionDigits,
+    getPriceFractionDigits(converted),
+  );
 
   return new Intl.NumberFormat("en-GB", {
-    maximumFractionDigits,
+    maximumFractionDigits: resolvedMaximumFractionDigits,
     style: "currency",
     currency,
   }).format(converted);
@@ -77,11 +85,31 @@ export function formatCurrencyAmount(
   maximumFractionDigits = 2,
 ) {
   const converted = convertCurrencyAmount(value, fromCurrency, toCurrency, rates);
+  const resolvedMaximumFractionDigits = Math.max(
+    maximumFractionDigits,
+    getPriceFractionDigits(converted),
+  );
+
+  return new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: resolvedMaximumFractionDigits,
+    style: "currency",
+    currency: toCurrency,
+  }).format(converted);
+}
+
+export function formatInstrumentPriceForDisplay(
+  value: number,
+  currency: SupportedDisplayCurrency,
+  rates: CurrencyRateMap,
+  assetClass?: PricedAssetClass,
+) {
+  const converted = convertUsdToDisplayCurrency(value, currency, rates);
+  const maximumFractionDigits = getPriceFractionDigits(converted, assetClass);
 
   return new Intl.NumberFormat("en-GB", {
     maximumFractionDigits,
     style: "currency",
-    currency: toCurrency,
+    currency,
   }).format(converted);
 }
 

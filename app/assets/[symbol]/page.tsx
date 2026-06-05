@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { notFound } from "next/navigation";
-import { formatCurrencyForDisplay } from "@/app/_lib/currency";
+import { formatInstrumentPriceForDisplay } from "@/app/_lib/currency";
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
+import { getMarketSession } from "@/app/_lib/market-hours";
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getAssetBySymbol } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
@@ -20,6 +21,18 @@ import {
 } from "../../_lib/format";
 import { AssetLiveChartPanel } from "../../_components/asset-live-chart-panel";
 import { ActionLink, KeyValue, Panel, PageHeader, StatusChip } from "../../_components/ui";
+
+function formatMarketSessionLabel(state: ReturnType<typeof getMarketSession>["state"]) {
+  if (state === "Open") {
+    return "MARKET OPEN";
+  }
+
+  if (state === "Closed") {
+    return "MARKET CLOSED";
+  }
+
+  return state;
+}
 
 export default async function AssetDetailPage({
   params,
@@ -54,6 +67,7 @@ export default async function AssetDetailPage({
   const initialChart = await fetchLiveCandlesForSymbol(asset.symbol, "1h", 64).catch(() =>
     buildFallbackChart(asset.symbol, asset.name, asset.sparkline, asset.lastSyncedAt, "1h"),
   );
+  const marketSession = getMarketSession(asset);
 
   const assetSetups = scannerResults
     .filter((result) => result.symbol === asset.symbol)
@@ -76,16 +90,16 @@ export default async function AssetDetailPage({
       )
     : null;
   const matchedStrategy = strategies.find((strategy) => strategy.name === asset.activeStrategy) ?? null;
-  const formatDisplayPrice = (value: number, digits = 2) =>
-    formatCurrencyForDisplay(
+  const formatDisplayPrice = (value: number) =>
+    formatInstrumentPriceForDisplay(
       value,
       displayCurrencyState.currency,
       displayCurrencyState.rates,
-      digits,
+      asset.assetClass,
     );
   const entryZoneLabel =
     selectedSetup?.analysis
-      ? `${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.low, asset.assetClass === "Forex" ? 4 : 2)} - ${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.high, asset.assetClass === "Forex" ? 4 : 2)}`
+      ? `${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.low)} - ${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.high)}`
       : selectedView?.entry ?? selectedSetup?.entryZone ?? "Awaiting setup";
   const discountedEntryLabel =
     selectedSetup?.analysis
@@ -93,24 +107,18 @@ export default async function AssetDetailPage({
         ? (() => {
             const [lowRaw, highRaw] = selectedView.discountedEntry.split(" - ").map(Number);
             return Number.isFinite(lowRaw) && Number.isFinite(highRaw)
-              ? `${formatDisplayPrice(lowRaw, asset.assetClass === "Forex" ? 4 : 2)} - ${formatDisplayPrice(highRaw, asset.assetClass === "Forex" ? 4 : 2)}`
+              ? `${formatDisplayPrice(lowRaw)} - ${formatDisplayPrice(highRaw)}`
               : selectedView.discountedEntry;
           })()
         : selectedView?.discountedEntry ?? "Awaiting setup"
       : selectedView?.discountedEntry ?? "Awaiting setup";
   const stopLabel =
     selectedSetup?.analysis
-      ? formatDisplayPrice(
-          selectedSetup.analysis.chartAnnotations.stopLevel,
-          asset.assetClass === "Forex" ? 4 : 2,
-        )
+      ? formatDisplayPrice(selectedSetup.analysis.chartAnnotations.stopLevel)
       : selectedView?.stop ?? "Awaiting setup";
   const targetLabel =
     selectedSetup?.analysis
-      ? formatDisplayPrice(
-          selectedSetup.analysis.chartAnnotations.targetLevel,
-          asset.assetClass === "Forex" ? 4 : 2,
-        )
+      ? formatDisplayPrice(selectedSetup.analysis.chartAnnotations.targetLevel)
       : selectedView?.target ?? "Awaiting setup";
 
   return (
@@ -118,10 +126,16 @@ export default async function AssetDetailPage({
       <PageHeader
         title={`${asset.symbol} market map`}
         description={`Track ${asset.name} with the live chart, current setup, and replay context in one place.`}
-        action={<ActionLink href="/scanner">Open Leaderboard</ActionLink>}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
+            <ActionLink href="/scanner">Open Leaderboard</ActionLink>
+          </div>
+        }
       />
 
       <AssetLiveChartPanel
+        assetClass={asset.assetClass}
         analysisOverlay={selectedSetup?.analysis ?? null}
         chartVendor={configuredChartVendor}
         chartingLibraryAvailable={chartingLibraryAvailable}
@@ -153,10 +167,16 @@ export default async function AssetDetailPage({
                   <StatusChip label={selectedView.decision.label} />
                   <StatusChip label={selectedSetup.timeframe} />
                   <StatusChip label={selectedView.opportunityAction} />
+                  <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
                 </div>
               </div>
 
               <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
+                <KeyValue
+                  label="Market session"
+                  value={marketSession.state}
+                  detail={`${marketSession.venue} / ${marketSession.detail}`}
+                />
                 <KeyValue
                   label="Trend"
                   value={selectedView.direction}
@@ -223,7 +243,7 @@ export default async function AssetDetailPage({
             />
             <KeyValue
               label="ATR"
-              value={formatDisplayPrice(asset.atr, asset.assetClass === "Forex" ? 4 : 2)}
+              value={formatDisplayPrice(asset.atr)}
               detail={`${asset.tradeable ? "Tradeable" : "Watch only"} / ${asset.regime}`}
             />
           </div>
