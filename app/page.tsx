@@ -139,16 +139,10 @@ export default async function DashboardPage() {
     )
     .sort((left, right) => right.rankScore - left.rankScore);
 
-  const dayEntry = rankedViews.find((item) => item.horizon === "Day") ?? null;
-  const weekEntry =
-    rankedViews.find((item) => item.horizon === "Week") ??
-    rankedViews.find((item) => item.timeframe === "1D") ??
-    null;
-  const monthEntry =
-    rankedViews.find((item) => item.timeframe === "1D" && item.rankScore >= 78) ??
-    rankedViews.find((item) => item.horizon === "Month") ??
-    rankedViews.find((item) => item.timeframe === "1D") ??
-    null;
+  const dayRankedViews = rankedViews.filter((item) => item.horizon === "Day");
+  const nowEntry = dayRankedViews[0] ?? rankedViews[0] ?? null;
+  const todayEntry = dayRankedViews[1] ?? rankedViews[1] ?? null;
+  const next24hEntry = dayRankedViews[2] ?? rankedViews[2] ?? null;
   const topEvent = marketEvents[0] ?? null;
   const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
 
@@ -156,7 +150,7 @@ export default async function DashboardPage() {
     <div className="panel-stack-5">
       <PageHeader
         title="Best Siggi-led trading ideas"
-        description="See the strongest day, week, and month setups, then open the chart when one deserves a closer look."
+        description="See the strongest short-horizon setups for right now, today, and the next 24 hours, then open the chart when one deserves a closer look."
         action={<ActionLink href="/scanner">Open Opportunities</ActionLink>}
       />
 
@@ -178,29 +172,29 @@ export default async function DashboardPage() {
             ) : null}
           </div>
           <SummaryCard
-            label="Best daily"
-            value={dayEntry ? `${dayEntry.symbol} / ${dayEntry.confidence}%` : "None"}
-            detail={dayEntry ? `${dayEntry.decision.label} / timing fit ${dayEntry.readiness}%` : "No daily setup"}
+            label="Best now"
+            value={nowEntry ? `${nowEntry.symbol} / ${nowEntry.confidence}%` : "None"}
+            detail={nowEntry ? `${nowEntry.decision.label} / timing fit ${nowEntry.readiness}%` : "No immediate setup"}
             tone="text-cyan-200"
           />
           <SummaryCard
-            label="Best weekly"
-            value={weekEntry ? `${weekEntry.symbol} / ${weekEntry.confidence}%` : "None"}
-            detail={weekEntry ? `${weekEntry.decision.label} / timing fit ${weekEntry.readiness}%` : "No weekly setup"}
+            label="Best today"
+            value={todayEntry ? `${todayEntry.symbol} / ${todayEntry.confidence}%` : "None"}
+            detail={todayEntry ? `${todayEntry.decision.label} / timing fit ${todayEntry.readiness}%` : "No same-session setup"}
             tone="text-emerald-300"
           />
           <SummaryCard
-            label="Best monthly"
-            value={monthEntry ? `${monthEntry.symbol} / ${monthEntry.confidence}%` : "None"}
-            detail={monthEntry ? `${monthEntry.decision.label} / timing fit ${monthEntry.readiness}%` : "No monthly setup"}
+            label="Next 24h"
+            value={next24hEntry ? `${next24hEntry.symbol} / ${next24hEntry.confidence}%` : "None"}
+            detail={next24hEntry ? `${next24hEntry.decision.label} / timing fit ${next24hEntry.readiness}%` : "No clean 24h setup"}
           />
         </div>
       </Panel>
 
       <div className="grid gap-[5px] xl:grid-cols-3">
-        <EntryCard title="Best entry today" view={dayEntry} />
-        <EntryCard title="Best entry this week" view={weekEntry} />
-        <EntryCard title="Best entry this month" view={monthEntry} />
+        <EntryCard title="Best entry now" view={nowEntry} />
+        <EntryCard title="Best entry today" view={todayEntry} />
+        <EntryCard title="Best entry next 24h" view={next24hEntry} />
       </div>
 
       <Panel className="p-3 sm:p-3.5">
@@ -230,7 +224,7 @@ export default async function DashboardPage() {
           <div>
             <p className="micro-label">Why Siggi likes it</p>
             <p className="mt-1.5 text-[0.96rem] font-semibold text-white">
-              {dayEntry?.symbol ?? weekEntry?.symbol ?? "No current lead"} / short-term focus
+              {nowEntry?.symbol ?? todayEntry?.symbol ?? "No current lead"} / short-term focus
             </p>
           </div>
                   <Link href="/history" className="text-[0.78rem] font-medium text-slate-400 transition hover:text-white">
@@ -241,21 +235,21 @@ export default async function DashboardPage() {
           <div className="signal-surface-soft rounded-[0.4rem] p-3">
             <p className="micro-label">Event effect</p>
             <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-              {(dayEntry ?? weekEntry ?? monthEntry)?.eventEffect ??
+              {(nowEntry ?? todayEntry ?? next24hEntry)?.eventEffect ??
                 "No event impact summary is available yet."}
             </p>
           </div>
           <div className="signal-surface-soft rounded-[0.4rem] p-3">
             <p className="micro-label">Why Siggi is leaning</p>
             <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-              {(dayEntry ?? weekEntry ?? monthEntry)?.priorityReason ??
+              {(nowEntry ?? todayEntry ?? next24hEntry)?.priorityReason ??
                   "Siggi keeps syncing live prices, re-checks chart structure, weighs scheduled events, and uses stored backtest, replay, and confirmation context to rank the highest-probability short-term setups first."}
             </p>
           </div>
         </div>
-        {dayEntry ? (
+        {nowEntry ? (
           <div className="mt-3 grid gap-[5px] sm:grid-cols-4">
-            {dayEntry.scoreBreakdown.map((item) => (
+            {nowEntry.scoreBreakdown.map((item) => (
               <SummaryCard
                 key={item.label}
                 label={item.label}

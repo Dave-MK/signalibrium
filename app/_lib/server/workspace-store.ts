@@ -1,8 +1,12 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { roundPriceValue } from "@/app/_lib/market-prices";
+import {
+  getStrategyTriggerTimeframe,
+  selectStrategyProfile,
+} from "@/app/_lib/strategy-profiles";
 import { defaultWorkspaceData } from "@/app/_lib/server/workspace-seed";
 import type {
   PersistedAssetRecord,
+  PersistedAiOpportunity,
   PersistedBrokerConnection,
   OpportunityAnalysisSnapshot,
   PersistedPredictionHistoryRecord,
@@ -15,9 +19,14 @@ import type {
   PersistedWorkspaceData,
 } from "./workspace-types";
 
-const dataDirectory = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
-const defaultStorePath = path.join(dataDirectory, "workspace.json");
+const vercelTempStorePath = "/tmp/signalibrium-workspace.json";
+const kvWorkspaceKey = process.env.SIGNALIBRIUM_KV_WORKSPACE_KEY ?? "signalibrium:workspace";
 let pendingWrite = Promise.resolve();
+
+type UpstashRestResponse<T> = {
+  result?: T;
+  error?: string;
+};
 
 type LegacyTradeTicket = Omit<PersistedTradeTicket, "status" | "brokerStatus"> & {
   status?: PersistedTradeTicket["status"] | "Prepared" | "Simulated Open";
@@ -42,15 +51,121 @@ function getLastPositivePrice(points: number[]) {
   return null;
 }
 
+function normalizeSparkline(price: number, sparkline: number[]) {
+  const validPoints = sparkline.filter((value) => Number.isFinite(value) && value > 0);
+
+  if (!(Number.isFinite(price) && price > 0)) {
+    return validPoints;
+  }
+
+  if (validPoints.length < 2) {
+    return Array.from({ length: 12 }, () => roundPriceValue(price));
+  }
+
+  const max = Math.max(...validPoints);
+  const min = Math.min(...validPoints);
+  const last = validPoints[validPoints.length - 1];
+  const wildlyOutOfScale =
+    max > price * 250 ||
+    min < price / 250 ||
+    last > price * 250 ||
+    last < price / 250;
+
+  if (wildlyOutOfScale) {
+    return Array.from({ length: Math.max(validPoints.length, 12) }, () => roundPriceValue(price));
+  }
+
+  return validPoints;
+}
+
+function parseFormattedPriceLabel(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return 0;
+  }
+
+  const normalized = Number(value.replaceAll("£", "").replaceAll("$", "").replaceAll(",", "").trim());
+  return Number.isFinite(normalized) ? normalized : 0;
+}
+
+function parseFormattedPriceRange(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return { low: 0, high: 0 };
+  }
+
+  const [rawLow, rawHigh] = value.split("-").map((part) => parseFormattedPriceLabel(part));
+  const low = Number.isFinite(rawLow) ? rawLow : 0;
+  const high = Number.isFinite(rawHigh) ? rawHigh : low;
+
+  return {
+    low,
+    high,
+  };
+}
+
+function inferDirectionalStance(input: {
+  analysisBias?: string | null;
+  aiBias?: string | null;
+  forecast?: string | null;
+  thesis?: string | null;
+}) {
+  const combined = [
+    input.analysisBias,
+    input.aiBias,
+    input.forecast,
+    input.thesis,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    combined.includes("bear") ||
+    combined.includes("fade") ||
+    combined.includes("breakdown") ||
+    combined.includes("defensive") ||
+    combined.includes("weakening")
+  ) {
+    return "Short" as const;
+  }
+
+  return "Long" as const;
+}
+
 function normalizeAsset(asset: PersistedAssetRecord): PersistedAssetRecord {
   const healedPrice =
     typeof asset.price === "number" && Number.isFinite(asset.price) && asset.price > 0
       ? asset.price
       : getLastPositivePrice(asset.sparkline) ?? asset.price;
+  const normalizedSparkline = normalizeSparkline(healedPrice, asset.sparkline);
+  const profile = selectStrategyProfile({
+    assetClass: asset.assetClass,
+    liquidity: asset.liquidity,
+    regime: asset.regime,
+    score: asset.score,
+    stance: inferDirectionalStance({
+      aiBias: asset.aiBias,
+      forecast: asset.forecast,
+    }),
+    tradeability: asset.tradeable ? "TRADEABLE" : "WATCH",
+    volatility: asset.volatility,
+  });
+  const sparklineAtr =
+    normalizedSparkline.length > 1
+      ? normalizedSparkline
+          .slice(1)
+          .map((value, index) => Math.abs(value - normalizedSparkline[index]))
+          .reduce((total, value) => total + value, 0) / (normalizedSparkline.length - 1)
+      : asset.atr;
 
   return {
     ...asset,
     price: healedPrice,
+    activeStrategy: profile.name,
+    atr:
+      Number.isFinite(asset.atr) && asset.atr > 0 && asset.atr <= healedPrice * 5
+        ? asset.atr
+        : roundPriceValue(Math.max(sparklineAtr, healedPrice * 0.004), asset.assetClass),
+    sparkline: normalizedSparkline,
   };
 }
 
@@ -71,7 +186,85 @@ function normalizeExecutionMode(mode: string | null | undefined) {
 }
 
 function resolveStorePath() {
-  return process.env.SIGNALIBRIUM_STORE_PATH ?? defaultStorePath;
+  if (process.env.SIGNALIBRIUM_STORE_PATH) {
+    return process.env.SIGNALIBRIUM_STORE_PATH;
+  }
+
+  if (process.env.VERCEL) {
+    return vercelTempStorePath;
+  }
+
+  return `${process.cwd()}/data/workspace.json`;
+}
+
+function getKvConfig() {
+  const url = process.env.KV_REST_API_URL?.trim() || process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token =
+    process.env.KV_REST_API_TOKEN?.trim() || process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  if (!url || !token) {
+    return null;
+  }
+
+  return {
+    token,
+    url: url.replace(/\/$/, ""),
+  };
+}
+
+function shouldUseKvStore() {
+  return Boolean(getKvConfig());
+}
+
+async function fetchKvJson<T>(pathName: string, init?: RequestInit) {
+  const config = getKvConfig();
+
+  if (!config) {
+    throw new Error("Upstash Redis is not configured.");
+  }
+
+  const response = await fetch(`${config.url}${pathName}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Vercel KV request failed with ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as UpstashRestResponse<T>;
+
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+
+  return payload.result;
+}
+
+async function readKvWorkspacePayload() {
+  const stored = await fetchKvJson<string | PersistedWorkspaceData | null>(
+    `/get/${encodeURIComponent(kvWorkspaceKey)}`,
+  );
+
+  if (stored) {
+    return typeof stored === "string" ? stored : JSON.stringify(stored);
+  }
+
+  const seededPayload = JSON.stringify(defaultWorkspaceData, null, 2);
+  await writeKvWorkspacePayload(seededPayload);
+
+  return seededPayload;
+}
+
+async function writeKvWorkspacePayload(payload: string) {
+  await fetchKvJson<"OK">(`/set/${encodeURIComponent(kvWorkspaceKey)}`, {
+    body: payload,
+    method: "POST",
+  });
 }
 
 function normalizeTradeTicket(ticket: LegacyTradeTicket): PersistedTradeTicket {
@@ -416,6 +609,186 @@ function normalizePredictionHistoryRecord(
   };
 }
 
+function getScannerResultBySymbolOrId(
+  scannerResults: PersistedScannerResult[],
+  symbol: string,
+  sourceScannerResultId?: string | null,
+) {
+  if (sourceScannerResultId) {
+    const exactMatch = scannerResults.find((result) => result.id === sourceScannerResultId);
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+  }
+
+  return scannerResults.find((result) => result.symbol === symbol) ?? null;
+}
+
+function normalizeAiOpportunityRecord(
+  opportunity: PersistedAiOpportunity,
+  scannerResults: PersistedScannerResult[],
+  assetsBySymbol: Map<string, PersistedAssetRecord>,
+  backtests: PersistedWorkspaceData["backtests"],
+) {
+  const scannerResult = getScannerResultBySymbolOrId(
+    scannerResults,
+    opportunity.symbol,
+    opportunity.linkedScannerResultId,
+  );
+  const asset = assetsBySymbol.get(opportunity.symbol) ?? null;
+  const backtest =
+    (scannerResult
+      ? backtests.find((item) => item.linkedScannerResultId === scannerResult.id)
+      : null) ??
+    backtests.find((item) => item.linkedAssetSymbol === opportunity.symbol) ??
+    null;
+
+  if (!scannerResult) {
+    return opportunity;
+  }
+
+  const side = scannerResult.thesis.toLowerCase().includes("short") ? "Short" : opportunity.side;
+  const action =
+    scannerResult.tradeability === "TRADEABLE"
+      ? side === "Short"
+        ? ("Sell" as const)
+        : ("Buy" as const)
+      : ("Wait" as const);
+  const leadWindow =
+    scannerResult.timeframe === "15M"
+      ? "the next few hours"
+      : scannerResult.timeframe === "1H"
+        ? "the next session"
+        : "the next 24 hours";
+
+  return {
+    ...opportunity,
+    side,
+    title: `${scannerResult.strategy} intraday setup`,
+    summary: `${scannerResult.symbol} is being tracked on the ${scannerResult.strategy} playbook for ${leadWindow}.`,
+    action,
+    entryPlan: scannerResult.entryZone,
+    stopPlan: scannerResult.stopLoss,
+    targetPlan: scannerResult.takeProfit,
+    expectedMove:
+      side === "Short"
+        ? "Favors downside continuation if rallies fail back into resistance."
+        : "Favors upside continuation if pullbacks hold the planned zone.",
+    invalidation:
+      side === "Short"
+        ? "Reclaim the short trigger zone and hold above it, which would invalidate the fade."
+        : "Lose the pullback shelf and fail to reclaim the preferred entry pocket.",
+    marketContext: `${asset?.regime ?? "Mixed"} tape. ${asset?.forecast ?? opportunity.marketContext}`.slice(0, 240),
+    newsContext: opportunity.newsContext,
+    confirmationContext:
+      scannerResult.analysis?.validationSummary ??
+      `${scannerResult.strategy} is being cross-checked with event, confirmation, and replay memory before Siggi leans in.`,
+    linkedScannerResultId: scannerResult.id,
+    linkedBacktestId: backtest?.id ?? opportunity.linkedBacktestId,
+  };
+}
+
+function normalizePredictionHistoryAgainstScanner(
+  record: PersistedPredictionHistoryRecord,
+  scannerResults: PersistedScannerResult[],
+  assetsBySymbol: Map<string, PersistedAssetRecord>,
+) {
+  const scannerResult = getScannerResultBySymbolOrId(
+    scannerResults,
+    record.symbol,
+    record.sourceScannerResultId,
+  );
+  const asset = assetsBySymbol.get(record.symbol) ?? null;
+
+  if (!scannerResult) {
+    return record;
+  }
+
+  const parsedEntry = parseFormattedPriceRange(record.entryAtCall);
+  const parsedDiscountedEntry = parseFormattedPriceRange(record.discountedEntryAtCall);
+  const parsedStop = parseFormattedPriceLabel(record.stopAtCall);
+  const parsedTarget = parseFormattedPriceLabel(record.targetAtCall);
+  const currentEntry = parseFormattedPriceRange(scannerResult.entryZone);
+  const strategyAtCall =
+    record.strategyAtCall === "Unknown strategy" ||
+    record.strategyAtCall === "20-Day Breakout" ||
+    record.strategyAtCall === "50/200 Trend" ||
+    record.strategyAtCall === "RSI Pullback"
+      ? scannerResult.strategy
+      : record.strategyAtCall;
+  const timeframe =
+    record.timeframe === "4H" || record.timeframe === "1D" || record.timeframe === "1W"
+      ? scannerResult.timeframe
+      : record.timeframe;
+  const indicatorSnapshot =
+    record.indicatorSnapshotAtCall.length > 0
+      ? record.indicatorSnapshotAtCall
+      : (scannerResult.analysis?.indicatorSweep ?? []).map(
+          (item) => `${item.label}: ${item.status} / ${item.detail}`,
+        );
+  const strategySnapshot =
+    record.strategySnapshotAtCall.length > 0
+      ? record.strategySnapshotAtCall
+      : (scannerResult.analysis?.strategyChecks ?? []).map(
+          (item) => `${item.label}: ${item.status} / ${item.detail}`,
+        );
+  const validationSnapshot =
+    record.validationSnapshotAtCall.length > 0
+      ? record.validationSnapshotAtCall
+      : scannerResult.analysis?.validationSummary
+        ? [scannerResult.analysis.validationSummary]
+        : [];
+
+  return {
+    ...record,
+    instrumentName: asset?.name ?? record.instrumentName,
+    strategyAtCall,
+    timeframe,
+    horizon: "Day" as const,
+    sourceScannerResultId: scannerResult.id,
+    entryLowAtCall:
+      record.entryLowAtCall > 0
+        ? record.entryLowAtCall
+        : parsedEntry.low > 0
+          ? parsedEntry.low
+          : currentEntry.low,
+    entryHighAtCall:
+      record.entryHighAtCall > 0
+        ? record.entryHighAtCall
+        : parsedEntry.high > 0
+          ? parsedEntry.high
+          : currentEntry.high,
+    stopPriceAtCall:
+      record.stopPriceAtCall > 0
+        ? record.stopPriceAtCall
+        : parsedStop > 0
+          ? parsedStop
+          : parseFormattedPriceLabel(scannerResult.stopLoss),
+    targetPriceAtCall:
+      record.targetPriceAtCall > 0
+        ? record.targetPriceAtCall
+        : parsedTarget > 0
+          ? parsedTarget
+          : parseFormattedPriceLabel(scannerResult.takeProfit),
+    discountedEntryAtCall:
+      parsedDiscountedEntry.low > 0 && parsedDiscountedEntry.high > 0
+        ? record.discountedEntryAtCall
+        : scannerResult.entryZone,
+    patternSnapshotAtCall:
+      record.patternSnapshotAtCall === "No pattern snapshot was saved for this historical record."
+        ? `Siggi is now classifying this as a ${scannerResult.strategy} intraday setup built for ${scannerResult.timeframe} execution.`
+        : record.patternSnapshotAtCall,
+    indicatorSnapshotAtCall: indicatorSnapshot,
+    strategySnapshotAtCall: strategySnapshot,
+    validationSnapshotAtCall: validationSnapshot,
+    narrative:
+      record.narrative.includes("weekly")
+        ? record.narrative.replaceAll("weekly", "intraday").replaceAll("Weekly", "Intraday")
+        : record.narrative,
+  };
+}
+
 function normalizeSiggiTrade(
   trade: Partial<PersistedSiggiTrade>,
   now: string,
@@ -615,6 +988,16 @@ function normalizeWatchlists(candidateWatchlists: PersistedWorkspaceData["watchl
 
 async function ensureStoreFile() {
   const storePath = resolveStorePath();
+  const [{ promises: fs }, path] = await Promise.all([
+    import("node:fs"),
+    import("node:path"),
+  ]);
+
+  if (process.env.VERCEL && !shouldUseKvStore() && !process.env.SIGNALIBRIUM_STORE_PATH) {
+    throw new Error(
+      "Signalibrium needs Upstash Redis configured in production. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
+    );
+  }
 
   try {
     await fs.access(storePath);
@@ -628,6 +1011,106 @@ async function ensureStoreFile() {
 
 function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   const candidate = (raw ?? {}) as Partial<PersistedWorkspaceData>;
+  const normalizedAssets = mergeByKey(
+    Array.isArray(candidate.assets)
+      ? candidate.assets.map((asset) => normalizeAsset(asset as PersistedAssetRecord))
+      : undefined,
+    defaultWorkspaceData.assets.map((asset) => normalizeAsset(asset)),
+    (asset) => asset.symbol,
+  );
+  const assetBySymbol = new Map(normalizedAssets.map((asset) => [asset.symbol, asset] as const));
+  const normalizedScannerResults = dedupeScannerResults(
+    mergeByKey(
+      Array.isArray(candidate.scannerResults)
+        ? candidate.scannerResults.map((result) =>
+            normalizeScannerResult(result as PersistedScannerResult),
+          )
+        : undefined,
+      defaultWorkspaceData.scannerResults,
+      (result) => result.id,
+    ).map((result) => {
+      const asset = assetBySymbol.get(result.symbol);
+
+      if (!asset) {
+        return result;
+      }
+
+      const profile = selectStrategyProfile({
+        assetClass: asset.assetClass,
+        liquidity: asset.liquidity,
+        regime: asset.regime,
+        score: result.score,
+        stance: inferDirectionalStance({
+          analysisBias: result.analysis?.bias,
+          aiBias: asset.aiBias,
+          forecast: asset.forecast,
+          thesis: result.thesis,
+        }),
+        tradeability: result.tradeability,
+        volatility: asset.volatility,
+      });
+
+      return {
+        ...result,
+        strategy: profile.name,
+        timeframe: getStrategyTriggerTimeframe(profile, asset.assetClass),
+      };
+    }),
+  );
+  const normalizedBacktests = mergeByKey(
+    Array.isArray(candidate.backtests) ? candidate.backtests : undefined,
+    defaultWorkspaceData.backtests,
+    (backtest) => backtest.id,
+  ).map((backtest) => {
+    const asset = assetBySymbol.get(backtest.linkedAssetSymbol);
+
+    if (!asset) {
+      return backtest;
+    }
+
+    const profile = selectStrategyProfile({
+      assetClass: asset.assetClass,
+      liquidity: asset.liquidity,
+      regime: asset.regime,
+      score: asset.score,
+      stance: backtest.aiRead.toLowerCase().includes("weak") ? "Short" : "Long",
+      tradeability: asset.tradeable ? "TRADEABLE" : "WATCH",
+      volatility: asset.volatility,
+    });
+
+    return {
+      ...backtest,
+      strategy: profile.name,
+      timeframe: getStrategyTriggerTimeframe(profile, asset.assetClass),
+    };
+  });
+  const normalizedAiOpportunities = mergeByKey(
+    Array.isArray(candidate.aiOpportunities) ? candidate.aiOpportunities : undefined,
+    defaultWorkspaceData.aiOpportunities,
+    (opportunity) => opportunity.id,
+  ).map((opportunity) =>
+    normalizeAiOpportunityRecord(
+      opportunity,
+      normalizedScannerResults,
+      assetBySymbol,
+      normalizedBacktests,
+    ),
+  );
+  const normalizedPredictionHistory = mergeByKey(
+    Array.isArray(candidate.predictionHistory)
+      ? candidate.predictionHistory.map((record) =>
+          normalizePredictionHistoryRecord(record as PersistedPredictionHistoryRecord),
+        )
+      : undefined,
+    defaultWorkspaceData.predictionHistory,
+    (record) => record.id,
+  ).map((record) =>
+    normalizePredictionHistoryAgainstScanner(
+      record,
+      normalizedScannerResults,
+      assetBySymbol,
+    ),
+  );
 
   return {
     schemaVersion: 12,
@@ -696,29 +1179,9 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
     journalEntries: Array.isArray(candidate.journalEntries)
       ? candidate.journalEntries
       : defaultWorkspaceData.journalEntries,
-    assets: mergeByKey(
-      Array.isArray(candidate.assets)
-        ? candidate.assets.map((asset) => normalizeAsset(asset as PersistedAssetRecord))
-        : undefined,
-      defaultWorkspaceData.assets.map((asset) => normalizeAsset(asset)),
-      (asset) => asset.symbol,
-    ),
-    scannerResults: dedupeScannerResults(
-      mergeByKey(
-        Array.isArray(candidate.scannerResults)
-          ? candidate.scannerResults.map((result) =>
-              normalizeScannerResult(result as PersistedScannerResult),
-            )
-          : undefined,
-        defaultWorkspaceData.scannerResults,
-        (result) => result.id,
-      ),
-    ),
-    backtests: mergeByKey(
-      Array.isArray(candidate.backtests) ? candidate.backtests : undefined,
-      defaultWorkspaceData.backtests,
-      (backtest) => backtest.id,
-    ),
+    assets: normalizedAssets,
+    scannerResults: normalizedScannerResults,
+    backtests: normalizedBacktests,
     marketSnapshot:
       candidate.marketSnapshot ?? defaultWorkspaceData.marketSnapshot,
     marketEvents: mergeByKey(
@@ -733,20 +1196,8 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
       defaultWorkspaceData.confirmationChecks,
       (check) => check.id,
     ),
-    aiOpportunities: mergeByKey(
-      Array.isArray(candidate.aiOpportunities) ? candidate.aiOpportunities : undefined,
-      defaultWorkspaceData.aiOpportunities,
-      (opportunity) => opportunity.id,
-    ),
-    predictionHistory: mergeByKey(
-      Array.isArray(candidate.predictionHistory)
-        ? candidate.predictionHistory.map((record) =>
-            normalizePredictionHistoryRecord(record as PersistedPredictionHistoryRecord),
-          )
-        : undefined,
-      defaultWorkspaceData.predictionHistory,
-      (record) => record.id,
-    ),
+    aiOpportunities: normalizedAiOpportunities,
+    predictionHistory: normalizedPredictionHistory,
     siggiAccount: normalizeSiggiAccount(candidate.siggiAccount),
   };
 }
@@ -819,12 +1270,85 @@ function queueWrite<T>(task: () => Promise<T>) {
   return result;
 }
 
-export async function readWorkspaceData() {
-  const storePath = await ensureStoreFile();
-  const raw = await fs.readFile(storePath, "utf8");
+function isPermissionRenameError(error: unknown) {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    ["EPERM", "EACCES", "EBUSY"].includes((error as NodeJS.ErrnoException).code ?? "")
+  );
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function replaceWorkspaceFile(
+  fs: typeof import("node:fs").promises,
+  tempPath: string,
+  storePath: string,
+  payload: string,
+) {
+  const retryDelaysMs = [80, 180, 360, 720];
+
+  for (const delayMs of [0, ...retryDelaysMs]) {
+    if (delayMs > 0) {
+      await wait(delayMs);
+    }
+
+    try {
+      await fs.rename(tempPath, storePath);
+      return;
+    } catch (error) {
+      if (!isPermissionRenameError(error)) {
+        throw error;
+      }
+    }
+  }
 
   try {
-    return normalizeWorkspaceData(JSON.parse(raw));
+    await fs.copyFile(tempPath, storePath);
+  } catch {
+    try {
+      await fs.writeFile(storePath, payload, "utf8");
+    } catch {
+      try {
+        await fs.unlink(storePath);
+      } catch {
+        // If OneDrive still holds the destination, the final rename attempt below may still fail.
+      }
+
+      await fs.rename(tempPath, storePath);
+      return;
+    }
+  }
+
+  try {
+    await fs.unlink(tempPath);
+  } catch {
+    // OneDrive can keep the temp file locked briefly; it is gitignored and harmless.
+  }
+}
+
+export async function readWorkspaceData() {
+  const raw = shouldUseKvStore()
+    ? await readKvWorkspacePayload()
+    : await import("node:fs").then(async ({ promises: fs }) =>
+        fs.readFile(await ensureStoreFile(), "utf8"),
+      );
+
+  try {
+    const parsed = JSON.parse(raw);
+    const normalizedData = normalizeWorkspaceData(parsed);
+    const normalizedPayload = JSON.stringify(normalizedData);
+    const currentPayload = JSON.stringify(parsed);
+
+    if (normalizedPayload !== currentPayload) {
+      await writeWorkspaceData(normalizedData);
+    }
+
+    return normalizedData;
   } catch {
     const recoveredPayload = extractFirstCompleteJsonObject(raw);
 
@@ -841,7 +1365,6 @@ export async function readWorkspaceData() {
 
 export async function writeWorkspaceData(nextData: PersistedWorkspaceData) {
   return queueWrite(async () => {
-    const storePath = await ensureStoreFile();
     const now = new Date().toISOString();
     const stampedData: PersistedWorkspaceData = {
       ...nextData,
@@ -851,15 +1374,29 @@ export async function writeWorkspaceData(nextData: PersistedWorkspaceData) {
         updatedAt: now,
       },
     };
+    const payload = JSON.stringify(stampedData, null, 2);
+
+    if (shouldUseKvStore()) {
+      await writeKvWorkspacePayload(payload);
+
+      return stampedData;
+    }
+
+    const storePath = await ensureStoreFile();
+    const { promises: fs } = await import("node:fs");
     const tempPath = `${storePath}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
 
-    await fs.writeFile(tempPath, JSON.stringify(stampedData, null, 2), "utf8");
-    await fs.rename(tempPath, storePath);
+    await fs.writeFile(tempPath, payload, "utf8");
+    await replaceWorkspaceFile(fs, tempPath, storePath, payload);
 
     return stampedData;
   });
 }
 
 export function getWorkspaceStorePath() {
+  if (shouldUseKvStore()) {
+    return `upstash-redis:${kvWorkspaceKey}`;
+  }
+
   return resolveStorePath();
 }

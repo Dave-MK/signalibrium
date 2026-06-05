@@ -34,11 +34,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "**/*.mts",
-    ".signalibrium-build/types/**/*.ts",
-    ".signalibrium-build/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    ".signalibrium-build"
+    "node_modules"
   ]
 }

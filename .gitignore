@@ -17,6 +17,7 @@
 /.next/
 /.signalibrium-next/
 /.signalibrium-build/
+/.codex-tmp-next-build*/
 /out/
 
 # production
@@ -49,3 +50,4 @@ next-env.d.ts
 
 # local MVP persistence store
 /data/workspace.json
+/data/*.tmp

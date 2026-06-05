@@ -1,3 +1,5 @@
+import { strategyProfiles } from "@/app/_lib/strategy-profiles";
+
 export type Tone = "neutral" | "success" | "warning" | "danger" | "info";
 
 export type MarketRegime = "Risk-On" | "Balanced" | "Risk-Off";
@@ -820,71 +822,22 @@ export const setups: Setup[] = [
   },
 ];
 
-export const strategies: StrategyCard[] = [
-  {
-    id: "trend-50-200",
-    name: "50/200 Trend",
-    thesis:
-      "Stay aligned with broad directional structure and only act when the faster average confirms the dominant trend.",
-    supportedAssets: ["Crypto", "ETF", "Equity", "Forex", "Commodity", "Index"],
-    supportedTimeframes: ["4H", "1D"],
-    bestRegimes: ["Risk-On", "Balanced"],
-    worstRegimes: ["Risk-Off"],
-    backtest: {
-      profitFactor: 1.86,
-      maxDrawdown: -11.4,
-      tradeCount: 84,
-      winRate: 52.1,
-    },
-    rules: [
-      "50 SMA above 200 SMA for long bias.",
-      "Enter only when momentum confirms after pullback or compression.",
-      "Invalidate if price loses the higher-timeframe structure level.",
-    ],
+export const strategies: StrategyCard[] = strategyProfiles.map((profile, index) => ({
+  id: profile.id,
+  name: profile.name,
+  thesis: profile.thesis,
+  supportedAssets: profile.supportedAssets,
+  supportedTimeframes: profile.supportedTimeframes,
+  bestRegimes: profile.bestRegimes,
+  worstRegimes: profile.worstRegimes,
+  backtest: {
+    profitFactor: Number((1.52 + (index % 4) * 0.12).toFixed(2)),
+    maxDrawdown: Number((-6.8 - (index % 5) * 1.4).toFixed(1)),
+    tradeCount: 68 + index * 3,
+    winRate: Number((47.5 + (index % 6) * 1.8).toFixed(1)),
   },
-  {
-    id: "rsi-pullback",
-    name: "RSI Pullback",
-    thesis:
-      "Exploit pullbacks inside healthy trends when price resets without losing the underlying market regime.",
-    supportedAssets: ["Crypto", "ETF", "Forex", "Commodity"],
-    supportedTimeframes: ["4H", "1D"],
-    bestRegimes: ["Balanced", "Risk-On"],
-    worstRegimes: ["Risk-Off"],
-    backtest: {
-      profitFactor: 1.64,
-      maxDrawdown: -9.6,
-      tradeCount: 102,
-      winRate: 48.7,
-    },
-    rules: [
-      "Require trend alignment before taking an RSI reset.",
-      "Avoid entries when ATR is expanding sharply against the setup.",
-      "Prefer pullbacks that reclaim prior support within two candles.",
-    ],
-  },
-  {
-    id: "breakout-20d",
-    name: "20-Day Breakout",
-    thesis:
-      "Capture range expansion after sustained compression when liquidity is sufficient and the regime supports continuation.",
-    supportedAssets: ["Crypto", "ETF", "Equity", "Commodity", "Index"],
-    supportedTimeframes: ["1D"],
-    bestRegimes: ["Risk-On"],
-    worstRegimes: ["Risk-Off", "Balanced"],
-    backtest: {
-      profitFactor: 2.08,
-      maxDrawdown: -13.2,
-      tradeCount: 61,
-      winRate: 44.9,
-    },
-    rules: [
-      "Require clean breakout over a 20-day range high.",
-      "Reject signals when liquidity is thin or reward compression is poor.",
-      "Trail invalidation beneath the breakout shelf, not arbitrary percentages.",
-    ],
-  },
-];
+  rules: profile.rules,
+}));
 
 export const backtests: BacktestSnapshot[] = [
   {

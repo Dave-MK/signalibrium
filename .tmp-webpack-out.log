@@ -1,0 +1,10 @@
+
+> signalibrium@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.6 (webpack)
+- Local:         http://localhost:3001
+- Network:       http://100.112.2.133:3001
+- Environments: .env.local
+✓ Ready in 779ms
+[?25h

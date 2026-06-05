@@ -130,6 +130,27 @@ function computeRateOfChangeSeries(values: number[], period = 10) {
   });
 }
 
+function computeVwapSeries(candles: LiveCandle[]) {
+  let cumulativePriceVolume = 0;
+  let cumulativeVolume = 0;
+
+  return candles.map((candle) => {
+    if (!Number.isFinite(candle.volume) || candle.volume === null || candle.volume <= 0) {
+      return null;
+    }
+
+    const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+    cumulativePriceVolume += typicalPrice * candle.volume;
+    cumulativeVolume += candle.volume;
+
+    if (cumulativeVolume <= 0) {
+      return null;
+    }
+
+    return cumulativePriceVolume / cumulativeVolume;
+  });
+}
+
 function getLatestDefinedValue(series: Array<number | null>) {
   for (let index = series.length - 1; index >= 0; index -= 1) {
     const value = series[index];
@@ -234,6 +255,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const bollingerBands = computeBollingerBands(closes, 20, 2);
   const stochastic = computeStochasticSeries(candles, 14);
   const roc10 = computeRateOfChangeSeries(closes, 10);
+  const vwap = computeVwapSeries(candles);
 
   const latestClose = closes.at(-1) ?? 0;
   const latestEma20 = getLatestDefinedValue(ema20);
@@ -246,6 +268,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const latestBollingerLower = getLatestDefinedValue(bollingerBands.lower);
   const latestStochastic = getLatestDefinedValue(stochastic);
   const latestRoc10 = getLatestDefinedValue(roc10);
+  const latestVwap = getLatestDefinedValue(vwap);
   const overall = buildOverallRead({
     close: latestClose,
     ema20: latestEma20,
@@ -266,6 +289,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
     macdSignal: macdSeries.signal,
     overall,
     rsi,
+    vwap,
     signalCards: [
       {
         explanation:
@@ -400,6 +424,26 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
                     : "neutral",
               ),
         value: latestBollingerUpper ?? latestBollingerLower,
+      },
+      {
+        explanation:
+          latestVwap === null
+            ? "Volume-weighted trend read is unavailable because this feed does not expose usable intraday volume."
+            : latestClose >= latestVwap
+              ? "Price is holding above VWAP, which supports intraday continuation rather than immediate fade risk."
+              : "Price is trading below VWAP, so intraday control is still soft.",
+        label: "VWAP",
+        signal:
+          latestVwap === null
+            ? "neutral"
+            : latestClose >= latestVwap
+              ? "bullish"
+              : "bearish",
+        tone:
+          latestVwap === null
+            ? "Balanced"
+            : formatSignalTone(latestClose >= latestVwap ? "bullish" : "bearish"),
+        value: latestVwap,
       },
       {
         explanation:

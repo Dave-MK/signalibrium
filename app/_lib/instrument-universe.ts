@@ -9,7 +9,23 @@ export type InstrumentAssetClass =
 export type InstrumentStrategy =
   | "20-Day Breakout"
   | "50/200 Trend"
-  | "RSI Pullback";
+  | "RSI Pullback"
+  | "Crypto Breakout Retest"
+  | "Crypto Momentum Pullback"
+  | "Forex Session Breakout"
+  | "Forex Range Reversion"
+  | "Index Opening Range Breakout"
+  | "Index VWAP Pullback"
+  | "Equity VWAP Trend Continuation"
+  | "Equity Breakout Retest"
+  | "ETF VWAP Trend Continuation"
+  | "ETF Range Rotation"
+  | "Commodity Pivot Breakout"
+  | "Commodity Trend Pullback"
+  | "Fibonacci Pullback Confluence"
+  | "M/W Reversal Break"
+  | "Inefficiency Fill Reversal"
+  | "Event Volatility Breakout";
 
 export type InstrumentLiquidity = "High" | "Moderate" | "Thin";
 export type InstrumentVolatility = "Contained" | "Elevated" | "Fast";

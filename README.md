@@ -8,11 +8,11 @@ Signalibrium is a private AI trading intelligence workstation prototype built wi
 - record journal feedback
 - inspect risk and backtest surfaces
 
-The product is intentionally prototype-scoped. It persists workspace state locally, favors deterministic UI flows over automation, and does not place live trades.
+The product is intentionally prototype-scoped. It persists workspace state locally in development and can use Vercel KV in production, while the live-order connector remains guarded until the broker integration is complete.
 
 ## Current Status
 
-The app now includes a working local persistence layer backed by [`data/workspace.json`](C:\Users\apexd\OneDrive\Desktop\signalibrium\data\workspace.json). That store currently powers:
+The app includes a shared persistence layer backed by [`data/workspace.json`](C:\Users\apexd\OneDrive\Desktop\signalibrium\data\workspace.json) in local development and Upstash Redis in production when configured. That store currently powers:
 
 - watchlist CRUD in `/assets`
 - trade ticket CRUD in `/trade-tickets`
@@ -62,9 +62,9 @@ The client-side workspace actions call route handlers under `app/api/`:
 
 These handlers validate input, call repository functions, and persist updates through the shared workspace store.
 
-## Local Persistence Model
+## Persistence Model
 
-The MVP uses a server-side file-backed store instead of a database. The persisted document contains:
+Local development uses a server-side file-backed store. Production should use Upstash Redis from the Vercel Marketplace by setting `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. The persisted document contains:
 
 - `workspace`
 - `watchlists`
@@ -73,7 +73,7 @@ The MVP uses a server-side file-backed store instead of a database. The persiste
 - `schemaVersion`
 - `updatedAt`
 
-This keeps the repository boundary stable while the product shape is still changing. A future database migration should be able to replace storage internals without rewriting the UI surfaces or route contracts.
+This keeps the repository boundary stable while the product shape is still changing. A later move to relational storage can replace storage internals without rewriting the UI surfaces or route contracts.
 
 ## Project Structure
 
@@ -120,10 +120,34 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `npm run start` runs the production server
 - `npm run lint` runs ESLint
 
+## Deploying to Vercel
+
+The project is prepared for Vercel Git deployments. Connect the GitHub repository
+to Vercel, keep the framework preset as Next.js, and use the default commands:
+
+- install: `npm install`
+- build: `npm run build`
+- output: managed by Next.js
+
+Required production environment variables depend on the market-data rails you
+enable. Start with `SIGNALIBRIUM_CHART_VENDOR=embed`; only set IG credentials if
+you want the IG fallback enabled in production.
+
+For durable workspace persistence on Vercel, connect Upstash Redis from the
+Marketplace and set:
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `SIGNALIBRIUM_KV_WORKSPACE_KEY=signalibrium:workspace`
+
+Without those Redis variables, a Vercel production runtime will fail loudly instead
+of silently storing Siggy state in ephemeral `/tmp` storage.
+
 ## Notes
 
 - The repository currently mixes persisted workspace data with mock research data by design.
 - `data/workspace.json` is suitable for local prototyping, not multi-user or production use.
+- Upstash Redis stores the whole workspace document as one value; split it into normalized tables before high-volume multi-user trading workflows.
 - The app is centered on planning, simulation, review, and risk control. It is not an auto-execution system.
 
 ## Additional Documentation

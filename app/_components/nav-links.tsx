@@ -40,6 +40,18 @@ const links = [
     ),
   },
   {
+    href: "/strategies",
+    label: "Strategies",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M4 15.5V5.25A1.25 1.25 0 0 1 5.25 4h9.5A1.25 1.25 0 0 1 16 5.25v9.5A1.25 1.25 0 0 1 14.75 16H5.25A1.25 1.25 0 0 1 4 14.75" />
+        <path d="M7 7h6" />
+        <path d="M7 10h4" />
+        <path d="m7 13 1.25 1.25L13 9.5" />
+      </svg>
+    ),
+  },
+  {
     href: "/siggis-trades",
     label: "Siggi's Trades",
     icon: (

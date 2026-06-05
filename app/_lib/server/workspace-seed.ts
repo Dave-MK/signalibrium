@@ -6,6 +6,10 @@ import {
   type InstrumentUniverseEntry,
 } from "@/app/_lib/instrument-universe";
 import { getPriceFractionDigits } from "@/app/_lib/market-prices";
+import {
+  getStrategyTriggerTimeframe,
+  selectStrategyProfile,
+} from "@/app/_lib/strategy-profiles";
 import type {
   PersistedPredictionHistoryRecord,
   PersistedWorkspaceData,
@@ -32,25 +36,66 @@ function formatPrice(entry: InstrumentUniverseEntry, value: number) {
   return entry.assetClass === "Forex" ? formatted : `$${formatted}`;
 }
 
+function getSeededStrategySelection(entry: InstrumentUniverseEntry) {
+  const regime = inferRegime(entry);
+  const profile = selectStrategyProfile({
+    assetClass: entry.assetClass,
+    liquidity: entry.liquidity,
+    regime,
+    score: entry.score,
+    stance: entry.stance,
+    tradeability: entry.tradeability,
+    volatility: entry.volatility,
+  });
+
+  return {
+    profile,
+    regime,
+    timeframe: getStrategyTriggerTimeframe(profile, entry.assetClass),
+  };
+}
+
 function buildSetupId(entry: InstrumentUniverseEntry) {
-  return `setup-${entry.symbol.toLowerCase()}-${entry.activeStrategy.toLowerCase().replaceAll("/", "-").replaceAll(" ", "-")}`;
+  const { profile } = getSeededStrategySelection(entry);
+  return `setup-${entry.symbol.toLowerCase()}-${profile.name.toLowerCase().replaceAll("/", "-").replaceAll(" ", "-")}`;
 }
 
 function buildEntryLevels(entry: InstrumentUniverseEntry) {
+  const { timeframe } = getSeededStrategySelection(entry);
+  const entryCompression =
+    timeframe === "15M" ? 0.0028 : timeframe === "1H" ? 0.0042 : 0.0062;
+  const breakoutAllowance =
+    timeframe === "15M" ? 0.0018 : timeframe === "1H" ? 0.003 : 0.0046;
   const entryLow =
-    entry.stance === "Long" ? entry.price * 0.992 : entry.price * 0.998;
+    entry.stance === "Long"
+      ? entry.price * (1 - entryCompression)
+      : entry.price * (1 - breakoutAllowance);
   const entryHigh =
-    entry.stance === "Long" ? entry.price * 1.004 : entry.price * 1.008;
+    entry.stance === "Long"
+      ? entry.price * (1 + breakoutAllowance)
+      : entry.price * (1 + entryCompression);
+  const stopAtrMultiple =
+    timeframe === "15M" ? 0.75 : timeframe === "1H" ? 0.9 : 1.05;
+  const minimumStopGap = Math.max(entry.atr * 0.35, entry.price * 0.0014);
+  const rawStop =
+    entry.stance === "Long"
+      ? Math.max(entry.price - entry.atr * stopAtrMultiple, entry.price * 0.965)
+      : entry.price + entry.atr * stopAtrMultiple;
   const stop =
     entry.stance === "Long"
-      ? Math.max(entry.price - entry.atr * 1.15, entry.price * 0.94)
-      : entry.price + entry.atr * 1.15;
-  const rewardMultiple = entry.score >= 86 ? 2.4 : entry.score >= 78 ? 2.1 : 1.8;
+      ? Math.max(Math.min(rawStop, entryLow - minimumStopGap), entry.price * 0.7)
+      : Math.max(rawStop, entryHigh + minimumStopGap);
+  const rewardMultiple = entry.score >= 86 ? 2.1 : entry.score >= 78 ? 1.9 : 1.7;
   const riskDistance = Math.abs(entry.price - stop);
-  const target =
+  const rawTarget =
     entry.stance === "Long"
       ? entry.price + riskDistance * rewardMultiple
       : entry.price - riskDistance * rewardMultiple;
+  const minimumTargetGap = Math.max(entry.atr * 0.5, entry.price * 0.0022);
+  const target =
+    entry.stance === "Long"
+      ? Math.max(rawTarget, entryHigh + minimumTargetGap)
+      : Math.max(rawTarget, entry.price * 0.6);
 
   return {
     entryHigh: Number(entryHigh.toFixed(6)),
@@ -147,25 +192,24 @@ function buildMarketEvents() {
 }
 
 function resolveHistoryHorizon(entry: InstrumentUniverseEntry) {
-  if (entry.timeframe === "4H") {
-    return "Day" as const;
-  }
-
-  if (entry.activeStrategy === "50/200 Trend") {
-    return "Month" as const;
-  }
-
-  return "Week" as const;
+  void entry;
+  return "Day" as const;
 }
 
 const seededAssets = instrumentUniverse.map((entry) => ({
+  ...(() => {
+    const { profile, regime } = getSeededStrategySelection(entry);
+
+    return {
+      activeStrategy: profile.name,
+      regime,
+    };
+  })(),
   symbol: entry.symbol,
   name: entry.name,
   assetClass: entry.assetClass,
   price: entry.price,
   change24h: entry.change24h,
-  regime: inferRegime(entry),
-  activeStrategy: entry.activeStrategy,
   score: entry.score,
   tradeable: entry.tradeable,
   liquidity: entry.liquidity,
@@ -181,16 +225,17 @@ const seededAssets = instrumentUniverse.map((entry) => ({
 }));
 
 const seededScannerResults = instrumentUniverse.map((entry) => {
+  const { profile, regime, timeframe } = getSeededStrategySelection(entry);
   const levels = buildEntryLevels(entry);
 
   return {
     id: buildSetupId(entry),
     symbol: entry.symbol,
-    strategy: entry.activeStrategy,
-    timeframe: entry.timeframe,
+    strategy: profile.name,
+    timeframe,
     score: entry.score,
     riskScore: entry.riskScore,
-    regime: inferRegime(entry),
+    regime,
     entryZone: `${formatPrice(entry, levels.entryLow)} - ${formatPrice(entry, levels.entryHigh)}`,
     stopLoss: formatPrice(entry, levels.stop),
     takeProfit: formatPrice(entry, levels.target),
@@ -201,7 +246,7 @@ const seededScannerResults = instrumentUniverse.map((entry) => {
     thesis:
       entry.stance === "Short"
         ? `${entry.symbol} is weaker than the lead basket, so Siggi is watching for premium short entries instead of early dip-buying.`
-        : `${entry.symbol} remains aligned with the ${entry.activeStrategy} playbook and is being ranked for short-term pullback or continuation quality.`,
+        : `${entry.symbol} is being ranked around the ${profile.name} playbook so Siggi can focus on shorter intraday continuation or pullback quality rather than slower swing structures.`,
     linkedAssetSymbol: entry.symbol,
     linkedBacktestId: `bt-${entry.symbol.toLowerCase()}`,
     analysisStatus: "Ranked" as const,
@@ -213,6 +258,7 @@ const seededScannerResults = instrumentUniverse.map((entry) => {
 });
 
 const seededBacktests = instrumentUniverse.map((entry) => {
+  const { profile, timeframe } = getSeededStrategySelection(entry);
   const baseReturn = Math.max(8, entry.score * 0.42);
   const maxDrawdown = -Math.max(4.2, (100 - entry.score) * 0.22);
   const winRate = Math.min(0.68, Math.max(0.43, 0.44 + (entry.score - 70) / 200));
@@ -221,7 +267,7 @@ const seededBacktests = instrumentUniverse.map((entry) => {
   return {
     id: `bt-${entry.symbol.toLowerCase()}`,
     asset: entry.symbol,
-    strategy: entry.activeStrategy,
+    strategy: profile.name,
     totalReturn: Number(baseReturn.toFixed(1)),
     annualisedReturn: Number((baseReturn * 0.68).toFixed(1)),
     winRate: Number(winRate.toFixed(3)),
@@ -234,7 +280,7 @@ const seededBacktests = instrumentUniverse.map((entry) => {
         : ["Edge quality depends on waiting for the planned entry pocket."],
     equityCurve: [100, 102, 104, 103, 106, 109, 111, 114, 118, 121, 125, 129],
     drawdownCurve: [0, -0.4, -0.8, -1.5, -0.9, -1.8, -1.2, -2.4, -1.7, -1.1, -0.8, -0.4],
-    timeframe: entry.timeframe,
+    timeframe,
     dateRange: "01 Jan 2025 - 31 May 2026",
     startingCapital: 100000,
     feesBps: 12,
@@ -300,6 +346,7 @@ const seededAiOpportunities = instrumentUniverse
   .sort((left, right) => right.score - left.score)
   .slice(0, 16)
   .map((entry) => {
+    const { profile } = getSeededStrategySelection(entry);
     const levels = buildEntryLevels(entry);
 
     return {
@@ -313,7 +360,7 @@ const seededAiOpportunities = instrumentUniverse
       summary:
         entry.stance === "Short"
           ? `${entry.symbol} is being monitored for a cleaner premium short entry rather than an immediate market chase.`
-          : `${entry.symbol} is one of the stronger short-term instruments in the live universe and is worth stalking for a disciplined entry.`,
+          : `${entry.symbol} is one of the stronger short-term instruments in the live universe and is being stalked through the ${profile.name} playbook.`,
       confidence: Math.max(58, Math.min(92, entry.score - Math.round(entry.riskScore * 0.12))),
       action:
         entry.tradeability === "BLOCKED"
@@ -356,12 +403,13 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
   .sort((left, right) => right.score - left.score)
   .slice(0, 42)
   .map((entry, index) => {
+    const { profile, timeframe } = getSeededStrategySelection(entry);
     const levels = buildEntryLevels(entry);
     const calledAt = new Date(Date.parse(seededAt) - index * 16 * 60 * 60 * 1000).toISOString();
     const horizon = resolveHistoryHorizon(entry);
     const resolvedAt = new Date(
       Date.parse(calledAt) +
-        (horizon === "Day" ? 30 : horizon === "Week" ? 72 : 168) * 60 * 60 * 1000,
+        (timeframe === "15M" ? 6 : timeframe === "1H" ? 12 : 24) * 60 * 60 * 1000,
     ).toISOString();
     const direction: PersistedPredictionHistoryRecord["trendAtCall"] =
       entry.stance === "Short" ? "Bearish" : "Bullish";
@@ -422,8 +470,8 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
       symbol: entry.symbol,
       instrumentName: entry.name,
       assetClass: entry.assetClass,
-      strategyAtCall: entry.activeStrategy,
-      timeframe: entry.timeframe,
+      strategyAtCall: profile.name,
+      timeframe,
       horizon,
       sourceScannerResultId: buildSetupId(entry),
       trendAtCall: direction,
@@ -473,7 +521,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
         entry.stance === "Short" ? "MACD: Negative spread" : "MACD: Positive spread",
       ],
       strategySnapshotAtCall: [
-        `${entry.activeStrategy}: Primary setup`,
+        `${profile.name}: Primary setup`,
         entry.stance === "Short" ? "Pullback validation: premium short pocket" : "Pullback validation: discounted long pocket",
         "Breakout check: monitored before entry lock",
       ],

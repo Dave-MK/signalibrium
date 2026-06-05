@@ -309,19 +309,19 @@ function getTradeSpanHours(timeframe: string, horizon: BotTradeWindow) {
   const upper = timeframe.toUpperCase();
 
   if (upper.includes("1M")) {
-    return 30 * 24;
+    return 24;
   }
 
   if (upper.includes("1W")) {
-    return 14 * 24;
+    return 24;
   }
 
   if (upper.includes("1D")) {
-    return 5 * 24;
+    return 24;
   }
 
   if (upper.includes("4H")) {
-    return 36;
+    return 18;
   }
 
   if (upper.includes("1H")) {
@@ -333,18 +333,18 @@ function getTradeSpanHours(timeframe: string, horizon: BotTradeWindow) {
   }
 
   if (upper.includes("15M")) {
-    return 90 / 60;
+    return 3;
   }
 
   if (horizon === "Day") {
-    return 8;
+    return 12;
   }
 
   if (horizon === "Month") {
-    return 14 * 24;
+    return 24;
   }
 
-  return 5 * 24;
+  return 24;
 }
 
 function formatTradeSpan(hours: number) {
