@@ -72,12 +72,12 @@ function EntryCard({
       <p className="mt-3 text-[0.82rem] leading-5 text-slate-300">{view.rationale}</p>
       <div className="mt-3 grid gap-[5px] sm:grid-cols-4">
         <SummaryCard label="Entry zone" value={view.entry} detail="Full working zone" />
-        <SummaryCard label="Better fill" value={view.discountedEntry} detail="Preferred discounted pocket" />
         <SummaryCard label="Stop" value={view.stop} detail="Invalidation" />
         <SummaryCard label="Target" value={view.target} detail="First take profit" />
-      </div>
-      <div className="mt-3">
-        <p className="text-[0.76rem] leading-5 text-slate-400">{view.discountedEntryDetail}</p>
+        {view.pipDistanceToEntry
+          ? <SummaryCard label="Distance to entry" value={view.pipDistanceToEntry} detail="Current price vs entry zone" />
+          : <SummaryCard label="Trade span" value={view.tradeSpan} detail={view.tradeSpanDetail} />
+        }
       </div>
       <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
         <SummaryCard

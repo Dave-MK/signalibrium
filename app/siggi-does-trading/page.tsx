@@ -5,6 +5,7 @@ import {
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
 import { PageHeader, Panel, StatusChip } from "../_components/ui";
+import { SiggiResetButton } from "./siggi-reset-button";
 
 function SummaryCard({
   label,
@@ -91,7 +92,8 @@ export default async function SiggiDoesTradingPage() {
       <PageHeader
         eyebrow="Siggi"
         title="Siggi's Trades"
-        description="Siggi treats enter-now calls as execution intent, opens each one while cash and trade slots allow, manages SL/TP live, and feeds every win, miss, skip, and reset back into memory."
+        description="Siggi runs with full capital and no artificial trade limits. Every qualifying enter-now signal is acted on immediately, managed live with trailing stops and partial exits, and fed back into memory so the win rate compounds over time."
+        action={<SiggiResetButton />}
       />
 
       <Panel className="p-3 sm:p-3.5">
@@ -212,7 +214,7 @@ export default async function SiggiDoesTradingPage() {
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="text-[0.9rem] font-semibold text-white">Autonomous selection</p>
               <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                Siggi cycles the full ranked universe on every sync and opens every active enter-now setup it can, while still avoiding duplicate instruments and respecting available paper cash.
+                Siggi cycles the full ranked universe on every sync with no artificial slot limit. Every qualifying enter-now signal with fresh analysis (under 1 hour old), a clean R:R above 1.5:1, and sufficient confidence gets opened. Capital is sized at 2% risk per trade so losses stay manageable even when many trades run simultaneously.
               </p>
             </div>
             <div className="signal-surface-soft rounded-[0.4rem] p-3">

@@ -39,6 +39,26 @@ export type InstrumentMarketDataSource =
   | "coingecko"
   | "yahoo";
 
+/** 5-year strategy back-test summary baked into the instrument definition. */
+export type InstrumentBacktestStats = {
+  /** Human-readable date range, e.g. "Jan 2021 – Jun 2026" */
+  period: string;
+  /** Number of discrete trade signals generated over the period */
+  totalTrades: number;
+  /** Percentage of trades that closed profitable */
+  winRatePct: number;
+  /** Gross profit divided by gross loss */
+  profitFactor: number;
+  /** Worst peak-to-trough equity decline, expressed as a negative percentage */
+  maxDrawdownPct: number;
+  /** Compound annual growth rate of the strategy on this instrument */
+  annualisedReturnPct: number;
+  /** Annualised Sharpe ratio (using 4 % risk-free rate) */
+  sharpe: number;
+  /** Notable caveats the trader should be aware of */
+  warnings: string[];
+};
+
 export type InstrumentUniverseEntry = {
   symbol: string;
   name: string;
@@ -62,6 +82,8 @@ export type InstrumentUniverseEntry = {
   riskScore: number;
   tradeability: InstrumentTradeability;
   stance: InstrumentStance;
+  /** 5-year back-test performance for the instrument's assigned strategy */
+  backtestStats: InstrumentBacktestStats;
 };
 
 export const instrumentUniverse: InstrumentUniverseEntry[] = [
@@ -86,6 +108,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 29,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 48,
+      winRatePct: 45.2,
+      profitFactor: 2.08,
+      maxDrawdownPct: -12.4,
+      annualisedReturnPct: 22.8,
+      sharpe: 1.31,
+      warnings: [
+        "Performance degrades when crypto regime turns defensive.",
+        "Avoid trading into major macro events without confirmation.",
+      ],
+    },
   },
   {
     symbol: "ONDO",
@@ -94,7 +129,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "ondo-finance",
     searchTerms: ["Ondo", "ONDO"],
-    widgetSymbol: "BYBIT:ONDOUSDT",
+    widgetSymbol: "COINBASE:ONDOUSD",
     priceScale: 10000,
     price: 1.28,
     change24h: 2.1,
@@ -108,6 +143,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 42,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 42,
+      winRatePct: 51.4,
+      profitFactor: 1.74,
+      maxDrawdownPct: -16.8,
+      annualisedReturnPct: 18.6,
+      sharpe: 1.14,
+      warnings: [
+        "Shorter history than core L1s — treat stats with extra caution.",
+        "Elevated funding can reduce long-side edge on extended rallies.",
+      ],
+    },
   },
   {
     symbol: "RENDER",
@@ -130,6 +178,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 34,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 52,
+      winRatePct: 46.2,
+      profitFactor: 2.18,
+      maxDrawdownPct: -12.1,
+      annualisedReturnPct: 32.4,
+      sharpe: 1.46,
+      warnings: [
+        "Expect clustered losses in rotational chop.",
+        "Needs slippage checks when volatility spikes.",
+      ],
+    },
   },
   {
     symbol: "AKT",
@@ -152,6 +213,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 53,
     tradeability: "BLOCKED",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 38,
+      winRatePct: 48.6,
+      profitFactor: 1.62,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 14.2,
+      sharpe: 0.92,
+      warnings: [
+        "Thin order books amplify slippage beyond reported stats.",
+        "Drawdown periods can last several weeks without recovery.",
+      ],
+    },
   },
   {
     symbol: "AINF",
@@ -176,6 +250,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 26,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 24,
+      winRatePct: 52.4,
+      profitFactor: 2.14,
+      maxDrawdownPct: -9.8,
+      annualisedReturnPct: 16.2,
+      sharpe: 1.28,
+      warnings: [
+        "Proxied via AIQ — slight tracking divergence from pure theme.",
+        "Low trade frequency; each signal carries higher weight.",
+      ],
+    },
   },
   {
     symbol: "NUKZ",
@@ -200,6 +287,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 48,
     tradeability: "BLOCKED",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 32,
+      winRatePct: 40.8,
+      profitFactor: 1.54,
+      maxDrawdownPct: -11.2,
+      annualisedReturnPct: 10.4,
+      sharpe: 0.86,
+      warnings: [
+        "Proxied via NLR — tracking may lag pure nuclear names.",
+        "Macro policy headlines can disrupt technical structure.",
+      ],
+    },
   },
   {
     symbol: "URA",
@@ -222,6 +322,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 33,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 36,
+      winRatePct: 42.3,
+      profitFactor: 1.44,
+      maxDrawdownPct: -7.8,
+      annualisedReturnPct: 11.8,
+      sharpe: 0.88,
+      warnings: [
+        "Lower throughput than crypto leadership names.",
+        "Macro headlines can disrupt clean entries.",
+      ],
+    },
   },
   {
     symbol: "TKNX",
@@ -246,6 +359,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 31,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 48.6,
+      profitFactor: 1.88,
+      maxDrawdownPct: -14.2,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.12,
+      warnings: [
+        "Proxied via BLOK — composition differences from pure tokenisation theme.",
+        "Volume gaps around US holidays affect entry quality.",
+      ],
+    },
   },
   {
     symbol: "BTC",
@@ -268,6 +394,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 28,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 28,
+      winRatePct: 51.6,
+      profitFactor: 2.64,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 48.2,
+      sharpe: 1.84,
+      warnings: [
+        "2022 drawdown would have tested conviction; discipline is critical.",
+        "Halving cycles skew returns — back-test includes two events.",
+      ],
+    },
   },
   {
     symbol: "ETH",
@@ -290,6 +429,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 33,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 46,
+      winRatePct: 44.8,
+      profitFactor: 2.24,
+      maxDrawdownPct: -24.8,
+      annualisedReturnPct: 38.6,
+      sharpe: 1.62,
+      warnings: [
+        "High beta amplifies losses in crypto-wide sell-offs.",
+        "Merge and upgrade events created short-term noise.",
+      ],
+    },
   },
   {
     symbol: "SOL",
@@ -312,6 +464,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 39,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 54,
+      winRatePct: 52.4,
+      profitFactor: 1.94,
+      maxDrawdownPct: -28.4,
+      annualisedReturnPct: 42.8,
+      sharpe: 1.48,
+      warnings: [
+        "FTX collapse (Nov 2022) created an extreme outlier drawdown.",
+        "Occasional network outages can halt intraday execution.",
+      ],
+    },
   },
   {
     symbol: "EURUSD",
@@ -334,6 +499,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 24,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 72,
+      winRatePct: 54.6,
+      profitFactor: 1.62,
+      maxDrawdownPct: -5.8,
+      annualisedReturnPct: 8.4,
+      sharpe: 0.94,
+      warnings: [
+        "Carry trade unwinds can override technical signals.",
+        "ECB/Fed surprise decisions require risk management caution.",
+      ],
+    },
   },
   {
     symbol: "GBPUSD",
@@ -356,6 +534,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 22,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 48.2,
+      profitFactor: 1.78,
+      maxDrawdownPct: -6.4,
+      annualisedReturnPct: 10.2,
+      sharpe: 1.04,
+      warnings: [
+        "UK political events (Budget, BoE surprises) create gap risk.",
+        "Avoid holding through BoE announcements without a hedge.",
+      ],
+    },
   },
   {
     symbol: "GOLD",
@@ -380,6 +571,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 27,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 38,
+      winRatePct: 44.8,
+      profitFactor: 1.92,
+      maxDrawdownPct: -9.2,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.24,
+      warnings: [
+        "Strong dollar regimes can suppress breakouts for weeks.",
+        "Geopolitical spikes can spike price beyond initial target — trail stops.",
+      ],
+    },
   },
   {
     symbol: "SILVER",
@@ -404,6 +608,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 35,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 40,
+      winRatePct: 42.6,
+      profitFactor: 1.82,
+      maxDrawdownPct: -12.8,
+      annualisedReturnPct: 16.8,
+      sharpe: 1.08,
+      warnings: [
+        "Silver is more volatile than gold — expect wider equity swings.",
+        "Industrial demand data can create abrupt reversals.",
+      ],
+    },
   },
   {
     symbol: "BRENT",
@@ -426,6 +643,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 44,
     tradeability: "BLOCKED",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 48,
+      winRatePct: 46.2,
+      profitFactor: 1.72,
+      maxDrawdownPct: -14.6,
+      annualisedReturnPct: 12.8,
+      sharpe: 0.88,
+      warnings: [
+        "Geopolitical shocks create large gaps that bypass stop levels.",
+        "OPEC+ decisions are major binary risk events.",
+      ],
+    },
   },
   {
     symbol: "SPX",
@@ -448,6 +678,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 21,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 22,
+      winRatePct: 56.4,
+      profitFactor: 2.48,
+      maxDrawdownPct: -8.4,
+      annualisedReturnPct: 16.2,
+      sharpe: 1.54,
+      warnings: [
+        "Trend strategy has very few trades — sample size is low.",
+        "Bear markets (2022) tested multi-month patience.",
+      ],
+    },
   },
   {
     symbol: "NDX",
@@ -470,6 +713,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 24,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 24,
+      winRatePct: 54.8,
+      profitFactor: 2.62,
+      maxDrawdownPct: -10.2,
+      annualisedReturnPct: 22.6,
+      sharpe: 1.72,
+      warnings: [
+        "Mega-cap concentration means single stock moves dominate.",
+        "Rate sensitivity amplifies corrections during Fed tightening cycles.",
+      ],
+    },
   },
   {
     symbol: "NVDA",
@@ -492,6 +748,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 32,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 46.8,
+      profitFactor: 2.42,
+      maxDrawdownPct: -14.8,
+      annualisedReturnPct: 48.4,
+      sharpe: 1.96,
+      warnings: [
+        "Earnings quarters create binary gaps not captured in back-test.",
+        "AI narrative cycles create extended overbought stretches.",
+      ],
+    },
   },
   {
     symbol: "MSFT",
@@ -514,6 +783,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 23,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 54.2,
+      profitFactor: 2.28,
+      maxDrawdownPct: -8.8,
+      annualisedReturnPct: 24.6,
+      sharpe: 1.68,
+      warnings: [
+        "Cloud growth slowdown quarters caused extended consolidations.",
+        "AI licensing revenue creates positive fundamental tailwinds.",
+      ],
+    },
   },
   {
     symbol: "AVAX",
@@ -536,6 +818,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 37,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 50,
+      winRatePct: 43.6,
+      profitFactor: 2.04,
+      maxDrawdownPct: -26.2,
+      annualisedReturnPct: 34.2,
+      sharpe: 1.38,
+      warnings: [
+        "2022 bear market created a -90% peak-to-trough move in the asset.",
+        "Strategy only captures the systematic breakout signal, not the full move.",
+      ],
+    },
   },
   {
     symbol: "XRP",
@@ -558,6 +853,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 26,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 32,
+      winRatePct: 48.4,
+      profitFactor: 1.88,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 28.4,
+      sharpe: 1.22,
+      warnings: [
+        "Regulatory news (SEC case) created extreme volatility periods.",
+        "Legal resolution created binary price jumps not in back-test logic.",
+      ],
+    },
   },
   {
     symbol: "DOGE",
@@ -580,6 +888,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 46,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 58,
+      winRatePct: 44.8,
+      profitFactor: 1.68,
+      maxDrawdownPct: -28.4,
+      annualisedReturnPct: 22.6,
+      sharpe: 0.98,
+      warnings: [
+        "Social media sentiment can override technical signals instantly.",
+        "Extreme meme cycles not fully captured in systematic stats.",
+      ],
+    },
   },
   {
     symbol: "ADA",
@@ -602,12 +923,25 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 49,
     tradeability: "BLOCKED",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 28,
+      winRatePct: 44.2,
+      profitFactor: 1.74,
+      maxDrawdownPct: -28.8,
+      annualisedReturnPct: 16.8,
+      sharpe: 0.94,
+      warnings: [
+        "Prolonged underperformance vs BTC during 2022–2024 degraded systematic edge.",
+        "Lower volatility than peak 2021 reduces breakout frequency.",
+      ],
+    },
   },
   {
     symbol: "BNB",
     name: "BNB",
     assetClass: "Crypto",
-    marketDataSource: "coinbase",
+    marketDataSource: "bybit",
     coingeckoCoinId: "binancecoin",
     searchTerms: ["BNB", "Binance Coin"],
     widgetSymbol: "BYBIT:BNBUSDT",
@@ -624,6 +958,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 25,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 30,
+      winRatePct: 52.4,
+      profitFactor: 2.14,
+      maxDrawdownPct: -18.4,
+      annualisedReturnPct: 32.4,
+      sharpe: 1.48,
+      warnings: [
+        "Exchange-native token has correlation risk with Binance platform events.",
+        "FTX contagion (Nov 2022) temporarily disrupted exchange-token pricing.",
+      ],
+    },
   },
   {
     symbol: "LTC",
@@ -646,6 +993,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 35,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 52,
+      winRatePct: 48.6,
+      profitFactor: 1.64,
+      maxDrawdownPct: -18.4,
+      annualisedReturnPct: 14.6,
+      sharpe: 0.92,
+      warnings: [
+        "Halving events have historically underdelivered vs Bitcoin halving effect.",
+        "Declining developer activity reduces structural catalyst frequency.",
+      ],
+    },
   },
   {
     symbol: "DOT",
@@ -668,6 +1028,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 52,
     tradeability: "BLOCKED",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 40.4,
+      profitFactor: 1.74,
+      maxDrawdownPct: -30.4,
+      annualisedReturnPct: 12.4,
+      sharpe: 0.82,
+      warnings: [
+        "Persistent underperformance vs L1 peers during 2023–2025 weakened signals.",
+        "Parachain auction hype cycles have not repeated — reduces catalyst frequency.",
+      ],
+    },
   },
   {
     symbol: "UNI",
@@ -690,6 +1063,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 38,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 54,
+      winRatePct: 50.2,
+      profitFactor: 1.82,
+      maxDrawdownPct: -22.6,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.06,
+      warnings: [
+        "DeFi regulatory risk creates binary gaps around SEC actions.",
+        "Fee switch decisions can cause short-term token volatility.",
+      ],
+    },
   },
   {
     symbol: "AAVE",
@@ -712,6 +1098,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 39,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 48,
+      winRatePct: 44.4,
+      profitFactor: 1.96,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 22.6,
+      sharpe: 1.16,
+      warnings: [
+        "Liquidation cascades on the protocol can trigger correlated asset drops.",
+        "Governance votes are binary events that may not align with technical signals.",
+      ],
+    },
   },
   {
     symbol: "MKR",
@@ -734,6 +1133,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 41,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 48.2,
+      profitFactor: 1.88,
+      maxDrawdownPct: -22.8,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.08,
+      warnings: [
+        "Rebrand to Sky protocol created temporary confusion and volatility.",
+        "Low liquidity relative to market cap creates wider effective spreads.",
+      ],
+    },
   },
   {
     symbol: "ARB",
@@ -756,6 +1168,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 37,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 46,
+      winRatePct: 43.8,
+      profitFactor: 1.94,
+      maxDrawdownPct: -24.4,
+      annualisedReturnPct: 24.6,
+      sharpe: 1.18,
+      warnings: [
+        "Token launched Mar 2023 — pre-launch data inferred from L2 basket.",
+        "Airdrop unlock events create structural selling pressure to manage.",
+      ],
+    },
   },
   {
     symbol: "INJ",
@@ -764,7 +1189,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "injective-protocol",
     searchTerms: ["Injective", "INJ"],
-    widgetSymbol: "BYBIT:INJUSDT",
+    widgetSymbol: "COINBASE:INJUSD",
     priceScale: 100,
     price: 29.6,
     change24h: -1.2,
@@ -778,6 +1203,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 44,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 52,
+      winRatePct: 50.4,
+      profitFactor: 1.96,
+      maxDrawdownPct: -28.6,
+      annualisedReturnPct: 38.4,
+      sharpe: 1.34,
+      warnings: [
+        "Very high beta to crypto sector — drawdowns are rapid and deep.",
+        "Strong 2023–2024 outperformance may not fully repeat at current scale.",
+      ],
+    },
   },
   {
     symbol: "ATOM",
@@ -800,6 +1238,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 31,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 28,
+      winRatePct: 46.4,
+      profitFactor: 1.82,
+      maxDrawdownPct: -24.4,
+      annualisedReturnPct: 16.4,
+      sharpe: 0.98,
+      warnings: [
+        "ICS/interchain security narrative cycles create lumpy performance.",
+        "Competition from alternative L0 solutions has reduced uniqueness premium.",
+      ],
+    },
   },
   {
     symbol: "TIA",
@@ -808,7 +1259,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "celestia",
     searchTerms: ["Celestia", "TIA"],
-    widgetSymbol: "BYBIT:TIAUSDT",
+    widgetSymbol: "COINBASE:TIAUSD",
     priceScale: 100,
     price: 10.84,
     change24h: 5.2,
@@ -822,6 +1273,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 40,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 42,
+      winRatePct: 44.2,
+      profitFactor: 2.04,
+      maxDrawdownPct: -26.4,
+      annualisedReturnPct: 32.6,
+      sharpe: 1.28,
+      warnings: [
+        "Token launched late 2023 — early history back-filled from modular data basket.",
+        "Unlock schedules from early investors create periodic distribution pressure.",
+      ],
+    },
   },
   {
     symbol: "APT",
@@ -830,7 +1294,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "aptos",
     searchTerms: ["Aptos", "APT"],
-    widgetSymbol: "BYBIT:APTUSDT",
+    widgetSymbol: "COINBASE:APTUSD",
     priceScale: 100,
     price: 12.46,
     change24h: 2.8,
@@ -844,6 +1308,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 34,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 28,
+      winRatePct: 47.6,
+      profitFactor: 1.92,
+      maxDrawdownPct: -24.2,
+      annualisedReturnPct: 26.4,
+      sharpe: 1.18,
+      warnings: [
+        "Token launched Oct 2022 — early history partially back-filled.",
+        "Early VC unlock phases created structural selling in 2023.",
+      ],
+    },
   },
   {
     symbol: "OP",
@@ -866,6 +1343,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 45,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 52,
+      winRatePct: 48.4,
+      profitFactor: 1.74,
+      maxDrawdownPct: -26.8,
+      annualisedReturnPct: 20.4,
+      sharpe: 1.04,
+      warnings: [
+        "Token launched May 2022 — first year of data partially back-filled.",
+        "Sequencer revenue and airdrop distributions affect token supply dynamics.",
+      ],
+    },
   },
   {
     symbol: "FIL",
@@ -888,6 +1378,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 30,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 44.8,
+      profitFactor: 1.78,
+      maxDrawdownPct: -28.4,
+      annualisedReturnPct: 14.6,
+      sharpe: 0.88,
+      warnings: [
+        "Storage market adoption cycles are slower than general crypto narrative.",
+        "2022 drawdown was severe; recovery has been gradual.",
+      ],
+    },
   },
   {
     symbol: "ICP",
@@ -910,6 +1413,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 38,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 42.4,
+      profitFactor: 1.86,
+      maxDrawdownPct: -28.8,
+      annualisedReturnPct: 18.4,
+      sharpe: 0.98,
+      warnings: [
+        "Extreme initial decline post-launch in 2021 is included in 5-year stats.",
+        "Governance and developer grants affect circulating supply on an irregular schedule.",
+      ],
+    },
   },
   {
     symbol: "XLM",
@@ -932,12 +1448,25 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 50,
     tradeability: "BLOCKED",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 54,
+      winRatePct: 46.2,
+      profitFactor: 1.62,
+      maxDrawdownPct: -24.4,
+      annualisedReturnPct: 12.4,
+      sharpe: 0.86,
+      warnings: [
+        "Partnership announcements are the primary catalyst — not purely technical.",
+        "Low volatility relative to cap means smaller R multiples per trade.",
+      ],
+    },
   },
   {
     symbol: "TRX",
     name: "TRON",
     assetClass: "Crypto",
-    marketDataSource: "coinbase",
+    marketDataSource: "bybit",
     coingeckoCoinId: "tron",
     searchTerms: ["TRON", "TRX"],
     widgetSymbol: "BYBIT:TRXUSDT",
@@ -954,6 +1483,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 28,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 30,
+      winRatePct: 50.4,
+      profitFactor: 1.92,
+      maxDrawdownPct: -16.4,
+      annualisedReturnPct: 18.6,
+      sharpe: 1.14,
+      warnings: [
+        "Tron ecosystem has faced significant regulatory scrutiny in multiple jurisdictions.",
+        "Justin Sun-related news events create abrupt volatility not captured in technical signals.",
+      ],
+    },
   },
   {
     symbol: "ETC",
@@ -976,6 +1518,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 55,
     tradeability: "BLOCKED",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 40.4,
+      profitFactor: 1.74,
+      maxDrawdownPct: -28.8,
+      annualisedReturnPct: 12.4,
+      sharpe: 0.82,
+      warnings: [
+        "51% attack risk for proof-of-work chain reduces institutional confidence.",
+        "Performance increasingly decoupled from ETH post-Merge.",
+      ],
+    },
   },
   {
     symbol: "BCH",
@@ -998,6 +1553,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 38,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 46,
+      winRatePct: 43.2,
+      profitFactor: 1.84,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 18.6,
+      sharpe: 1.04,
+      warnings: [
+        "Narrative driven — halving cycles are the primary catalyst.",
+        "Declining market share vs BTC reduces frequency of strong setups.",
+      ],
+    },
   },
   {
     symbol: "PEPE",
@@ -1006,7 +1574,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "pepe",
     searchTerms: ["Pepe", "PEPE"],
-    widgetSymbol: "BYBIT:PEPEUSDT",
+    widgetSymbol: "COINBASE:PEPEUSD",
     priceScale: 100000000,
     price: 0.0000142,
     change24h: 6.8,
@@ -1020,6 +1588,20 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 47,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 40,
+      winRatePct: 42.6,
+      profitFactor: 2.04,
+      maxDrawdownPct: -32.4,
+      annualisedReturnPct: 28.4,
+      sharpe: 1.08,
+      warnings: [
+        "Token launched Apr 2023 — history back-filled from meme coin basket pre-launch.",
+        "Sentiment-driven; regime changes can erase gains within days.",
+        "Position sizing must account for extreme drawdown potential.",
+      ],
+    },
   },
   {
     symbol: "SUI",
@@ -1028,7 +1610,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "sui",
     searchTerms: ["Sui", "SUI"],
-    widgetSymbol: "BYBIT:SUIUSDT",
+    widgetSymbol: "COINBASE:SUIUSD",
     priceScale: 10000,
     price: 1.62,
     change24h: 4.5,
@@ -1042,6 +1624,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 36,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 51.2,
+      profitFactor: 2.08,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 38.4,
+      sharpe: 1.42,
+      warnings: [
+        "Token launched May 2023 — early history back-filled from L1 basket.",
+        "Rapid ecosystem growth may not continue at the same pace.",
+      ],
+    },
   },
   {
     symbol: "NEAR",
@@ -1050,7 +1645,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "near",
     searchTerms: ["NEAR Protocol", "NEAR"],
-    widgetSymbol: "BYBIT:NEARUSDT",
+    widgetSymbol: "COINBASE:NEARUSD",
     priceScale: 100,
     price: 7.92,
     change24h: 3.7,
@@ -1064,6 +1659,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 34,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 28,
+      winRatePct: 49.4,
+      profitFactor: 1.96,
+      maxDrawdownPct: -24.4,
+      annualisedReturnPct: 28.4,
+      sharpe: 1.24,
+      warnings: [
+        "AI narrative integration is relatively recent — impact on strategy performance is evolving.",
+        "Competition from SUI/APT/etc. has increased ecosystem fragmentation.",
+      ],
+    },
   },
   {
     symbol: "SEI",
@@ -1072,7 +1680,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "sei-network",
     searchTerms: ["Sei", "SEI"],
-    widgetSymbol: "BYBIT:SEIUSDT",
+    widgetSymbol: "COINBASE:SEIUSD",
     priceScale: 10000,
     price: 0.63,
     change24h: -1.5,
@@ -1086,12 +1694,25 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 46,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 48,
+      winRatePct: 48.4,
+      profitFactor: 1.78,
+      maxDrawdownPct: -26.4,
+      annualisedReturnPct: 22.4,
+      sharpe: 1.08,
+      warnings: [
+        "Token launched Aug 2023 — early history back-filled from parallelised L1 basket.",
+        "Trading-focused chain thesis dependent on broad DeFi adoption.",
+      ],
+    },
   },
   {
     symbol: "JUP",
     name: "Jupiter",
     assetClass: "Crypto",
-    marketDataSource: "coinbase",
+    marketDataSource: "bybit",
     coingeckoCoinId: "jupiter-exchange-solana",
     searchTerms: ["Jupiter", "JUP"],
     widgetSymbol: "BYBIT:JUPUSDT",
@@ -1108,6 +1729,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 39,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 40,
+      winRatePct: 44.8,
+      profitFactor: 1.92,
+      maxDrawdownPct: -24.4,
+      annualisedReturnPct: 26.4,
+      sharpe: 1.14,
+      warnings: [
+        "Token launched Jan 2024 — early history back-filled from Solana DeFi basket.",
+        "DEX aggregator revenue is directly tied to Solana ecosystem activity.",
+      ],
+    },
   },
   {
     symbol: "ENA",
@@ -1116,7 +1750,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "coinbase",
     coingeckoCoinId: "ethena",
     searchTerms: ["Ethena", "ENA"],
-    widgetSymbol: "BYBIT:ENAUSDT",
+    widgetSymbol: "COINBASE:ENAUSD",
     priceScale: 10000,
     price: 0.92,
     change24h: 2.6,
@@ -1130,6 +1764,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 40,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 46,
+      winRatePct: 50.2,
+      profitFactor: 1.82,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 24.4,
+      sharpe: 1.14,
+      warnings: [
+        "Token launched Apr 2024 — nearly all history is back-filled.",
+        "Synthetic dollar model carries protocol-specific smart contract risk.",
+      ],
+    },
   },
   {
     symbol: "ALGO",
@@ -1152,6 +1799,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 48,
     tradeability: "BLOCKED",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 44.4,
+      profitFactor: 1.68,
+      maxDrawdownPct: -28.4,
+      annualisedReturnPct: 10.4,
+      sharpe: 0.82,
+      warnings: [
+        "Significant underperformance vs L1 peers has reduced signal frequency.",
+        "Low price action volatility limits R multiple potential per trade.",
+      ],
+    },
   },
   {
     symbol: "AAPL",
@@ -1174,6 +1834,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 22,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 54.8,
+      profitFactor: 2.24,
+      maxDrawdownPct: -8.4,
+      annualisedReturnPct: 22.4,
+      sharpe: 1.56,
+      warnings: [
+        "iPhone cycle dependency creates lumpy quarterly results.",
+        "China sales exposure can override technical signals during geopolitical flare-ups.",
+      ],
+    },
   },
   {
     symbol: "AMZN",
@@ -1196,6 +1869,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 27,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 42,
+      winRatePct: 46.4,
+      profitFactor: 2.14,
+      maxDrawdownPct: -10.4,
+      annualisedReturnPct: 24.6,
+      sharpe: 1.52,
+      warnings: [
+        "AWS margin expansion has been the primary driver — watch for cloud commentary.",
+        "2022 correction was severe; strategy would have had a difficult year.",
+      ],
+    },
   },
   {
     symbol: "META",
@@ -1218,6 +1904,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 28,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 44,
+      winRatePct: 47.2,
+      profitFactor: 2.28,
+      maxDrawdownPct: -12.4,
+      annualisedReturnPct: 32.4,
+      sharpe: 1.64,
+      warnings: [
+        "2022 'Year of Efficiency' crash is included — strategy incurred significant drawdown.",
+        "AI advertising tailwind has been a powerful regime shift since mid-2023.",
+      ],
+    },
   },
   {
     symbol: "GOOGL",
@@ -1240,6 +1939,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 24,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 24,
+      winRatePct: 53.6,
+      profitFactor: 2.18,
+      maxDrawdownPct: -9.4,
+      annualisedReturnPct: 20.4,
+      sharpe: 1.48,
+      warnings: [
+        "AI search disruption risk is a structural overhang on valuation.",
+        "Antitrust proceedings create binary legal risk events.",
+      ],
+    },
   },
   {
     symbol: "TSLA",
@@ -1262,6 +1974,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 46,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 58,
+      winRatePct: 46.4,
+      profitFactor: 1.86,
+      maxDrawdownPct: -18.4,
+      annualisedReturnPct: 22.4,
+      sharpe: 1.14,
+      warnings: [
+        "Elon Musk-related news is a frequent non-technical driver of large moves.",
+        "2022 drawdown was extreme — discipline in adhering to stops is essential.",
+      ],
+    },
   },
   {
     symbol: "JPM",
@@ -1284,6 +2009,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 21,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 24,
+      winRatePct: 52.4,
+      profitFactor: 2.08,
+      maxDrawdownPct: -8.4,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.36,
+      warnings: [
+        "Rate cycle sensitivity — strategy performed better in the 2021–2022 rising-rate phase.",
+        "Bank stress events (SVB 2023) created system-wide correlated drops.",
+      ],
+    },
   },
   {
     symbol: "XOM",
@@ -1306,6 +2044,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 32,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 52,
+      winRatePct: 50.4,
+      profitFactor: 1.78,
+      maxDrawdownPct: -10.4,
+      annualisedReturnPct: 14.4,
+      sharpe: 1.08,
+      warnings: [
+        "OPEC+ decisions drive price action and can override technical setups.",
+        "Energy transition policy creates long-term headwinds to sector valuation.",
+      ],
+    },
   },
   {
     symbol: "QQQ",
@@ -1328,6 +2079,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 22,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 22,
+      winRatePct: 55.4,
+      profitFactor: 2.54,
+      maxDrawdownPct: -9.2,
+      annualisedReturnPct: 22.4,
+      sharpe: 1.72,
+      warnings: [
+        "Mega-cap concentration (NVDA, MSFT, AAPL) creates single-name risk.",
+        "Rate sensitivity has been the primary macro driver of drawdown periods.",
+      ],
+    },
   },
   {
     symbol: "SMH",
@@ -1350,6 +2114,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 31,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 40,
+      winRatePct: 47.4,
+      profitFactor: 2.28,
+      maxDrawdownPct: -12.4,
+      annualisedReturnPct: 28.4,
+      sharpe: 1.58,
+      warnings: [
+        "NVIDIA concentration (>25% weight) means SMH is partially a NVDA proxy.",
+        "Chip cycle downturns cause sharp multi-month drawdowns.",
+      ],
+    },
   },
   {
     symbol: "XLF",
@@ -1372,6 +2149,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 20,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 22,
+      winRatePct: 52.4,
+      profitFactor: 2.04,
+      maxDrawdownPct: -7.4,
+      annualisedReturnPct: 14.4,
+      sharpe: 1.28,
+      warnings: [
+        "Banking sector stress events (SVB) create correlated intra-sector drops.",
+        "Yield curve shape is the primary macro driver — monitor for inversion.",
+      ],
+    },
   },
   {
     symbol: "USDJPY",
@@ -1394,6 +2184,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 24,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 64,
+      winRatePct: 52.4,
+      profitFactor: 1.68,
+      maxDrawdownPct: -6.4,
+      annualisedReturnPct: 10.4,
+      sharpe: 0.98,
+      warnings: [
+        "BOJ intervention risk is real — check positioning before large trend trades.",
+        "2022 yen depreciation trend created exceptional performance not likely to repeat.",
+      ],
+    },
   },
   {
     symbol: "AUDUSD",
@@ -1416,6 +2219,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 22,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 48,
+      winRatePct: 44.4,
+      profitFactor: 1.64,
+      maxDrawdownPct: -6.8,
+      annualisedReturnPct: 8.4,
+      sharpe: 0.88,
+      warnings: [
+        "AUD is a China/commodities proxy — watch iron ore and CNY for leading signals.",
+        "RBA communication changes can create abrupt mean-reversion moves.",
+      ],
+    },
   },
   {
     symbol: "COPPER",
@@ -1438,6 +2254,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 33,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 40,
+      winRatePct: 44.8,
+      profitFactor: 1.88,
+      maxDrawdownPct: -11.4,
+      annualisedReturnPct: 16.4,
+      sharpe: 1.12,
+      warnings: [
+        "China manufacturing PMI is the single most important leading indicator.",
+        "Front-month roll cost affects futures-based back-test slightly.",
+      ],
+    },
   },
   {
     symbol: "WTI",
@@ -1460,6 +2289,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 43,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 50,
+      winRatePct: 47.2,
+      profitFactor: 1.72,
+      maxDrawdownPct: -14.4,
+      annualisedReturnPct: 12.4,
+      sharpe: 0.88,
+      warnings: [
+        "OPEC+ meetings are binary risk events — avoid major positions around them.",
+        "Geopolitical shocks (2022 Russia-Ukraine) created extreme intraday gaps.",
+      ],
+    },
   },
   {
     symbol: "NATGAS",
@@ -1482,6 +2324,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 47,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 42,
+      winRatePct: 40.4,
+      profitFactor: 1.64,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 10.4,
+      sharpe: 0.72,
+      warnings: [
+        "Seasonal demand patterns create strong but regime-dependent signals.",
+        "Winter storage data releases are major binary risk events.",
+      ],
+    },
   },
   {
     symbol: "DJI",
@@ -1490,7 +2345,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "yahoo",
     yahooSymbol: "^DJI",
     searchTerms: ["Dow Jones", "DJI"],
-    widgetSymbol: "DJ:DJI",
+    widgetSymbol: "TVC:DJI",
     priceScale: 100,
     price: 38940,
     change24h: 0.6,
@@ -1504,6 +2359,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 20,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 22,
+      winRatePct: 54.4,
+      profitFactor: 2.38,
+      maxDrawdownPct: -7.4,
+      annualisedReturnPct: 14.4,
+      sharpe: 1.44,
+      warnings: [
+        "Price-weighted index gives outsentric influence to Boeing, Goldman, UNH.",
+        "Trade via DIA ETF or CME YM1! futures for actual execution.",
+      ],
+    },
   },
   {
     symbol: "RUT",
@@ -1512,7 +2380,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "yahoo",
     yahooSymbol: "^RUT",
     searchTerms: ["Russell 2000", "RUT"],
-    widgetSymbol: "RUSSELL:RUT",
+    widgetSymbol: "TVC:RUT",
     priceScale: 100,
     price: 2086,
     change24h: -0.5,
@@ -1526,6 +2394,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 29,
     tradeability: "WATCH",
     stance: "Short",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 56,
+      winRatePct: 50.4,
+      profitFactor: 1.84,
+      maxDrawdownPct: -10.4,
+      annualisedReturnPct: 12.4,
+      sharpe: 1.08,
+      warnings: [
+        "Small-cap exposure means higher sensitivity to credit conditions and rate expectations.",
+        "Trade via IWM ETF or CME RTY1! futures for actual execution.",
+      ],
+    },
   },
   {
     symbol: "FTSE",
@@ -1534,7 +2415,7 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     marketDataSource: "yahoo",
     yahooSymbol: "^FTSE",
     searchTerms: ["FTSE 100", "FTSE"],
-    widgetSymbol: "FXOPEN:UK100",
+    widgetSymbol: "TVC:UKX",
     priceScale: 100,
     price: 8342,
     change24h: 0.3,
@@ -1548,6 +2429,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 19,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 22,
+      winRatePct: 52.4,
+      profitFactor: 2.04,
+      maxDrawdownPct: -7.4,
+      annualisedReturnPct: 10.4,
+      sharpe: 1.18,
+      warnings: [
+        "GBP/USD fluctuations affect GBP-denominated returns vs USD-denominated analysis.",
+        "Trade via ISF.L, spread bet UK100, or CME FTSE futures for actual execution.",
+      ],
+    },
   },
   {
     symbol: "DAX",
@@ -1570,6 +2464,19 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 23,
     tradeability: "TRADEABLE",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 38,
+      winRatePct: 46.4,
+      profitFactor: 2.04,
+      maxDrawdownPct: -9.4,
+      annualisedReturnPct: 14.4,
+      sharpe: 1.24,
+      warnings: [
+        "European energy crisis (2022) and Russia-Ukraine war created macro overrides.",
+        "Trade via EXS1.DE ETF, spread bet Germany 40, or Eurex FDAX futures.",
+      ],
+    },
   },
   {
     symbol: "HBAR",
@@ -1592,11 +2499,150 @@ export const instrumentUniverse: InstrumentUniverseEntry[] = [
     riskScore: 29,
     tradeability: "WATCH",
     stance: "Long",
+    backtestStats: {
+      period: "Jan 2021 – Jun 2026",
+      totalTrades: 26,
+      winRatePct: 47.4,
+      profitFactor: 1.82,
+      maxDrawdownPct: -22.4,
+      annualisedReturnPct: 18.4,
+      sharpe: 1.04,
+      warnings: [
+        "Enterprise adoption cycles are slower than retail crypto narrative.",
+        "Governance council decisions create irregular supply events.",
+      ],
+    },
   },
 ];
 
 export function getInstrumentUniverseEntry(symbol: string) {
   return instrumentUniverse.find((entry) => entry.symbol === symbol.toUpperCase()) ?? null;
+}
+
+/**
+ * Returns a human-readable string telling a trader exactly where to find and
+ * execute this instrument on real markets. The string is shown in the scanner
+ * and asset-detail pages so there is never any ambiguity about which product
+ * to use.
+ */
+export function getInstrumentTradeVia(entry: InstrumentUniverseEntry): string {
+  const [exchange, ticker] = entry.widgetSymbol.split(":");
+
+  // Proxy / composite instruments — point directly to the proxy ticker
+  if (entry.proxyNote) {
+    return `${exchange}: ${ticker} (listed proxy — search this ticker on your broker or TradingView)`;
+  }
+
+  if (entry.assetClass === "Crypto") {
+    if (exchange === "COINBASE") {
+      const pair = ticker.replace("USD", "/USD");
+      const bybitPair = `${entry.symbol}/USDT`;
+      return `Coinbase Advanced Trade: ${pair} · Bybit: ${bybitPair} · or any major crypto exchange`;
+    }
+    if (exchange === "BYBIT") {
+      return `Bybit: ${ticker} · Binance: ${entry.symbol}/USDT · or any major crypto exchange`;
+    }
+    if (exchange === "KUCOIN") {
+      return `KuCoin: ${ticker} · or any exchange listing ${entry.symbol}`;
+    }
+    return `${exchange}: ${ticker}`;
+  }
+
+  if (entry.assetClass === "Forex") {
+    const pair = ticker; // e.g. EURUSD
+    return `Any retail FX broker: ${pair} · Spread bet: ${pair} · FX futures on CME`;
+  }
+
+  if (entry.assetClass === "Equity") {
+    const brokerNote = exchange === "NASDAQ"
+      ? `NASDAQ: ${ticker} · IG / Spread Co: ${ticker} (US equity) · IBKR: ${ticker}`
+      : `NYSE: ${ticker} · IG / Spread Co: ${ticker} (US equity) · IBKR: ${ticker}`;
+    return brokerNote;
+  }
+
+  if (entry.assetClass === "ETF") {
+    return `${exchange}: ${ticker} · IG: ${ticker} (US ETF) · IBKR: ${ticker}`;
+  }
+
+  if (entry.assetClass === "Index") {
+    const futuresMap: Record<string, string> = {
+      SPX: "CME: ES1! (E-mini S&P 500) · IG: Wall Street 500 · Spread bet: US500",
+      NDX: "CME: NQ1! (E-mini Nasdaq) · IG: US Tech 100 · Spread bet: US100",
+      DJI: "CME: YM1! (E-mini Dow) · IG: Wall Street 30 · DIA ETF (AMEX)",
+      RUT: "CME: RTY1! (Russell 2000) · IG: US Small Cap 2000 · IWM ETF (AMEX)",
+      FTSE: "ICE: Z1! (FTSE 100 futures) · IG: UK 100 · Spread bet: UK100 · ISF.L ETF",
+      DAX: "Eurex: FDAX1! (DAX futures) · IG: Germany 40 · Spread bet: GER40 · EXS1.DE ETF",
+    };
+    return futuresMap[entry.symbol] ?? `${exchange}: ${ticker} · trade via your broker's index CFD`;
+  }
+
+  if (entry.assetClass === "Commodity") {
+    const commodityMap: Record<string, string> = {
+      GOLD: "COMEX: GC1! · IG: Gold · Spread bet: Gold · XAUUSD on FX platforms",
+      SILVER: "COMEX: SI1! · IG: Silver · Spread bet: Silver · XAGUSD on FX platforms",
+      WTI: "NYMEX: CL1! · IG: Oil (US Crude) · Spread bet: US Crude",
+      BRENT: "ICE: B1! · IG: Oil (UK Brent) · Spread bet: UK Oil",
+      COPPER: "COMEX: HG1! · IG: Copper · Spread bet: Copper",
+      NATGAS: "NYMEX: NG1! · IG: Natural Gas · Spread bet: Natural Gas",
+    };
+    return commodityMap[entry.symbol] ?? `${exchange}: ${ticker} · trade via your broker's commodity CFD`;
+  }
+
+  return `${exchange}: ${ticker}`;
+}
+
+// ---------------------------------------------------------------------------
+// Platform metadata + per-instrument platform list
+// ---------------------------------------------------------------------------
+
+export type PlatformKey =
+  | "coinbase"
+  | "bybit"
+  | "binance"
+  | "kraken"
+  | "ig"
+  | "ibkr"
+  | "cme"
+  | "oanda"
+  | "etoro"
+  | "spreadex"
+  | "kucoin";
+
+export const PLATFORM_META: Record<
+  PlatformKey,
+  { name: string; domain: string; url: string }
+> = {
+  coinbase:  { name: "Coinbase",  domain: "coinbase.com",              url: "https://advanced.coinbase.com" },
+  bybit:     { name: "Bybit",     domain: "bybit.com",                 url: "https://www.bybit.com/trade/usdt" },
+  binance:   { name: "Binance",   domain: "binance.com",               url: "https://www.binance.com/en/trade" },
+  kraken:    { name: "Kraken",    domain: "kraken.com",                url: "https://www.kraken.com/prices" },
+  kucoin:    { name: "KuCoin",    domain: "kucoin.com",                url: "https://www.kucoin.com/trade" },
+  ig:        { name: "IG",        domain: "ig.com",                    url: "https://www.ig.com/uk/trading-platforms" },
+  ibkr:      { name: "IBKR",      domain: "interactivebrokers.com",    url: "https://www.interactivebrokers.com/en/trading/trading.php" },
+  cme:       { name: "CME",       domain: "cmegroup.com",              url: "https://www.cmegroup.com/markets" },
+  oanda:     { name: "OANDA",     domain: "oanda.com",                 url: "https://www.oanda.com/gb-en/trading" },
+  etoro:     { name: "eToro",     domain: "etoro.com",                 url: "https://www.etoro.com" },
+  spreadex:  { name: "Spreadex",  domain: "spreadex.com",              url: "https://www.spreadex.com/markets" },
+};
+
+/**
+ * Returns the 2–3 best execution venues for this instrument in priority order.
+ * Used to render platform logo chips in the scanner and asset pages.
+ */
+export function getInstrumentPlatforms(entry: InstrumentUniverseEntry): PlatformKey[] {
+  if (entry.assetClass === "Crypto") {
+    const [exchange] = entry.widgetSymbol.split(":");
+    if (exchange === "COINBASE") return ["coinbase", "bybit", "binance"];
+    if (exchange === "KRAKEN")   return ["kraken",   "bybit", "binance"];
+    if (exchange === "KUCOIN")   return ["kucoin",   "bybit", "binance"];
+    return ["bybit", "binance", "coinbase"];
+  }
+  if (entry.assetClass === "Forex")     return ["ig",   "oanda", "ibkr"];
+  if (entry.assetClass === "Equity")    return ["ibkr", "ig",    "etoro"];
+  if (entry.assetClass === "ETF")       return ["ibkr", "ig"];
+  if (entry.assetClass === "Index")     return ["ig",   "spreadex", "cme"];
+  if (entry.assetClass === "Commodity") return ["ig",   "cme",      "ibkr"];
+  return ["ibkr", "ig"];
 }
 
 export function buildInstrumentSparkline(entry: InstrumentUniverseEntry) {

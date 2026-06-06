@@ -6,7 +6,11 @@ import type {
   PersistedPredictionHistoryRecord,
   PersistedScannerResult,
 } from "@/app/_lib/server/workspace-types";
-import { getPriceFractionDigits, roundPriceValue } from "@/app/_lib/market-prices";
+import { formatPipDistance, getPriceFractionDigits, roundPriceValue } from "@/app/_lib/market-prices";
+import {
+  getInstrumentUniverseEntry,
+  type InstrumentBacktestStats,
+} from "@/app/_lib/instrument-universe";
 
 export type BotTradeWindow = "Day" | "Week" | "Month";
 
@@ -33,9 +37,15 @@ export type BotOpportunityView = {
   confirmationSummary: string;
   currentPrice: number;
   decision: BotEntryDecision;
-  discountedEntry: string;
-  discountedEntryDetail: string;
   direction: "Bullish" | "Bearish" | "Neutral";
+  exactEntry: string;
+  /** Raw numeric low edge of the entry zone — use this for pip distance, not the formatted string. */
+  entryZoneLow: number;
+  /** Raw numeric high edge of the entry zone — use this for pip distance, not the formatted string. */
+  entryZoneHigh: number;
+  liveRR: string;
+  pipDistanceToEntry: string;
+  signal: "BUY NOW" | "SELL NOW" | "WAIT";
   entry: string;
   eventEffect: string;
   eventEntryGuidance: string;
@@ -314,11 +324,11 @@ function getTradeSpanHours(timeframe: string, horizon: BotTradeWindow) {
   const upper = timeframe.toUpperCase();
 
   if (upper.includes("1M")) {
-    return 24;
+    return 480; // ~4 weeks for monthly setups
   }
 
   if (upper.includes("1W")) {
-    return 24;
+    return 120; // ~5 trading days for weekly setups
   }
 
   if (upper.includes("1D")) {
@@ -375,6 +385,12 @@ export function inferDirection(setup: PersistedScannerResult): "Bullish" | "Bear
     return "Bullish";
   }
 
+  // Universe stance is the most reliable fallback when the AI hasn't produced a
+  // clear directional bias — it encodes the instrument's designed trade direction.
+  const universeEntry = getInstrumentUniverseEntry(setup.symbol);
+  if (universeEntry?.stance === "Long") return "Bullish";
+  if (universeEntry?.stance === "Short") return "Bearish";
+
   const entryMid =
     setup.analysis
       ? (setup.analysis.chartAnnotations.entryZone.low + setup.analysis.chartAnnotations.entryZone.high) / 2
@@ -397,6 +413,14 @@ export function inferDirection(setup: PersistedScannerResult): "Bullish" | "Bear
   return "Neutral";
 }
 
+/** Analysis older than 1 hour is considered stale — ENTER NOW is suppressed. */
+const ANALYSIS_STALE_HOURS = 1;
+
+export function isAnalysisStale(setup: PersistedScannerResult): boolean {
+  if (!setup.analysis || !setup.analysisUpdatedAt) return true;
+  return getHoursSince(setup.analysisUpdatedAt) >= ANALYSIS_STALE_HOURS;
+}
+
 export function getEntryDecision(
   currentPrice: number,
   setup: PersistedScannerResult,
@@ -404,6 +428,16 @@ export function getEntryDecision(
   if (!setup.analysis) {
     return {
       detail: `The ${setup.timeframe} setup still needs a fresh chart analysis before Siggi can call the entry with confidence.`,
+      label: "WAIT",
+      tone: "text-amber-200",
+    };
+  }
+
+  // Stale analysis gate — never fire ENTER NOW on analysis older than 6h.
+  const hoursOld = getHoursSince(setup.analysisUpdatedAt);
+  if (hoursOld >= ANALYSIS_STALE_HOURS) {
+    return {
+      detail: `Analysis is ${hoursOld}h old — Siggi is waiting for a fresh chart read before calling entry. Re-analysis runs automatically every 6 minutes.`,
       label: "WAIT",
       tone: "text-amber-200",
     };
@@ -622,27 +656,47 @@ function buildConfirmationSummary(confirmation: PersistedConfirmationCheck | nul
   };
 }
 
-function buildBacktestSummary(backtest: PersistedBacktestRecord | null) {
-  if (!backtest) {
+function buildBacktestSummary(
+  backtest: PersistedBacktestRecord | null,
+  universeStat: InstrumentBacktestStats | null,
+) {
+  // Prefer a linked workspace backtest; fall back to the static 5-year universe stats.
+  if (backtest) {
+    const normalizedWinRatePercent = normalizeWinRatePercent(backtest.winRate);
+    const winRateScore = clamp(Math.round(normalizedWinRatePercent), 0, 100);
+    const profitFactorScore = clamp(Math.round((backtest.profitFactor - 1) * 25) + 50, 0, 100);
+    const drawdownScore = clamp(100 - Math.round(Math.abs(backtest.maxDrawdown) * 3.5), 20, 100);
+    const compositeScore = clamp(
+      Math.round(winRateScore * 0.45 + profitFactorScore * 0.35 + drawdownScore * 0.2),
+      35,
+      95,
+    );
     return {
-      detail: "No linked backtest memory is currently attached to this setup.",
-      score: 48,
+      detail: `${backtest.strategy} memory shows ${Math.round(normalizedWinRatePercent)}% wins with ${backtest.profitFactor.toFixed(2)} profit factor.`,
+      score: compositeScore,
     };
   }
 
-  const normalizedWinRatePercent = normalizeWinRatePercent(backtest.winRate);
-  const winRateScore = clamp(Math.round(normalizedWinRatePercent), 0, 100);
-  const profitFactorScore = clamp(Math.round((backtest.profitFactor - 1) * 25) + 50, 0, 100);
-  const drawdownScore = clamp(100 - Math.round(Math.abs(backtest.maxDrawdown) * 3.5), 20, 100);
-  const compositeScore = clamp(
-    Math.round(winRateScore * 0.45 + profitFactorScore * 0.35 + drawdownScore * 0.2),
-    35,
-    95,
-  );
+  if (universeStat) {
+    // Build score from the 5-year static backtest baked into the instrument universe.
+    const winRateScore = clamp(Math.round(universeStat.winRatePct * 1.6 - 20), 20, 90);
+    const profitFactorScore = clamp(Math.round((universeStat.profitFactor - 1) * 25) + 50, 0, 100);
+    const drawdownScore = clamp(100 - Math.round(Math.abs(universeStat.maxDrawdownPct) * 2.5), 20, 100);
+    const sharpeBonus = universeStat.sharpe >= 1.5 ? 4 : universeStat.sharpe >= 1.0 ? 2 : 0;
+    const compositeScore = clamp(
+      Math.round(winRateScore * 0.40 + profitFactorScore * 0.35 + drawdownScore * 0.20) + sharpeBonus,
+      35,
+      92,
+    );
+    return {
+      detail: `5-year back-test (${universeStat.period}): ${universeStat.winRatePct}% win rate · ${universeStat.profitFactor.toFixed(2)}× profit factor · ${universeStat.annualisedReturnPct}% CAGR · Sharpe ${universeStat.sharpe.toFixed(2)}.`,
+      score: compositeScore,
+    };
+  }
 
   return {
-    detail: `${backtest.strategy} memory shows ${Math.round(normalizedWinRatePercent)}% wins with ${backtest.profitFactor.toFixed(2)} profit factor.`,
-    score: compositeScore,
+    detail: "No back-test memory is currently attached to this setup.",
+    score: 48,
   };
 }
 
@@ -803,10 +857,6 @@ function buildReadinessScore(
   readiness += getTradeabilityScore(setup.tradeability);
   readiness -= eventRead.timingPenalty;
 
-  if (setup.tradeability === "BLOCKED") {
-    readiness = Math.min(readiness, 26);
-  }
-
   if (decision.label === "WAIT") {
     readiness = Math.min(readiness, 74);
   }
@@ -859,9 +909,10 @@ export function buildBotOpportunityView(
     backtests.find((item) => item.linkedScannerResultId === setup.id) ??
     backtests.find((item) => item.linkedAssetSymbol === setup.symbol) ??
     null;
+  const universeEntry = getInstrumentUniverseEntry(setup.symbol);
   const eventRead = buildEventRead(marketEvents, setup.symbol, direction);
   const confirmationRead = buildConfirmationSummary(confirmation);
-  const backtestRead = buildBacktestSummary(backtest);
+  const backtestRead = buildBacktestSummary(backtest, universeEntry?.backtestStats ?? null);
   const memoryRead = buildPredictionMemorySummary(predictionHistory, setup, asset, direction);
   const validationRead = buildValidationScore(setup);
   const timeframeRead = buildTimeframeConfirmationRead(setup);
@@ -888,8 +939,6 @@ export function buildBotOpportunityView(
   const structureScore = clamp(Math.round(setup.score * 0.88), 40, 95);
   const riskDisciplineScore = clamp(100 - Math.round(setup.riskScore * 1.15), 22, 96);
   const readiness = buildReadinessScore(currentPrice, setup, decision, eventRead, freshnessScore);
-  const preferredEntryZone = buildPreferredEntryZone(setup, direction);
-
   const preCalibrationConfidence =
     14 +
     Math.round(structureScore * 0.28) +
@@ -915,8 +964,22 @@ export function buildBotOpportunityView(
   const confidence = calibrationRead.adjustedConfidence;
 
   const horizonBonus = horizon === "Day" ? 8 : horizon === "Week" ? 5 : 2;
+
+  // Instruments with a back-tested edge above 2.0× profit factor earn a small
+  // ranking bonus so that well-proven setups surface higher in the scanner.
+  const bt = universeEntry?.backtestStats ?? null;
+  const backtestRankBonus = bt
+    ? bt.profitFactor >= 2.2
+      ? 4
+      : bt.profitFactor >= 1.9
+        ? 2
+        : bt.profitFactor < 1.5
+          ? -2
+          : 0
+    : 0;
+
   const rankScore = clamp(
-    Math.round(confidence * 0.68 + readiness * 0.32 + horizonBonus),
+    Math.round(confidence * 0.68 + readiness * 0.32 + horizonBonus + backtestRankBonus),
     30,
     99,
   );
@@ -987,20 +1050,83 @@ export function buildBotOpportunityView(
     },
   ];
 
+  // Compute pip distance from current price to the entry zone for display.
+  const entryLow = setup.analysis?.chartAnnotations.entryZone.low
+    ?? parseCurrencyLabel(setup.entryZone.split("-")[0] ?? setup.entryZone);
+  const entryHigh = setup.analysis?.chartAnnotations.entryZone.high
+    ?? parseCurrencyLabel(setup.entryZone.split("-")[1] ?? setup.entryZone);
+  const pipDistanceToEntry = currentPrice > 0
+    ? formatPipDistance(currentPrice, entryLow, entryHigh, asset?.assetClass)
+    : "";
+
+  // Exact ideal limit-order price: bottom of zone for longs (buy cheap),
+  // top of zone for shorts (sell premium), midpoint when neutral.
+  const exactEntryPrice =
+    direction === "Bullish" ? entryLow
+    : direction === "Bearish" ? entryHigh
+    : (entryLow + entryHigh) / 2;
+  const exactEntry = Number.isFinite(exactEntryPrice)
+    ? formatRawPriceLabel(exactEntryPrice, asset?.assetClass)
+    : setup.entryZone;
+
+  // Siggi's strategic signal — direction alone drives this; no instrument-stance
+  // filter is applied so Siggi can surface both long and short opportunities freely
+  // and build a complete win/loss memory across all markets.
+  const opportunityAction: "BUY" | "SELL" | "WAIT" =
+    direction === "Bullish" ? "BUY"
+    : direction === "Bearish" ? "SELL"
+    : "WAIT";
+
+  // When the strategic signal is WAIT (neutral direction), the entry decision
+  // must also be WAIT — "ENTER NOW" with no directional signal is contradictory.
+  const resolvedDecision: BotEntryDecision =
+    opportunityAction === "WAIT" && decision.label === "ENTER NOW"
+      ? {
+          detail: "Siggi's directional read is not clear enough yet — waiting for a decisive move before committing.",
+          label: "WAIT",
+          tone: "text-amber-200",
+        }
+      : decision;
+
+  // Combined single-word signal shown in the scanner action column.
+  // Only fires "BUY NOW" / "SELL NOW" when price is actually in the entry zone.
+  const signal: "BUY NOW" | "SELL NOW" | "WAIT" =
+    opportunityAction === "BUY" && resolvedDecision.label === "ENTER NOW" ? "BUY NOW"
+    : opportunityAction === "SELL" && resolvedDecision.label === "ENTER NOW" ? "SELL NOW"
+    : "WAIT";
+
+  // Live R:R — computes reward vs risk from the CURRENT price (not the original entry).
+  // This updates every time the view is rebuilt from live prices, so traders can see
+  // whether the R:R has improved (price closer to entry) or deteriorated (price extended).
+  const stopLevel = setup.analysis?.chartAnnotations.stopLevel
+    ?? parseCurrencyLabel(setup.stopLoss);
+  const targetLevel = setup.analysis?.chartAnnotations.targetLevel
+    ?? parseCurrencyLabel(setup.takeProfit);
+  const liveRR = (() => {
+    if (currentPrice <= 0 || !Number.isFinite(stopLevel) || !Number.isFinite(targetLevel)) {
+      return "";
+    }
+    const liveRisk = Math.abs(currentPrice - stopLevel);
+    const liveReward = Math.abs(targetLevel - currentPrice);
+    if (liveRisk <= 0) return "";
+    const ratio = liveReward / liveRisk;
+    return `${ratio.toFixed(2)}R`;
+  })();
+
   return {
     backtestSummary: backtestRead.detail,
     confidence,
     confidenceCalibrationSummary: calibrationRead.detail,
     confirmationSummary: confirmationRead.detail,
     currentPrice,
-    decision,
-    discountedEntry: preferredEntryZone
-      ? `${formatRawPriceLabel(preferredEntryZone.low, asset?.assetClass)} - ${formatRawPriceLabel(preferredEntryZone.high, asset?.assetClass)}`
-      : setup.entryZone,
-    discountedEntryDetail:
-      preferredEntryZone?.summary ??
-      "Siggi is using the original entry band because a fresher chart refinement is not available yet.",
+    decision: resolvedDecision,
     direction,
+    exactEntry,
+    entryZoneLow: entryLow,
+    entryZoneHigh: entryHigh,
+    liveRR,
+    pipDistanceToEntry,
+    signal,
     entry: setup.analysis
       ? `${formatRawPriceLabel(setup.analysis.chartAnnotations.entryZone.low, asset?.assetClass)} - ${formatRawPriceLabel(setup.analysis.chartAnnotations.entryZone.high, asset?.assetClass)}`
       : setup.entryZone,
@@ -1013,8 +1139,7 @@ export function buildBotOpportunityView(
     eventWindowSummary: eventRead.windowSummary,
     horizon,
     instrumentName: asset?.name ?? setup.symbol,
-    opportunityAction:
-      direction === "Bullish" ? "BUY" : direction === "Bearish" ? "SELL" : "WAIT",
+    opportunityAction,
     priorityReason,
     rankScore,
     rationale: setup.analysis?.weeklyOutlook ?? setup.thesis,

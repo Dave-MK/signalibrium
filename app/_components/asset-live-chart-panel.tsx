@@ -1139,16 +1139,6 @@ export function AssetLiveChartPanel({
                 <span>The timeframe controls now sit in the chart header for faster switching.</span>
               </div>
               <div className="flex flex-wrap items-center gap-1.25">
-                {selectedOpportunityId ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleReanalyze()}
-                    disabled={isReanalyzing}
-                    className="signal-surface-soft rounded-[0.4rem] px-3 py-1.5 text-[0.76rem] font-semibold text-white disabled:opacity-50"
-                  >
-                    {isReanalyzing ? "Re-analysing..." : "Re-analyse"}
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   onClick={() => setIsFullAnalysisOpen(true)}

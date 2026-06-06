@@ -101,17 +101,7 @@ export default async function AssetDetailPage({
     selectedSetup?.analysis
       ? `${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.low)} - ${formatDisplayPrice(selectedSetup.analysis.chartAnnotations.entryZone.high)}`
       : selectedView?.entry ?? selectedSetup?.entryZone ?? "Awaiting setup";
-  const discountedEntryLabel =
-    selectedSetup?.analysis
-      ? selectedView?.discountedEntry
-        ? (() => {
-            const [lowRaw, highRaw] = selectedView.discountedEntry.split(" - ").map(Number);
-            return Number.isFinite(lowRaw) && Number.isFinite(highRaw)
-              ? `${formatDisplayPrice(lowRaw)} - ${formatDisplayPrice(highRaw)}`
-              : selectedView.discountedEntry;
-          })()
-        : selectedView?.discountedEntry ?? "Awaiting setup"
-      : selectedView?.discountedEntry ?? "Awaiting setup";
+  const pipDistanceLabel = selectedView?.pipDistanceToEntry ?? "";
   const stopLabel =
     selectedSetup?.analysis
       ? formatDisplayPrice(selectedSetup.analysis.chartAnnotations.stopLevel)
@@ -187,11 +177,13 @@ export default async function AssetDetailPage({
                   value={entryZoneLabel}
                   detail="Original analysis band"
                 />
-                <KeyValue
-                  label="Better fill"
-                  value={discountedEntryLabel}
-                  detail={selectedView.discountedEntryDetail}
-                />
+                {pipDistanceLabel ? (
+                  <KeyValue
+                    label="Distance to entry"
+                    value={pipDistanceLabel}
+                    detail="Current price vs entry zone"
+                  />
+                ) : null}
                 <KeyValue label="Stop" value={stopLabel} detail="Invalidation level" />
                 <KeyValue label="Target" value={targetLabel} detail="First profit objective" />
                 <KeyValue

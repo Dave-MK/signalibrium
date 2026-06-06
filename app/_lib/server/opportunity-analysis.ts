@@ -69,8 +69,8 @@ function getMultiTimeframeIntervals(
 
   if (interval === "4h") {
     return [
-      { label: "Trigger", timeframe: "4h", interval: "4h" },
-      { label: "Structure", timeframe: "1D", interval: "1day" },
+      { label: "Trigger", timeframe: "1h", interval: "1h" },
+      { label: "Structure", timeframe: "4h", interval: "4h" },
       { label: "Trend", timeframe: "1D", interval: "1day" },
     ];
   }
@@ -134,7 +134,7 @@ function resolveExecutionPlan(input: {
   const configuredMidpoint = (configuredEntryZone.low + configuredEntryZone.high) / 2;
   const driftRatio =
     input.currentPrice > 0 ? Math.abs(configuredMidpoint - input.currentPrice) / input.currentPrice : 0;
-  const hasStaleExecutionPlan = driftRatio >= 0.18;
+  const hasStaleExecutionPlan = driftRatio >= 0.08;
 
   if (!hasStaleExecutionPlan) {
     return {

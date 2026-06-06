@@ -119,6 +119,22 @@ export async function analyzeScannerResult(resultId: string) {
   return payload.scannerResult;
 }
 
+/** Analyse a single stale result — called by the background intelligence loop every 2 minutes. */
+export async function analyzeStaleResults() {
+  return requestJson<{ analysed: number; symbols?: string[]; reason?: string }>(
+    "/api/scanner-results/analyze-stale",
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+/** Analyse up to `count` stale results in one go — called by the manual "Refresh all" button. */
+export async function analyzeAllStale(count = 10) {
+  return requestJson<{ analysed: number; symbols?: string[]; errors?: string[] }>(
+    `/api/scanner-results/analyze-stale?count=${count}`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
 export async function fetchMarketChart(
   symbol: string,
   interval: SupportedChartInterval,
@@ -134,6 +150,13 @@ export async function fetchMarketChart(
   );
 
   return payload.chart;
+}
+
+export async function resetSiggiAccount() {
+  return requestJson<{ success: boolean; startingBalanceGbp: number; resetAt: string }>(
+    "/api/siggi/reset",
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 export async function updateDisplayCurrency(currency: SupportedDisplayCurrency) {

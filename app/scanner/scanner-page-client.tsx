@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { AssetLiveChartPanel } from "@/app/_components/asset-live-chart-panel";
 import { useDisplayCurrency } from "@/app/_components/display-currency-provider";
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
-import { formatDateTimeLabel, formatWinRate } from "@/app/_lib/format";
+import { formatDateTimeLabel, formatPercent, formatWinRate } from "@/app/_lib/format";
+import { formatPipDistance } from "@/app/_lib/market-prices";
+import {
+  getInstrumentPlatforms,
+  getInstrumentUniverseEntry,
+  PLATFORM_META,
+  type PlatformKey,
+} from "@/app/_lib/instrument-universe";
 import { getMarketSession } from "@/app/_lib/market-hours";
+import { analyzeAllStale } from "@/app/_lib/workspace-api";
 import type {
   PersistedAssetRecord,
   PersistedBacktestRecord,
@@ -64,20 +73,6 @@ function formatRowPrice(
   return formatPrice(asset.price, asset.assetClass);
 }
 
-function formatRangeLabel(
-  range: string,
-  formatPrice: (value: number, assetClass?: PersistedAssetRecord["assetClass"]) => string,
-  assetClass?: PersistedAssetRecord["assetClass"],
-) {
-  const [lowRaw, highRaw] = range.split(" - ").map(Number);
-
-  if (!Number.isFinite(lowRaw) || !Number.isFinite(highRaw)) {
-    return range;
-  }
-
-  return `${formatPrice(lowRaw, assetClass)} - ${formatPrice(highRaw, assetClass)}`;
-}
-
 function formatMarketSessionLabel(state: ReturnType<typeof getMarketSession>["state"]) {
   if (state === "Open") {
     return "MARKET OPEN";
@@ -126,6 +121,50 @@ function FullScreenModal({
   );
 }
 
+/**
+ * Computes the pip/point distance from the live asset price to the nearest
+ * edge of the entry zone, using raw numeric entry zone values from the view.
+ * Using numbers directly avoids any string-parsing ambiguity.
+ */
+function livePipDistance(
+  asset: PersistedAssetRecord | null,
+  entryZoneLow: number,
+  entryZoneHigh: number,
+): string {
+  if (!asset || !(asset.price > 0)) return "";
+  if (!Number.isFinite(entryZoneLow) || !Number.isFinite(entryZoneHigh) || entryZoneLow <= 0) return "";
+  return formatPipDistance(asset.price, entryZoneLow, entryZoneHigh, asset.assetClass);
+}
+
+function PlatformLogos({ platforms }: { platforms: PlatformKey[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {platforms.map((key) => {
+        const meta = PLATFORM_META[key];
+        return (
+          <a
+            key={key}
+            href={meta.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={meta.name}
+            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center overflow-hidden rounded-[5px] bg-white/[0.08] ring-1 ring-white/10 transition hover:ring-white/30"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${meta.domain}&sz=32`}
+              alt={meta.name}
+              width={16}
+              height={16}
+              className="h-4 w-4 object-contain"
+            />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
 function LeaderboardRow({
   asset,
   rank,
@@ -142,80 +181,143 @@ function LeaderboardRow({
   onOpenEvents: (setupId: string) => void;
 }) {
   const { formatPrice } = useDisplayCurrency();
-  const betterEntryLabel = formatRangeLabel(view.discountedEntry, formatPrice, asset?.assetClass);
   const marketSession = getMarketSession(asset);
+  const universeEntry = getInstrumentUniverseEntry(view.symbol);
+  const platforms = universeEntry ? getInstrumentPlatforms(universeEntry) : [];
+
   return (
-    <div className="grid gap-[5px] border-b border-white/6 px-3 py-2.5 last:border-b-0 lg:grid-cols-[3.3rem_minmax(0,1.32fr)_0.78fr_0.74fr_0.78fr_0.95fr_0.82fr_1.02fr_1.08fr_10rem] lg:items-center">
-      <div className="text-[0.8rem] font-semibold text-slate-500">#{rank}</div>
+    <div className="grid gap-x-3 gap-y-0 border-b border-white/[0.05] px-3 py-3 last:border-b-0 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:items-start">
 
+      {/* Rank */}
+      <div className="flex h-full items-center">
+        <span className="text-[0.78rem] font-semibold tabular-nums text-slate-600">#{rank}</span>
+      </div>
+
+      {/* Instrument */}
       <div className="min-w-0">
-        <p className="text-[0.9rem] font-semibold text-white">
-          {view.symbol} <span className="text-slate-400">/ {view.instrumentName}</span>
+        <p className="truncate text-[0.9rem] font-semibold leading-tight text-white">
+          {view.symbol}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="text-[0.75rem] text-slate-400">
-            {view.timeframe} / {view.horizon} / {setup.strategy}
-          </span>
+        <p className="mt-0.5 truncate text-[0.75rem] text-slate-400">{view.instrumentName}</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
           <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
+          <span className="rounded-[0.25rem] bg-white/[0.06] px-1.5 py-0.5 text-[0.64rem] font-medium uppercase tracking-wide text-slate-400">
+            {view.timeframe}
+          </span>
+          <span className="rounded-[0.25rem] bg-white/[0.06] px-1.5 py-0.5 text-[0.64rem] font-medium uppercase tracking-wide text-slate-400">
+            {view.horizon}
+          </span>
         </div>
-        <p className="mt-0.5 text-[0.72rem] text-slate-500">
-          {marketSession.venue} / {marketSession.detail}
+        <p className="mt-1 text-[0.68rem] text-slate-600">{setup.strategy}</p>
+      </div>
+
+      {/* Trade on — platform logos */}
+      <div className="min-w-0">
+        <p className="micro-label">Trade on</p>
+        <div className="mt-1.5">
+          {platforms.length > 0
+            ? <PlatformLogos platforms={platforms} />
+            : <p className="text-[0.74rem] text-slate-600">—</p>}
+        </div>
+        <p className="mt-1.5 text-[0.67rem] text-slate-600">{marketSession.venue}</p>
+      </div>
+
+      {/* Price (pips) */}
+      {(() => {
+        const pipGap = livePipDistance(asset, view.entryZoneLow, view.entryZoneHigh);
+        return (
+          <div className="min-w-0">
+            <p className="micro-label">Price (pips)</p>
+            <p className="mt-1 text-[0.84rem] font-semibold tabular-nums text-white">
+              {formatRowPrice(asset, formatPrice)}
+              {pipGap && (
+                pipGap.startsWith("in zone") ? (
+                  <span className="ml-1.5 text-[0.70rem] font-semibold text-emerald-400" title="Price is inside the entry zone">
+                    ({pipGap})
+                  </span>
+                ) : (
+                  <span className="ml-1.5 text-[0.72rem] font-normal text-slate-500" title="Distance from live price to entry zone">
+                    ({pipGap})
+                  </span>
+                )
+              )}
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* Exact entry */}
+      <div className="min-w-0">
+        <p className="micro-label">Enter at</p>
+        <p className={`mt-1 text-[0.84rem] font-semibold tabular-nums ${
+          view.opportunityAction === "BUY" ? "text-emerald-300" :
+          view.opportunityAction === "SELL" ? "text-rose-300" :
+          "text-slate-400"
+        }`}>
+          {view.exactEntry}
+        </p>
+        <p className="mt-0.5 text-[0.68rem] text-slate-600">
+          {view.opportunityAction === "BUY" ? "limit buy" :
+           view.opportunityAction === "SELL" ? "limit sell" : "no signal"}
         </p>
       </div>
 
+      {/* Action */}
       <div className="min-w-0">
-        <p className="micro-label">Price</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-white">{formatRowPrice(asset, formatPrice)}</p>
+        <p className="micro-label">Action</p>
+        <p className={`mt-1 text-[0.86rem] font-bold leading-tight tracking-wide ${
+          view.signal === "BUY NOW"  ? "text-emerald-400" :
+          view.signal === "SELL NOW" ? "text-rose-400"    :
+          "text-amber-300"
+        }`}>
+          {view.signal}
+        </p>
+        <p className="mt-0.5 text-[0.68rem] tabular-nums text-slate-500">{view.confidence}% conf</p>
       </div>
 
-      <div className="min-w-0">
-        <p className="micro-label">Trend</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-white">{view.direction}</p>
-      </div>
-
-      <div className="min-w-0">
-        <p className="micro-label">Bias</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-white">{view.opportunityAction}</p>
-      </div>
-
-      <div className="min-w-0">
-        <p className="micro-label">Action now</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <StatusChip label={view.decision.label} />
-          <span className="text-[0.75rem] text-slate-400">{view.confidence}%</span>
-        </div>
-      </div>
-
+      {/* Trade span */}
       <div className="min-w-0" title={view.tradeSpanDetail}>
-        <p className="micro-label">Trade span</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-cyan-200">{view.tradeSpan}</p>
+        <p className="micro-label">Hold</p>
+        <p className="mt-1 text-[0.8rem] font-semibold text-cyan-200">{view.tradeSpan}</p>
       </div>
 
+      {/* Timing */}
       <div className="min-w-0">
-        <p className="micro-label">Better entry</p>
-        <p className="mt-1 text-[0.82rem] font-semibold text-white">{betterEntryLabel}</p>
-        <p className="mt-0.5 text-[0.72rem] leading-4 text-slate-400">
-          {view.direction === "Bearish" ? "Preferred premium short" : "Preferred discounted long"}
-        </p>
+        <p className="micro-label">Timing</p>
+        <p className={`mt-1 text-[0.74rem] leading-5 ${view.decision.tone}`}>{view.timingWindow}</p>
+        {(() => {
+          if (!setup.analysisUpdatedAt) {
+            return (
+              <span className="mt-1 inline-block rounded-[0.22rem] bg-slate-700/60 px-1.5 py-0.5 text-[0.62rem] font-medium text-slate-400">
+                Not analysed
+              </span>
+            );
+          }
+          const hoursAgo = Math.max(0, Math.round((Date.now() - Date.parse(setup.analysisUpdatedAt)) / 3_600_000));
+          const isStale = hoursAgo >= 6;
+          return (
+            <span className={`mt-1 inline-block rounded-[0.22rem] px-1.5 py-0.5 text-[0.62rem] font-medium ${
+              isStale ? "bg-red-500/15 text-red-400" : hoursAgo >= 2 ? "bg-amber-400/10 text-amber-300" : "bg-emerald-500/10 text-emerald-400"
+            }`}>
+              {hoursAgo === 0 ? "Just analysed" : `Analysed ${hoursAgo}h ago`}
+            </span>
+          );
+        })()}
       </div>
 
-      <div className="min-w-0">
-        <p className="micro-label">Why wait or go</p>
-        <p className={`mt-1 text-[0.76rem] leading-4 ${view.decision.tone}`}>{view.timingWindow}</p>
-      </div>
-
-      <div className="flex flex-wrap gap-[5px] lg:justify-end">
+      {/* Buttons */}
+      <div className="flex flex-wrap gap-1.5 lg:flex-col lg:items-end">
         <button
           type="button"
           onClick={() => onOpenAnalysis(setup.id)}
-          className="signal-button rounded-[0.4rem] px-2.5 py-1.75 text-[0.74rem] font-semibold"
+          className="signal-button rounded-[0.4rem] px-2.5 py-1.5 text-[0.73rem] font-semibold"
         >
           Analysis
         </button>
         <button
           type="button"
           onClick={() => onOpenEvents(setup.id)}
-          className="signal-surface-soft rounded-[0.4rem] px-2.5 py-1.75 text-[0.74rem] font-semibold text-white"
+          className="signal-surface-soft rounded-[0.4rem] px-2.5 py-1.5 text-[0.73rem] font-semibold text-white"
         >
           Events
         </button>
@@ -243,10 +345,40 @@ export default function ScannerPageClient({
   initialScannerResults: PersistedScannerResult[];
   predictionHistory: PersistedPredictionHistoryRecord[];
 }) {
+  const router = useRouter();
   const { formatPrice } = useDisplayCurrency();
   const [analysisSetupId, setAnalysisSetupId] = useState<string | null>(null);
   const [eventsSetupId, setEventsSetupId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MarketTab>("All");
+  const [isRefreshing, startRefreshTransition] = useTransition();
+  const [refreshStatus, setRefreshStatus] = useState<string | null>(null);
+  const refreshStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleRefreshAll() {
+    if (isRefreshing) return;
+
+    startRefreshTransition(async () => {
+      setRefreshStatus("Re-analysing all opportunities...");
+
+      try {
+        const result = await analyzeAllStale(10);
+        const count = result.analysed ?? 0;
+        setRefreshStatus(
+          count > 0
+            ? `${count} ${count === 1 ? "setup" : "setups"} re-analysed — refreshing...`
+            : "All setups are already fresh.",
+        );
+        router.refresh();
+      } catch {
+        setRefreshStatus("Re-analysis failed — will retry automatically.");
+      } finally {
+        if (refreshStatusTimeoutRef.current) {
+          clearTimeout(refreshStatusTimeoutRef.current);
+        }
+        refreshStatusTimeoutRef.current = setTimeout(() => setRefreshStatus(null), 5_000);
+      }
+    });
+  }
 
   useEffect(() => {
     if (!analysisSetupId && !eventsSetupId) {
@@ -339,14 +471,6 @@ export default function ScannerPageClient({
   const selectedEventsAsset = selectedEventsItem
     ? assetsBySymbol.get(selectedEventsItem.setup.symbol) ?? null
     : null;
-  const selectedEventBetterFill = selectedEventsItem
-    ? formatRangeLabel(
-        selectedEventsItem.view.discountedEntry,
-        formatPrice,
-        selectedEventsAsset?.assetClass,
-      )
-    : null;
-
   const readyNowCount = visibleRows.filter(
     (item) => item.view.decision.label === "ENTER NOW" && item.view.readiness >= 75,
   ).length;
@@ -358,8 +482,39 @@ export default function ScannerPageClient({
         <PageHeader
           title="Opportunities"
           description="See the strongest cross-market names, then open analysis or event context without leaving the board."
-          action={<ActionLink href="/assets">Open Charts</ActionLink>}
+          action={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRefreshAll}
+                disabled={isRefreshing}
+                className={`flex items-center gap-1.5 rounded-[0.4rem] px-3 py-1.5 text-[0.73rem] font-semibold transition ${
+                  isRefreshing
+                    ? "cursor-not-allowed bg-white/[0.04] text-slate-500"
+                    : "signal-surface-soft text-white hover:bg-white/[0.08]"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  className={`h-3.5 w-3.5 shrink-0 ${isRefreshing ? "animate-spin" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="M13.6 2.4A7 7 0 1 1 2.8 13" />
+                  <path d="M14 1v4h-4" />
+                </svg>
+                {isRefreshing ? "Re-analysing..." : "Refresh all"}
+              </button>
+              <ActionLink href="/assets">Open Charts</ActionLink>
+            </div>
+          }
         />
+        {refreshStatus && (
+          <div className="rounded-[0.4rem] bg-cyan-500/10 px-3 py-2 text-[0.78rem] font-medium text-cyan-300 ring-1 ring-cyan-500/20">
+            {refreshStatus}
+          </div>
+        )}
 
         <Panel className="p-3 sm:p-3.5">
           <div className="grid gap-[5px] sm:grid-cols-3">
@@ -376,7 +531,7 @@ export default function ScannerPageClient({
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="micro-label">Ready now</p>
               <p className="mt-1.5 text-[0.96rem] font-semibold text-emerald-300">{readyNowCount}</p>
-              <p className="mt-1 text-[0.76rem] text-slate-400">Best discounted entries live now</p>
+              <p className="mt-1 text-[0.76rem] text-slate-400">In entry zone now</p>
             </div>
           </div>
 
@@ -399,15 +554,14 @@ export default function ScannerPageClient({
         </Panel>
 
         <Panel className="overflow-hidden p-0">
-          <div className="grid gap-[5px] border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.69rem] font-semibold uppercase tracking-[0.16em] text-slate-500 lg:grid-cols-[3.3rem_minmax(0,1.32fr)_0.78fr_0.74fr_0.78fr_0.95fr_0.82fr_1.02fr_1.08fr_10rem]">
+          <div className="grid gap-x-3 border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-600 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem]">
             <span>Rank</span>
             <span>Instrument</span>
-            <span>Price</span>
-            <span>Trend</span>
-            <span>Bias</span>
+            <span>Trade on</span>
+            <span>Price (pips)</span>
+            <span>Enter at</span>
             <span>Action</span>
-            <span>Trade span</span>
-            <span>Entry</span>
+            <span>Hold</span>
             <span>Timing</span>
             <span className="lg:text-right">Review</span>
           </div>
@@ -474,15 +628,12 @@ export default function ScannerPageClient({
                   <p className="mt-1.5 text-[0.98rem] font-semibold text-white">
                     {selectedEventsItem.view.confidence}%
                   </p>
-                  <p className="mt-1 text-[0.76rem] text-slate-400">Current prediction quality</p>
+                  <p className="mt-1 text-[0.76rem] text-slate-400">
+                    {selectedEventsItem.view.liveRR
+                      ? `Live R:R from current price: ${selectedEventsItem.view.liveRR}`
+                      : "Current prediction quality"}
+                  </p>
                 </div>
-                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
-                    <p className="micro-label">Better fill</p>
-                    <p className="mt-1.5 text-[0.98rem] font-semibold text-cyan-200">
-                      {selectedEventBetterFill}
-                    </p>
-                    <p className="mt-1 text-[0.76rem] text-slate-400">Preferred pocket</p>
-                  </div>
                 <div className="signal-surface-soft rounded-[0.4rem] p-3">
                   <p className="micro-label">Event move</p>
                   <p className="mt-1.5 text-[0.98rem] font-semibold text-emerald-300">
@@ -555,6 +706,127 @@ export default function ScannerPageClient({
                 ))}
               </div>
             </Panel>
+
+            {(() => {
+              const universeEntry = selectedEventsItem
+                ? getInstrumentUniverseEntry(selectedEventsItem.setup.symbol)
+                : null;
+              const bt = universeEntry?.backtestStats;
+              if (!bt) return null;
+              return (
+                <Panel className="p-3 sm:p-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="micro-label">
+                      Strategy back-test · {selectedEventsItem!.setup.strategy}
+                    </p>
+                    <span className="rounded-[0.25rem] bg-amber-400/10 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-300">
+                      Estimated
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[0.72rem] leading-4 text-amber-200/70">
+                    These figures are projected from strategy-class ranges. Real historical fills will replace them as Siggi records live trades.
+                  </p>
+                  <div className="mt-3 grid gap-[5px] sm:grid-cols-3 xl:grid-cols-6">
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Win rate</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-white">{bt.winRatePct}%</p>
+                      <p className="mt-0.5 text-[0.7rem] text-slate-400">{bt.totalTrades} signals</p>
+                    </div>
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Profit factor</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-emerald-300">{bt.profitFactor.toFixed(2)}</p>
+                      <p className="mt-0.5 text-[0.7rem] text-slate-400">gross profit / loss</p>
+                    </div>
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Max drawdown</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-red-300">{bt.maxDrawdownPct}%</p>
+                      <p className="mt-0.5 text-[0.7rem] text-slate-400">peak-to-trough</p>
+                    </div>
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Ann. return</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-cyan-200">{formatPercent(bt.annualisedReturnPct)}</p>
+                      <p className="mt-0.5 text-[0.7rem] text-slate-400">CAGR estimate</p>
+                    </div>
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Sharpe</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-white">{bt.sharpe.toFixed(2)}</p>
+                      <p className="mt-0.5 text-[0.7rem] text-slate-400">risk-adjusted</p>
+                    </div>
+                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <p className="micro-label">Trade on</p>
+                      <div className="mt-1.5">
+                        <PlatformLogos platforms={getInstrumentPlatforms(universeEntry!)} />
+                      </div>
+                    </div>
+                  </div>
+                  {bt.warnings.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {bt.warnings.map((w) => (
+                        <p key={w} className="text-[0.74rem] leading-4 text-amber-200/80">
+                          {w}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+              );
+            })()}
+
+            {(() => {
+              const evView = selectedEventsItem?.view;
+              if (!evView) return null;
+              const entryStr = evView.exactEntry.replace(/[$£€,]/g, "");
+              const stopStr = evView.stop.replace(/[$£€,]/g, "");
+              const entryPrice = Number(entryStr);
+              const stopPrice = Number(stopStr);
+              const riskPerUnit = entryPrice > 0 && stopPrice > 0 ? Math.abs(entryPrice - stopPrice) : 0;
+              const riskPct = entryPrice > 0 && riskPerUnit > 0 ? (riskPerUnit / entryPrice) * 100 : 0;
+
+              // Calculate units for 1% and 2% account risk at representative account sizes
+              function calcUnits(accountSize: number, riskFraction: number) {
+                if (riskPerUnit <= 0) return "N/A";
+                const riskAmount = accountSize * riskFraction;
+                const units = riskAmount / riskPerUnit;
+                return units >= 1 ? Math.round(units).toLocaleString() : units.toFixed(4);
+              }
+
+              return (
+                <Panel className="p-3 sm:p-3.5">
+                  <p className="micro-label">Position sizing guidance</p>
+                  <p className="mt-1.5 text-[0.76rem] leading-5 text-slate-400">
+                    Based on entry at <span className="font-medium text-slate-200">{evView.exactEntry}</span> and stop at <span className="font-medium text-slate-200">{evView.stop}</span> — risk per unit is{" "}
+                    <span className="font-medium text-slate-200">{riskPerUnit > 0 ? `${riskPct.toFixed(2)}% of entry price` : "unknown (no analysis yet)"}</span>.
+                  </p>
+                  {riskPerUnit > 0 && (
+                    <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                        <p className="micro-label">1% risk · $10k account</p>
+                        <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(10_000, 0.01)} units</p>
+                        <p className="mt-0.5 text-[0.7rem] text-slate-400">$100 max loss on trade</p>
+                      </div>
+                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                        <p className="micro-label">1% risk · $50k account</p>
+                        <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(50_000, 0.01)} units</p>
+                        <p className="mt-0.5 text-[0.7rem] text-slate-400">$500 max loss on trade</p>
+                      </div>
+                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                        <p className="micro-label">2% risk · $10k account</p>
+                        <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(10_000, 0.02)} units</p>
+                        <p className="mt-0.5 text-[0.7rem] text-slate-400">$200 max loss on trade</p>
+                      </div>
+                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                        <p className="micro-label">2% risk · $50k account</p>
+                        <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(50_000, 0.02)} units</p>
+                        <p className="mt-0.5 text-[0.7rem] text-slate-400">$1,000 max loss on trade</p>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-2 text-[0.68rem] leading-4 text-slate-600">
+                    Risk no more than 1–2% of your account per trade. These are indicative unit sizes — adjust for leverage, lot sizes, and your broker's minimum increments.
+                  </p>
+                </Panel>
+              );
+            })()}
 
             <Panel className="p-3 sm:p-3.5">
               <p className="micro-label">Confirmation memory</p>

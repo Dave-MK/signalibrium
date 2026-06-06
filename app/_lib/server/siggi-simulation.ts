@@ -9,13 +9,15 @@ import type {
   PersistedWorkspaceData,
 } from "./workspace-types";
 
-const minimumFreeCashToTradeGbp = 5;
-const maximumConcurrentTrades = 5;
-const bustThresholdGbp = 1;
-const maxRiskPerTrade = 0.02;
-const minCashReserveRatio = 0.20;
-const maxPortfolioHeatRatio = 0.06;
-const maxTradesPerAssetClass = 2;
+// Siggi operates with full capital — no artificial limits on concurrent trades.
+// Risk discipline is preserved (2% per trade, 5% reserve) but the old penny-ante
+// caps that prevented him from acting on good signals have been removed.
+const maximumConcurrentTrades = 20;   // was 5 — Siggi can now run as many as he qualifies for
+const maxRiskPerTrade = 0.02;          // 2% per trade — unchanged (this is sensible risk management)
+const minCashReserveRatio = 0.05;      // was 0.20 — only 5% buffer needed; 95% can be deployed
+const maxPortfolioHeatRatio = 0.40;    // was 0.06 — up to 40% of equity at open risk at once
+const maxTradesPerAssetClass = 6;      // was 2 — more diversity per asset class allowed
+const bustThresholdGbp = 50;           // scale with £10k starting balance (was £1 for £50 account)
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -152,8 +154,8 @@ const minReadiness = 72;
 const minRiskReward = 1.5;
 
 const signalMaxAgeHours: Record<string, number> = {
-  Day: 12,
-  Week: 36,
+  Day: 2,    // Day signals expire quickly — re-analysis every hour keeps them current
+  Week: 24,
   Month: 72,
 };
 
@@ -173,7 +175,9 @@ function isSignalFresh(record: PersistedPredictionHistoryRecord, nowMs: number) 
   return Number.isFinite(calledAtMs) && nowMs - calledAtMs <= maxAgeHours * 60 * 60 * 1000;
 }
 
-const maxAnalysisAgeHours: Record<string, number> = { Day: 36, Week: 96, Month: 192 };
+// Analysis must be fresh — Siggi won't enter a trade on stale chart data.
+// Max 1h for Day setups, 4h for Week setups, 12h for Monthly setups.
+const maxAnalysisAgeHours: Record<string, number> = { Day: 1, Week: 4, Month: 12 };
 
 // Maximum time a trade can stay on its initial stop before Siggi calls time — 3× the signal window
 const maxTradeHoldHours: Record<string, number> = { Day: 36, Week: 96, Month: 192 };
@@ -272,6 +276,8 @@ function shouldOpenTrade(input: {
     };
   }
 
+  // Minimum free cash = 0.5% of total equity (scales with account size)
+  const minimumFreeCashToTradeGbp = Math.max(10, computeTotalEquityGbp(input.account) * 0.005);
   if (input.account.cashBalanceGbp < minimumFreeCashToTradeGbp) {
     return {
       allow: false,
@@ -324,9 +330,10 @@ function openSiggiTrade(input: {
   const totalEquityGbp = computeTotalEquityGbp(input.account);
   const freeCash = input.account.cashBalanceGbp;
   const cashReserve = totalEquityGbp * minCashReserveRatio;
+  const minimumFreeCashToTradeGbp = Math.max(10, totalEquityGbp * 0.005);
   const deployable = freeCash - cashReserve;
 
-  if (deployable <= 0) {
+  if (deployable <= minimumFreeCashToTradeGbp) {
     return input.account;
   }
 
@@ -343,7 +350,7 @@ function openSiggiTrade(input: {
   // Risk-based sizing: stake = riskAmount / stopDistance
   const riskAmount = totalEquityGbp * effectiveMaxRisk;
   const stopDistanceRatio = riskDistanceUsd / Math.max(entryPrice, 0.000001);
-  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), minimumFreeCashToTradeGbp, deployable);
+  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), Math.max(10, totalEquityGbp * 0.005), deployable);
   const riskBudgetGbp = stakeGbp * stopDistanceRatio;
   const stakeUsd = convertGbpToUsd(stakeGbp, input.usdToGbpRate);
   const riskBudgetUsd = convertGbpToUsd(riskBudgetGbp, input.usdToGbpRate);

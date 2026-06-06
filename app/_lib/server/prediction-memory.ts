@@ -667,7 +667,7 @@ function createPredictionRecord(input: {
     stopPriceAtCall: stopPrice,
     targetPriceAtCall: targetPrice,
     entryAtCall: input.view.entry,
-    discountedEntryAtCall: input.view.discountedEntry,
+    discountedEntryAtCall: input.view.entry,
     stopAtCall: input.view.stop,
     targetAtCall: input.view.target,
     eventMoveAtCall: input.view.eventMove,

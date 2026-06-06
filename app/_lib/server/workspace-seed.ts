@@ -106,7 +106,22 @@ function buildEntryLevels(entry: InstrumentUniverseEntry) {
   };
 }
 
+/**
+ * Builds seed market events with timestamps relative to the current time so
+ * they are never permanently frozen in the past.  "Upcoming" events are placed
+ * a few hours ahead of now, "Live" events are placed at the current hour, and
+ * "Recent" events are placed a few hours behind now.  This ensures the force-
+ * wait logic in buildEventRead() always has plausible window timings.
+ */
 function buildMarketEvents() {
+  const now = new Date();
+
+  function relativeIso(offsetHours: number) {
+    return new Date(now.getTime() + offsetHours * 3_600_000).toISOString();
+  }
+
+  const nowStr = now.toISOString();
+
   return [
     {
       id: "event-fed-path",
@@ -117,12 +132,12 @@ function buildMarketEvents() {
       bias: "Mixed" as const,
       scope: "Macro" as const,
       relatedSymbols: ["BTC", "ETH", "SOL", "NDX", "NVDA", "SPX"],
-      startsAt: "2026-06-04T18:00:00.000Z",
+      startsAt: relativeIso(6), // ~6 hours ahead — triggers the upcoming shock-window logic
       sourceLabel: "Macro Calendar",
       sourceType: "Calendar" as const,
       status: "Upcoming" as const,
-      createdAt: seededAt,
-      updatedAt: seededAt,
+      createdAt: nowStr,
+      updatedAt: nowStr,
     },
     {
       id: "event-crypto-beta",
@@ -133,12 +148,12 @@ function buildMarketEvents() {
       bias: "Bullish" as const,
       scope: "Sector" as const,
       relatedSymbols: ["BTC", "ETH", "SOL", "LINK", "RENDER", "AVAX", "SUI", "JUP"],
-      startsAt: "2026-06-04T09:00:00.000Z",
+      startsAt: relativeIso(0), // Now — status is Live
       sourceLabel: "Flow Monitor",
       sourceType: "Flow" as const,
       status: "Live" as const,
-      createdAt: seededAt,
-      updatedAt: seededAt,
+      createdAt: nowStr,
+      updatedAt: nowStr,
     },
     {
       id: "event-usd-watch",
@@ -149,12 +164,12 @@ function buildMarketEvents() {
       bias: "Bearish" as const,
       scope: "Macro" as const,
       relatedSymbols: ["EURUSD", "GBPUSD", "GOLD", "SILVER"],
-      startsAt: "2026-06-04T07:30:00.000Z",
+      startsAt: relativeIso(-1), // 1 hour ago — status is Live
       sourceLabel: "FX Desk",
       sourceType: "Flow" as const,
       status: "Live" as const,
-      createdAt: seededAt,
-      updatedAt: seededAt,
+      createdAt: nowStr,
+      updatedAt: nowStr,
     },
     {
       id: "event-ai-mega-cap",
@@ -165,12 +180,12 @@ function buildMarketEvents() {
       bias: "Bullish" as const,
       scope: "Sector" as const,
       relatedSymbols: ["NVDA", "MSFT", "NDX", "AINF"],
-      startsAt: "2026-06-04T11:00:00.000Z",
+      startsAt: relativeIso(-8), // 8 hours ago — status is Recent
       sourceLabel: "Equity Research",
       sourceType: "News" as const,
       status: "Recent" as const,
-      createdAt: seededAt,
-      updatedAt: seededAt,
+      createdAt: nowStr,
+      updatedAt: nowStr,
     },
     {
       id: "event-energy-range",
@@ -181,19 +196,22 @@ function buildMarketEvents() {
       bias: "Neutral" as const,
       scope: "Sector" as const,
       relatedSymbols: ["BRENT"],
-      startsAt: "2026-06-04T06:45:00.000Z",
+      startsAt: relativeIso(-4), // 4 hours ago — status is Recent
       sourceLabel: "Commodities Desk",
       sourceType: "News" as const,
       status: "Recent" as const,
-      createdAt: seededAt,
-      updatedAt: seededAt,
+      createdAt: nowStr,
+      updatedAt: nowStr,
     },
   ];
 }
 
-function resolveHistoryHorizon(entry: InstrumentUniverseEntry) {
-  void entry;
-  return "Day" as const;
+function resolveHistoryHorizon(entry: InstrumentUniverseEntry): "Day" | "Week" | "Month" {
+  const { timeframe } = getSeededStrategySelection(entry);
+  const upper = timeframe.toUpperCase();
+  if (upper.includes("1M")) return "Month";
+  if (upper.includes("1W") || upper.includes("1D")) return "Week";
+  return "Day";
 }
 
 const seededAssets = instrumentUniverse.map((entry) => ({
@@ -274,14 +292,17 @@ const seededBacktests = instrumentUniverse.map((entry) => {
     maxDrawdown: Number(maxDrawdown.toFixed(1)),
     profitFactor: Number(profitFactor.toFixed(2)),
     sharpe: Number((0.82 + (entry.score - 70) / 70).toFixed(2)),
-    warnings:
+    warnings: [
+      "⚠ Estimated figures — live trade history has not yet been recorded for this instrument.",
+      "These projections are derived from strategy-class performance ranges, not real historical fills.",
       entry.volatility === "Fast"
-        ? ["Expect wider intraday swings and stricter size discipline."]
-        : ["Edge quality depends on waiting for the planned entry pocket."],
+        ? "Expect wider intraday swings and stricter position-size discipline in fast-moving conditions."
+        : "Edge quality depends heavily on waiting for the planned entry pocket rather than chasing price.",
+    ],
     equityCurve: [100, 102, 104, 103, 106, 109, 111, 114, 118, 121, 125, 129],
     drawdownCurve: [0, -0.4, -0.8, -1.5, -0.9, -1.8, -1.2, -2.4, -1.7, -1.1, -0.8, -0.4],
     timeframe,
-    dateRange: "01 Jan 2025 - 31 May 2026",
+    dateRange: "Estimated — no live trade history yet",
     startingCapital: 100000,
     feesBps: 12,
     slippageBps: entry.volatility === "Fast" ? 20 : 14,
@@ -621,9 +642,9 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     id: "siggi-paper-account",
     botName: "Siggi",
     baseCurrency: "GBP",
-    startingBalanceGbp: 50,
-    cashBalanceGbp: 50,
-    highWatermarkGbp: 50,
+    startingBalanceGbp: 10_000,
+    cashBalanceGbp: 10_000,
+    highWatermarkGbp: 10_000,
     resetCount: 0,
     successfulTrades: 0,
     failedTrades: 0,
@@ -632,8 +653,8 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     equityCurve: [
       {
         at: seededAt,
-        cashBalanceGbp: 50,
-        equityGbp: 50,
+        cashBalanceGbp: 10_000,
+        equityGbp: 10_000,
         openTrades: 0,
       },
     ],
@@ -643,7 +664,7 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
         at: seededAt,
         type: "Reset",
         symbol: null,
-        detail: "Siggi paper account initialized with GBP 50 starting capital.",
+        detail: "Siggi paper account initialized with GBP 10,000 — full capital deployed across all qualifying enter-now signals.",
       },
     ],
     lastEvaluatedAt: null,

@@ -22,6 +22,7 @@ import type {
 } from "@/app/_lib/server/workspace-types";
 import { formatPercent } from "../_lib/format";
 import {
+  analyzeStaleResults,
   pulseMarketData,
   syncMarketData,
   syncMarketIntelligence,
@@ -242,7 +243,7 @@ export function AppShell({
   }, [marketSnapshot.updatedAt, router]);
 
   useEffect(() => {
-    const intelligenceIntervalMs = 12 * 60_000;
+    const intelligenceIntervalMs = 6 * 60_000;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
@@ -284,6 +285,54 @@ export function AppShell({
 
       if (intervalId) {
         clearInterval(intervalId);
+      }
+    };
+  }, [router]);
+
+  // Dedicated analysis loop — runs every 2 minutes to keep all instruments
+  // fresh within the 1-hour window.  Completely independent of the intelligence
+  // sync so neither blocks the other.
+  useEffect(() => {
+    const analysisIntervalMs = 2 * 60_000;
+    let analysisIntervalId: ReturnType<typeof setInterval> | null = null;
+    let analysisTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let analysisCancelled = false;
+    let analysisInFlight = false;
+
+    async function runAnalysisPass() {
+      if (analysisCancelled || document.visibilityState !== "visible" || analysisInFlight) {
+        return;
+      }
+
+      analysisInFlight = true;
+
+      try {
+        await analyzeStaleResults();
+        startTransition(() => router.refresh());
+      } catch {
+        // Non-fatal — analysis failures are logged on the server side.
+      } finally {
+        analysisInFlight = false;
+      }
+    }
+
+    // Stagger the first run by 30s so it doesn't compete with the initial market sync
+    analysisTimeoutId = setTimeout(() => {
+      void runAnalysisPass();
+      analysisIntervalId = setInterval(() => {
+        void runAnalysisPass();
+      }, analysisIntervalMs);
+    }, 30_000);
+
+    return () => {
+      analysisCancelled = true;
+
+      if (analysisTimeoutId) {
+        clearTimeout(analysisTimeoutId);
+      }
+
+      if (analysisIntervalId) {
+        clearInterval(analysisIntervalId);
       }
     };
   }, [router]);
