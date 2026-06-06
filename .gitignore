@@ -51,3 +51,6 @@ next-env.d.ts
 # local MVP persistence store
 /data/workspace.json
 /data/*.tmp
+
+# clerk configuration (can include secrets)
+/.clerk/

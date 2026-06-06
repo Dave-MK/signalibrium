@@ -551,6 +551,8 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
           : outcome === "Stopped"
             ? "Resolved from the seeded candle-range replay."
             : "The seeded replay could not produce a decisive win/loss resolution.",
+      resolvedSource: "seed_replay",
+      tradedStatus: "not_traded",
       narrative:
         outcomeAccuracy === "Accurate"
           ? `${entry.symbol} respected the planned ${entry.timeframe} setup after the call, and the move developed in the forecast direction before invalidation was threatened.`

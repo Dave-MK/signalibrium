@@ -244,6 +244,8 @@ export type PersistedSiggiTrade = {
   stopPrice: number;
   targetPrice: number;
   stopMode: "Initial" | "Breakeven" | "Trailing";
+  initialStopPrice: number;
+  partialExitDone: boolean;
   stakeGbp: number;
   stakeUsd: number;
   quantity: number;
@@ -269,7 +271,7 @@ export type PersistedSiggiEquitySnapshot = {
 export type PersistedSiggiActivity = {
   id: string;
   at: string;
-  type: "Opened" | "Closed" | "Skipped" | "Stop Moved" | "Reset";
+  type: "Opened" | "Closed" | "Partial Exit" | "Skipped" | "Stop Moved" | "Reset";
   symbol: string | null;
   detail: string;
 };
@@ -349,6 +351,8 @@ export type PersistedPredictionHistoryRecord = {
   maxAdverseExcursionPct: number;
   accuracyScore: number;
   resolutionEvidence: string | null;
+  resolvedSource: "live_trade" | "seed_replay" | "candle_range" | "price_snapshot" | null;
+  tradedStatus: "traded" | "skipped" | "not_traded" | null;
   narrative: string;
   createdAt: string;
   updatedAt: string;

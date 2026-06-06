@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { summarizePredictionAccuracy } from "./_lib/bot-engine";
 import { getDisplayCurrencyState } from "./_lib/server/currency-preference";
 import { getMarketSnapshot } from "./_lib/server/repositories/market-snapshot";
@@ -30,21 +31,23 @@ export default async function RootLayout({
     [...scannerResults].sort((left, right) => right.score - left.score)[0] ?? null;
 
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="min-h-full">
-        <DisplayCurrencyProvider
-          currency={displayCurrencyState.currency}
-          rates={displayCurrencyState.rates}
-        >
-          <AppShell
-            marketSnapshot={marketSnapshot}
-            predictionAccuracy={predictionAccuracy}
-            topScannerResult={topScannerResult}
+    <ClerkProvider>
+      <html lang="en" className="h-full antialiased">
+        <body className="min-h-full">
+          <DisplayCurrencyProvider
+            currency={displayCurrencyState.currency}
+            rates={displayCurrencyState.rates}
           >
-            {children}
-          </AppShell>
-        </DisplayCurrencyProvider>
-      </body>
-    </html>
+            <AppShell
+              marketSnapshot={marketSnapshot}
+              predictionAccuracy={predictionAccuracy}
+              topScannerResult={topScannerResult}
+            >
+              {children}
+            </AppShell>
+          </DisplayCurrencyProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

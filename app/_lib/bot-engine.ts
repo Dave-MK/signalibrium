@@ -84,6 +84,11 @@ export type PredictionAccuracySummary = {
   resolvedPredictions: number;
   accuratePredictions: number;
   recentAccuracy: number;
+  liveAccuracy: number | null;
+  liveResolved: number;
+  liveAccurate: number;
+  seedAccuracy: number;
+  seedResolved: number;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -746,7 +751,7 @@ function buildConfidenceCalibrationRead(input: {
     return bucketMatch && sameDirection && (sameSymbol || (sameHorizon && sameAssetClass));
   });
 
-  if (relevant.length < 4) {
+  if (relevant.length < 2) {
     return {
       adjustedConfidence: input.baseConfidence,
       detail: "Confidence is still mostly model-driven here because there is not enough resolved history in this confidence bucket yet.",
@@ -754,8 +759,15 @@ function buildConfidenceCalibrationRead(input: {
     };
   }
 
-  const successes = relevant.filter((record) => record.outcome === "Hit Target").length;
-  const observedAccuracy = Math.round((successes / relevant.length) * 100);
+  // Weight the 5 most recent calls at 2× so the calibration tracks fresh performance faster
+  const recentCutoff = 5;
+  const recentCalls = relevant.slice(0, recentCutoff);
+  const olderCalls = relevant.slice(recentCutoff);
+  const weightedSuccesses =
+    recentCalls.filter((r) => r.outcome === "Hit Target").length * 2 +
+    olderCalls.filter((r) => r.outcome === "Hit Target").length;
+  const weightedTotal = recentCalls.length * 2 + olderCalls.length;
+  const observedAccuracy = Math.round((weightedSuccesses / weightedTotal) * 100);
   const weight = Math.min(0.45, relevant.length / 20);
   const adjustedConfidence = clamp(
     Math.round(input.baseConfidence * (1 - weight) + observedAccuracy * weight),
@@ -765,7 +777,7 @@ function buildConfidenceCalibrationRead(input: {
 
   return {
     adjustedConfidence,
-    detail: `${relevant.length} resolved calls in a similar confidence bucket are actually running at ${observedAccuracy}% target-hit accuracy, so the displayed confidence is calibrated toward that live result.`,
+    detail: `${relevant.length} resolved calls in a similar confidence bucket show ${observedAccuracy}% target-hit accuracy (recent calls weighted 2×), so confidence is calibrated toward that live result.`,
     score: clamp(observedAccuracy, 30, 95),
   };
 }
@@ -1021,7 +1033,7 @@ export function buildBotOpportunityView(
     timeframeConfirmationSummary: timeframeRead.detail,
     tradeSpan: formatTradeSpan(tradeSpanHours),
     tradeSpanDetail:
-      "Maximum planned hold before Siggy should re-check or flatten if TP/SL has not resolved it, or if the market turns uncertain mid-entry.",
+      "Maximum planned hold before Siggi should re-check or flatten if TP/SL has not resolved it, or if the market turns uncertain mid-entry.",
     timingWindow: getTimingWindow(horizon, readiness, decision, eventRead.tone, eventRead),
   };
 }
@@ -1036,6 +1048,20 @@ export function summarizePredictionAccuracy(
   const accurate = resolved.filter((item) => item.outcome === "Hit Target");
   const recentAccurate = recent.filter((item) => item.outcomeAccuracy === "Accurate");
 
+  // Live accuracy: only signals resolved by an actual paper trade
+  const liveResolved = resolved.filter((item) => item.resolvedSource === "live_trade");
+  const liveAccurate = liveResolved.filter((item) => item.outcome === "Hit Target");
+  const liveAccuracy =
+    liveResolved.length >= 20
+      ? Math.round((liveAccurate.length / liveResolved.length) * 1000) / 10
+      : null;
+
+  // Seed/backtest accuracy: everything that wasn't resolved by a live trade
+  const seedResolved = resolved.filter(
+    (item) => !item.resolvedSource || item.resolvedSource !== "live_trade",
+  );
+  const seedAccurate = seedResolved.filter((item) => item.outcome === "Hit Target");
+
   return {
     overallAccuracy:
       resolved.length > 0
@@ -1047,5 +1073,13 @@ export function summarizePredictionAccuracy(
       recent.length > 0
         ? Math.round((recentAccurate.length / recent.length) * 1000) / 10
         : 0,
+    liveAccuracy,
+    liveResolved: liveResolved.length,
+    liveAccurate: liveAccurate.length,
+    seedAccuracy:
+      seedResolved.length > 0
+        ? Math.round((seedAccurate.length / seedResolved.length) * 1000) / 10
+        : 0,
+    seedResolved: seedResolved.length,
   };
 }

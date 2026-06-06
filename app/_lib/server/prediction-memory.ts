@@ -591,6 +591,22 @@ async function resolveAmbiguousOutcomeWithDrilldown(input: {
   };
 }
 
+function assertPriceScaleConsistency(
+  label: string,
+  zonePrice: number,
+  assetPrice: number,
+  symbol: string,
+) {
+  if (assetPrice <= 0 || zonePrice <= 0) return;
+  const drift = Math.abs(zonePrice - assetPrice) / assetPrice;
+
+  if (drift > 0.25) {
+    console.warn(
+      `[Currency mismatch] ${symbol} ${label}: zone=${zonePrice.toFixed(4)}, live=${assetPrice.toFixed(4)}, drift=${(drift * 100).toFixed(1)}% — likely USD vs GBP. Check FX normalisation.`,
+    );
+  }
+}
+
 function createPredictionRecord(input: {
   asset: PersistedAssetRecord;
   events: PersistedMarketEvent[];
@@ -610,6 +626,10 @@ function createPredictionRecord(input: {
     (Number.isFinite(Number.parseFloat(input.view.target))
       ? Number.parseFloat(input.view.target)
       : input.asset.price);
+
+  assertPriceScaleConsistency("entryZone", (entryLow + entryHigh) / 2, input.asset.price, input.setup.symbol);
+  assertPriceScaleConsistency("stop", stopPrice, input.asset.price, input.setup.symbol);
+  assertPriceScaleConsistency("target", targetPrice, input.asset.price, input.setup.symbol);
   const indicatorSnapshotAtCall =
     input.setup.analysis?.indicatorSweep?.map(
       (item) => `${item.label}: ${item.status} / ${item.detail}`,
@@ -674,6 +694,8 @@ function createPredictionRecord(input: {
     maxAdverseExcursionPct: 0,
     accuracyScore: 50,
     resolutionEvidence: null,
+    resolvedSource: null,
+    tradedStatus: null,
     narrative: buildPredictionNarrative({
       eventContext,
       outcome: "Monitoring",
@@ -771,6 +793,8 @@ async function resolvePredictionOutcome(
       : currentPrice <= record.stopPriceAtCall;
   const ambiguousHit = (effectiveOutcome?.outcome ?? candleOutcome?.outcome) === "Ambiguous";
 
+  const priceResolvedSource = candleRangeInput ? "candle_range" : "price_snapshot";
+
   if (ambiguousHit) {
     const resolutionEvidence = buildResolutionEvidence({
       ambiguousResolution: true,
@@ -791,6 +815,7 @@ async function resolvePredictionOutcome(
       outcomeAccuracy: "Neutral",
       accuracyScore: 50,
       resolutionEvidence,
+      resolvedSource: priceResolvedSource,
       narrative: buildPredictionNarrative({
         ambiguousResolution: true,
         eventContext: record.eventContextAtCall,
@@ -826,6 +851,7 @@ async function resolvePredictionOutcome(
       outcomeAccuracy: targetHit ? "Accurate" : "Inaccurate",
       accuracyScore: targetHit ? 100 : 0,
       resolutionEvidence,
+      resolvedSource: priceResolvedSource,
       narrative: buildPredictionNarrative({
         ambiguousResolution: effectiveOutcome?.ambiguousResolution ?? false,
         eventContext: record.eventContextAtCall,
@@ -938,8 +964,18 @@ export async function refreshPredictionMemory(
     } | null>
   >();
 
+  // Build set of prediction IDs that have an active live trade — those resolve via the trade only
+  const activeTradeByPredictionId = new Set(
+    data.siggiAccount.openTrades.map((trade) => trade.predictionId),
+  );
+
   data.predictionHistory = await Promise.all(data.predictionHistory.map(async (record) => {
     if (record.monitoringStatus !== "Active") {
+      return record;
+    }
+
+    // Siggi has an open trade on this signal — the trade outcome is the only valid resolution
+    if (activeTradeByPredictionId.has(record.id)) {
       return record;
     }
 

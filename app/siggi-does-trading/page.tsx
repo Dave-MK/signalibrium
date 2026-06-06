@@ -91,7 +91,7 @@ export default async function SiggiDoesTradingPage() {
       <PageHeader
         eyebrow="Siggi"
         title="Siggi's Trades"
-        description="Siggy treats enter-now calls as execution intent, opens each one while cash and trade slots allow, manages SL/TP live, and feeds every win, miss, skip, and reset back into memory."
+        description="Siggi treats enter-now calls as execution intent, opens each one while cash and trade slots allow, manages SL/TP live, and feeds every win, miss, skip, and reset back into memory."
       />
 
       <Panel className="p-3 sm:p-3.5">
@@ -212,7 +212,7 @@ export default async function SiggiDoesTradingPage() {
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="text-[0.9rem] font-semibold text-white">Autonomous selection</p>
               <p className="mt-1.5 text-[0.82rem] leading-5 text-slate-300">
-                Siggy cycles the full ranked universe on every sync and opens every active enter-now setup it can, while still avoiding duplicate instruments and respecting available paper cash.
+                Siggi cycles the full ranked universe on every sync and opens every active enter-now setup it can, while still avoiding duplicate instruments and respecting available paper cash.
               </p>
             </div>
             <div className="signal-surface-soft rounded-[0.4rem] p-3">

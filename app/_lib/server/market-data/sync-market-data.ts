@@ -168,7 +168,7 @@ function buildMarketSnapshot(
     weakest
       ? `${weakest.symbol} is lagging at ${formatSignedPercent(weakest.change24h)}`
       : null,
-    proxyCount > 0 ? `${proxyCount} composite symbols are using listed proxies for live pricing.` : null,
+    proxyCount > 0 ? `${proxyCount} composite symbols are using listed proxies for live pricing` : null,
   ].filter(Boolean);
 
   const nextSnapshot: PersistedMarketSnapshot = {

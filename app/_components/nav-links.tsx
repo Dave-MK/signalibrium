@@ -74,6 +74,17 @@ const links = [
       </svg>
     ),
   },
+  {
+    href: "/billing",
+    label: "Billing",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="2.5" y="5.5" width="15" height="9" rx="1.5" />
+        <path d="M2.5 8.5h15" />
+        <path d="M6 12.5h2.5" />
+      </svg>
+    ),
+  },
 ];
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {

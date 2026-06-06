@@ -60,26 +60,31 @@ export default async function HistoryPage() {
       <Panel className="p-3 sm:p-3.5">
         <div className="grid gap-[5px] sm:grid-cols-4">
           <SummaryCell
-            label="Overall accuracy"
-            value={`${accuracy.overallAccuracy}%`}
-            detail={`${accuracy.accuratePredictions} accurate from ${accuracy.resolvedPredictions} resolved calls`}
+            label="Live accuracy"
+            value={accuracy.liveAccuracy !== null ? `${accuracy.liveAccuracy}%` : "Insufficient data"}
+            detail={
+              accuracy.liveAccuracy !== null
+                ? `${accuracy.liveAccurate} accurate from ${accuracy.liveResolved} live paper trades`
+                : `${accuracy.liveResolved} live trade${accuracy.liveResolved === 1 ? "" : "s"} resolved — need 20 for a meaningful rate`
+            }
             tone="text-emerald-300"
+          />
+          <SummaryCell
+            label="Backtest / seed accuracy"
+            value={`${accuracy.seedAccuracy}%`}
+            detail={`${accuracy.seedResolved} seeded or replay signals — not counted in live rate`}
+            tone="text-amber-300"
           />
           <SummaryCell
             label="Recent accuracy"
             value={`${accuracy.recentAccuracy}%`}
-            detail="Last 12 resolved predictions"
+            detail="Last 12 resolved predictions (all sources)"
             tone="text-cyan-200"
           />
           <SummaryCell
             label="Tracked predictions"
             value={`${predictionHistory.length}`}
-            detail={`${ambiguousCalls.length} same-candle clashes are logged as ambiguous, not counted as wins or losses`}
-          />
-          <SummaryCell
-            label="Purpose"
-            value="Trust layer"
-            detail="Use this page to see whether enter-now calls matured or failed"
+            detail={`${ambiguousCalls.length} same-candle clashes logged as ambiguous, not counted as wins or losses`}
           />
         </div>
       </Panel>
@@ -182,9 +187,14 @@ export default async function HistoryPage() {
               className="grid gap-[5px] border-b border-white/6 px-3 py-2.5 last:border-b-0 lg:grid-cols-[minmax(0,1.2fr)_0.75fr_0.72fr_0.9fr_1fr_0.85fr_0.85fr_0.8fr] lg:items-center"
             >
               <div className="min-w-0">
-                <p className="text-[0.88rem] font-semibold text-white">
-                  {item.symbol} <span className="text-slate-400">/ {item.instrumentName}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[0.88rem] font-semibold text-white">
+                    {item.symbol} <span className="text-slate-400">/ {item.instrumentName}</span>
+                  </p>
+                  {(!item.resolvedSource || item.resolvedSource === "seed_replay") && item.monitoringStatus === "Resolved" && (
+                    <span className="rounded px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider bg-amber-900/50 text-amber-300">SEED</span>
+                  )}
+                </div>
                 <p className="mt-0.5 text-[0.74rem] text-slate-400">
                   {item.assetClass} / {item.timeframe} / {item.horizon}
                 </p>

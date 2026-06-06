@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { supportedChartIntervals } from "@/app/_lib/market-data-contract";
 import { getTradingViewSymbolDefinition, listTradingViewWatchlistSymbols } from "@/app/_lib/tradingview-symbols";
 import { deriveChartAnalysis } from "@/app/_lib/chart-analysis";
@@ -1065,7 +1065,7 @@ export function AssetLiveChartPanel({
           minute: "2-digit",
         })}.`,
       );
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch (reanalyzeError) {
       setError(
         reanalyzeError instanceof Error

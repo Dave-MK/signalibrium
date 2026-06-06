@@ -84,7 +84,7 @@ function getMultiTimeframeIntervals(
 
 function formatPrice(value: number) {
   const decimals = getPriceFractionDigits(value);
-  return `$${value.toFixed(decimals)}`;
+  return value.toFixed(decimals);
 }
 
 function scaleSparklineToAssetPrice(series: number[] | undefined, price: number | undefined) {

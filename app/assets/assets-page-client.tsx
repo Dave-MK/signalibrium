@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import type { MarketDataSyncSummary } from "@/app/_lib/market-data-contract";
 import { getMarketSession } from "@/app/_lib/market-hours";
 import type {
@@ -72,7 +72,7 @@ export default function AssetsPageClient({
       setAssets(customEvent.detail.assets);
       setSyncSummary(customEvent.detail);
       setError(null);
-      router.refresh();
+      startTransition(() => router.refresh());
     }
 
     function handleSyncError(event: Event) {

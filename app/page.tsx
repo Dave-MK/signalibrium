@@ -127,6 +127,7 @@ export default async function DashboardPage() {
 
   const assetsBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
   const rankedViews = scannerResults
+    .filter((setup) => setup.tradeability !== "BLOCKED")
     .map((setup) =>
       buildBotOpportunityView(
         setup,

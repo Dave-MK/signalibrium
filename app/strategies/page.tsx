@@ -139,7 +139,7 @@ export default async function StrategiesPage() {
         <div className="panel p-3.5">
           <p className="micro-label">Decision Stack</p>
           <h2 className="mt-1 text-lg font-semibold text-white">
-            How Siggy validates a prediction
+            How Siggi validates a prediction
           </h2>
           <div className="mt-3 grid gap-1.25 md:grid-cols-5">
             {strategyDecisionFramework.map((layer, index) => (
@@ -163,7 +163,7 @@ export default async function StrategiesPage() {
               No single pattern gets to boss the trade.
             </p>
             <p className="mt-2 text-[0.8rem] leading-6 text-slate-300">
-              Siggy upgrades confidence when structure, location, candle behaviour,
+              Siggi upgrades confidence when structure, location, candle behaviour,
               indicators, market time, and event risk point the same way. If they
               conflict, the setup waits or gets downgraded.
             </p>
@@ -175,7 +175,7 @@ export default async function StrategiesPage() {
         <div className="panel p-3.5">
           <p className="micro-label">Candles</p>
           <h2 className="mt-1 text-lg font-semibold text-white">
-            What candle types tell Siggy
+            What candle types tell Siggi
           </h2>
           <div className="mt-3 grid gap-1.25 sm:grid-cols-2">
             {candlePatternGuide.map((pattern) => (
@@ -195,7 +195,7 @@ export default async function StrategiesPage() {
         <div className="panel p-3.5">
           <p className="micro-label">Patterns</p>
           <h2 className="mt-1 text-lg font-semibold text-white">
-            Trend structures Siggy cross-references
+            Trend structures Siggi cross-references
           </h2>
           <div className="mt-3 grid gap-1.25 sm:grid-cols-2">
             {trendPatternGuide.map((pattern) => (

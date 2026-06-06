@@ -20,7 +20,14 @@ import type {
 } from "./workspace-types";
 
 const vercelTempStorePath = "/tmp/signalibrium-workspace.json";
+// Legacy single-blob key — used only for one-time migration
 const kvWorkspaceKey = process.env.SIGNALIBRIUM_KV_WORKSPACE_KEY ?? "signalibrium:workspace";
+// Namespaced keys (Bug Fix 6): each slice is stored and updated independently
+const kvCoreKey = "signalibrium:v1:core";
+const kvAssetsKey = "signalibrium:v1:assets";
+const kvIntelligenceKey = "signalibrium:v1:intelligence";
+const kvPredictionsKey = "signalibrium:v1:predictions";
+const kvSiggiKey = "signalibrium:v1:siggi";
 let pendingWrite = Promise.resolve();
 
 type UpstashRestResponse<T> = {
@@ -245,26 +252,106 @@ async function fetchKvJson<T>(pathName: string, init?: RequestInit) {
   return payload.result;
 }
 
+function safeParseSlice(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function pipelineKv(commands: string[][]): Promise<Array<unknown>> {
+  const config = getKvConfig();
+  if (!config) throw new Error("Upstash Redis is not configured.");
+  const response = await fetch(`${config.url}/pipeline`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(commands),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Redis pipeline failed: ${response.status}`);
+  const results = (await response.json()) as Array<{ result: unknown; error?: string }>;
+  return results.map((r) => r.result ?? null);
+}
+
+async function readKvNamespacedPayload(): Promise<string | null> {
+  const [core, assets, intelligence, predictions, siggi] = await pipelineKv([
+    ["GET", kvCoreKey],
+    ["GET", kvAssetsKey],
+    ["GET", kvIntelligenceKey],
+    ["GET", kvPredictionsKey],
+    ["GET", kvSiggiKey],
+  ]);
+
+  if ([core, assets, intelligence, predictions, siggi].every((r) => r === null)) {
+    return null; // No v1 keys found — triggers legacy migration below
+  }
+
+  const merged = {
+    ...safeParseSlice(core),
+    ...safeParseSlice(assets),
+    ...safeParseSlice(intelligence),
+    ...safeParseSlice(predictions),
+    ...safeParseSlice(siggi),
+  };
+
+  return JSON.stringify(merged);
+}
+
+async function writeKvNamespacedSlices(data: PersistedWorkspaceData) {
+  await pipelineKv([
+    ["SET", kvCoreKey, JSON.stringify({
+      schemaVersion: data.schemaVersion,
+      updatedAt: data.updatedAt,
+      workspace: data.workspace,
+      syncState: data.syncState,
+      watchlists: data.watchlists,
+      brokerConnections: data.brokerConnections,
+      tradeTickets: data.tradeTickets,
+      journalEntries: data.journalEntries,
+      marketSnapshot: data.marketSnapshot,
+    })],
+    ["SET", kvAssetsKey, JSON.stringify({ assets: data.assets })],
+    ["SET", kvIntelligenceKey, JSON.stringify({
+      scannerResults: data.scannerResults,
+      backtests: data.backtests,
+      confirmationChecks: data.confirmationChecks,
+      aiOpportunities: data.aiOpportunities,
+      marketEvents: data.marketEvents,
+    })],
+    ["SET", kvPredictionsKey, JSON.stringify({ predictionHistory: data.predictionHistory })],
+    ["SET", kvSiggiKey, JSON.stringify({ siggiAccount: data.siggiAccount })],
+  ]);
+}
+
 async function readKvWorkspacePayload() {
-  const stored = await fetchKvJson<string | PersistedWorkspaceData | null>(
+  const namespaced = await readKvNamespacedPayload();
+  if (namespaced !== null) return namespaced;
+
+  // One-time migration from the legacy single-blob key
+  const legacy = await fetchKvJson<string | PersistedWorkspaceData | null>(
     `/get/${encodeURIComponent(kvWorkspaceKey)}`,
   );
 
-  if (stored) {
-    return typeof stored === "string" ? stored : JSON.stringify(stored);
+  const raw = legacy
+    ? (typeof legacy === "string" ? legacy : JSON.stringify(legacy))
+    : JSON.stringify(defaultWorkspaceData, null, 2);
+
+  const normalized = normalizeWorkspaceData(JSON.parse(raw));
+  await writeKvNamespacedSlices(normalized);
+
+  try {
+    await fetchKvJson<number>(`/del/${encodeURIComponent(kvWorkspaceKey)}`);
+  } catch {
+    // Non-fatal — legacy key will simply be ignored on future reads
   }
 
-  const seededPayload = JSON.stringify(defaultWorkspaceData, null, 2);
-  await writeKvWorkspacePayload(seededPayload);
-
-  return seededPayload;
-}
-
-async function writeKvWorkspacePayload(payload: string) {
-  await fetchKvJson<"OK">(`/set/${encodeURIComponent(kvWorkspaceKey)}`, {
-    body: payload,
-    method: "POST",
-  });
+  return JSON.stringify(normalized);
 }
 
 function normalizeTradeTicket(ticket: LegacyTradeTicket): PersistedTradeTicket {
@@ -603,6 +690,19 @@ function normalizePredictionHistoryRecord(
     accuracyScore:
       legacyAmbiguousStop ? 50 : typeof record.accuracyScore === "number" ? record.accuracyScore : 50,
     resolutionEvidence: normalizedResolutionEvidence,
+    resolvedSource:
+      record.resolvedSource === "live_trade" ||
+      record.resolvedSource === "seed_replay" ||
+      record.resolvedSource === "candle_range" ||
+      record.resolvedSource === "price_snapshot"
+        ? record.resolvedSource
+        : null,
+    tradedStatus:
+      record.tradedStatus === "traded" ||
+      record.tradedStatus === "skipped" ||
+      record.tradedStatus === "not_traded"
+        ? record.tradedStatus
+        : null,
     narrative: normalizedNarrative,
     createdAt: typeof record.createdAt === "string" ? record.createdAt : now,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : now,
@@ -816,6 +916,11 @@ function normalizeSiggiTrade(
       trade.stopMode === "Breakeven" || trade.stopMode === "Trailing"
         ? trade.stopMode
         : "Initial",
+    initialStopPrice:
+      typeof trade.initialStopPrice === "number" ? trade.initialStopPrice
+        : typeof trade.stopPrice === "number" ? trade.stopPrice
+        : 0,
+    partialExitDone: trade.partialExitDone === true,
     stakeGbp: typeof trade.stakeGbp === "number" ? trade.stakeGbp : 0,
     stakeUsd: typeof trade.stakeUsd === "number" ? trade.stakeUsd : 0,
     quantity: typeof trade.quantity === "number" ? trade.quantity : 0,
@@ -872,6 +977,7 @@ function normalizeSiggiActivity(
     type:
       activity.type === "Opened" ||
       activity.type === "Closed" ||
+      activity.type === "Partial Exit" ||
       activity.type === "Skipped" ||
       activity.type === "Stop Moved" ||
       activity.type === "Reset"
@@ -941,6 +1047,57 @@ function normalizeSiggiAccount(
     updatedAt:
       typeof candidate?.updatedAt === "string" ? candidate.updatedAt : seeded.updatedAt,
   };
+}
+
+function reconcilePredictionHistoryWithTrades(
+  predictionHistory: PersistedPredictionHistoryRecord[],
+  siggiAccount: PersistedSiggiAccount,
+): PersistedPredictionHistoryRecord[] {
+  const allTrades = [...siggiAccount.openTrades, ...siggiAccount.closedTrades];
+  const tradeByPredictionId = new Map(allTrades.map((trade) => [trade.predictionId, trade]));
+
+  return predictionHistory.map((record) => {
+    const trade = tradeByPredictionId.get(record.id);
+
+    // Seed-replay records never have a corresponding trade — preserve them as-is
+    if (record.resolvedSource === "seed_replay") {
+      return record;
+    }
+
+    if (trade) {
+      if (trade.status === "Open") {
+        // Trade is live — mark the prediction as being traded but don't resolve it yet
+        return record.tradedStatus === "traded" ? record : { ...record, tradedStatus: "traded" };
+      }
+
+      // Closed trade: the trade outcome is the ground truth, override the signal
+      const tradeOutcome = trade.status as "Hit Target" | "Stopped";
+      return {
+        ...record,
+        resolvedSource: "live_trade",
+        tradedStatus: "traded",
+        monitoringStatus: "Resolved" as const,
+        outcome: tradeOutcome,
+        outcomeAccuracy: tradeOutcome === "Hit Target" ? ("Accurate" as const) : ("Inaccurate" as const),
+        accuracyScore: tradeOutcome === "Hit Target" ? 100 : 0,
+        resolvedAt: record.resolvedAt ?? trade.closedAt ?? trade.updatedAt,
+      };
+    }
+
+    // No trade for this prediction — infer resolvedSource from resolutionMethod if missing
+    if (!record.resolvedSource && record.monitoringStatus === "Resolved") {
+      const inferredSource: PersistedPredictionHistoryRecord["resolvedSource"] =
+        record.resolutionMethod === "candle-range" ||
+        record.resolutionMethod === "lower-timeframe-drilldown" ||
+        record.resolutionMethod === "pulse-tape" ||
+        record.resolutionMethod === "sequence-inference"
+          ? "candle_range"
+          : "price_snapshot";
+      return { ...record, resolvedSource: inferredSource };
+    }
+
+    return record;
+  });
 }
 
 function mergeByKey<T>(
@@ -1112,7 +1269,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
     ),
   );
 
-  return {
+  const normalized: PersistedWorkspaceData = {
     schemaVersion: 12,
     updatedAt:
       typeof candidate.updatedAt === "string"
@@ -1200,6 +1357,15 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
     predictionHistory: normalizedPredictionHistory,
     siggiAccount: normalizeSiggiAccount(candidate.siggiAccount),
   };
+
+  // Reconcile prediction accuracy against actual trade outcomes (idempotent backfill)
+  const reconciledAccount = normalized.siggiAccount;
+  normalized.predictionHistory = reconcilePredictionHistoryWithTrades(
+    normalized.predictionHistory,
+    reconciledAccount,
+  );
+
+  return normalized;
 }
 
 function extractFirstCompleteJsonObject(raw: string) {
@@ -1377,7 +1543,7 @@ export async function writeWorkspaceData(nextData: PersistedWorkspaceData) {
     const payload = JSON.stringify(stampedData, null, 2);
 
     if (shouldUseKvStore()) {
-      await writeKvWorkspacePayload(payload);
+      await writeKvNamespacedSlices(stampedData);
 
       return stampedData;
     }
@@ -1395,7 +1561,7 @@ export async function writeWorkspaceData(nextData: PersistedWorkspaceData) {
 
 export function getWorkspaceStorePath() {
   if (shouldUseKvStore()) {
-    return `upstash-redis:${kvWorkspaceKey}`;
+    return `upstash-redis:${kvCoreKey} (+4 namespaced keys)`;
   }
 
   return resolveStorePath();

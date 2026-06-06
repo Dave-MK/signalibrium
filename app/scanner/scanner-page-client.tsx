@@ -428,19 +428,19 @@ export default function ScannerPageClient({
         </Panel>
       </div>
 
-      {selectedAnalysisItem && selectedAnalysisAsset ? (
+      {selectedAnalysisItem ? (
         <FullScreenModal
-          title={`${selectedAnalysisItem.setup.symbol} / ${selectedAnalysisAsset.name}`}
+          title={`${selectedAnalysisItem.setup.symbol} / ${selectedAnalysisAsset?.name ?? selectedAnalysisItem.view.instrumentName}`}
           subtitle="Live chart, indicators, structure, and re-analysis in one fullscreen workspace."
           onClose={() => setAnalysisSetupId(null)}
         >
           <AssetLiveChartPanel
-            assetClass={selectedAnalysisAsset.assetClass}
+            assetClass={selectedAnalysisAsset?.assetClass}
             analysisOverlay={selectedAnalysisItem.setup.analysis}
             chartVendor={chartVendor}
             chartingLibraryAvailable={chartingLibraryAvailable}
-            name={selectedAnalysisAsset.name}
-            price={selectedAnalysisAsset.price}
+            name={selectedAnalysisAsset?.name ?? selectedAnalysisItem.view.instrumentName}
+            price={selectedAnalysisAsset?.price ?? 0}
             selectedOpportunityId={selectedAnalysisItem.setup.id}
             selectedOpportunityLabel={`${selectedAnalysisItem.setup.symbol} / ${selectedAnalysisItem.setup.strategy}`}
             symbol={selectedAnalysisItem.setup.symbol}

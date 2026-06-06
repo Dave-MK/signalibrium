@@ -27,6 +27,8 @@ import {
   syncMarketIntelligence,
   updateDisplayCurrency,
 } from "../_lib/workspace-api";
+import { UserButton } from "@clerk/nextjs";
+import { AffiliateBrokerButton } from "./affiliate-broker-button";
 import { useDisplayCurrency } from "./display-currency-provider";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
@@ -133,7 +135,7 @@ export function AppShell({
             detail: summary,
           }),
         );
-        router.refresh();
+        startTransition(() => router.refresh());
       } catch {
         // Keep the shell quiet on short-cycle pulse failures.
       } finally {
@@ -187,7 +189,7 @@ export function AppShell({
             detail: summary,
           }),
         );
-        router.refresh();
+        startTransition(() => router.refresh());
       } catch (error) {
         window.dispatchEvent(
           new CustomEvent<{ message: string }>("signalibrium:market-data-sync-error", {
@@ -258,7 +260,7 @@ export function AppShell({
 
       try {
         await syncMarketIntelligence();
-        router.refresh();
+        startTransition(() => router.refresh());
       } catch {
         // Keep the shell quiet on background intelligence sync failures.
       } finally {
@@ -363,8 +365,14 @@ export function AppShell({
             <NavLinks collapsed={isSidebarCollapsed} />
           </div>
 
-          {!isSidebarCollapsed && topScannerResult ? (
+          {!isSidebarCollapsed && (
             <div className="mt-4 hidden lg:block">
+              <AffiliateBrokerButton className="w-full justify-center" />
+            </div>
+          )}
+
+          {!isSidebarCollapsed && topScannerResult ? (
+            <div className="mt-3 hidden lg:block">
               <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
                 <p className="micro-label">Focus</p>
                 <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -420,11 +428,9 @@ export function AppShell({
                   aria-label="Display currency"
                   value={activeCurrency}
                   onChange={(event) => {
-                    startTransition(() => {
-                      void updateDisplayCurrency(
-                        event.target.value as SupportedDisplayCurrency,
-                      ).then(() => router.refresh());
-                    });
+                    void updateDisplayCurrency(
+                      event.target.value as SupportedDisplayCurrency,
+                    ).then(() => startTransition(() => router.refresh()));
                   }}
                   className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.72rem] font-medium text-slate-200 outline-none"
                 >
@@ -435,6 +441,10 @@ export function AppShell({
                   ))}
                 </select>
                 <StatusChip label="LIVE" />
+                <UserButton
+                  appearance={{ variables: { colorPrimary: "#10b981" } }}
+                  userProfileUrl="/billing"
+                />
               </div>
             </div>
           </header>
