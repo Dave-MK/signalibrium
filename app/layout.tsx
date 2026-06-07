@@ -4,7 +4,6 @@ import { summarizePredictionAccuracy } from "./_lib/bot-engine";
 import { getDisplayCurrencyState } from "./_lib/server/currency-preference";
 import { getMarketSnapshot } from "./_lib/server/repositories/market-snapshot";
 import { listPredictionHistory } from "./_lib/server/repositories/prediction-history";
-import { listScannerResults } from "./_lib/server/repositories/scanner-results";
 import { AppShell } from "./_components/app-shell";
 import { DisplayCurrencyProvider } from "./_components/display-currency-provider";
 import "./globals.css";
@@ -20,15 +19,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [displayCurrencyState, marketSnapshot, predictionHistory, scannerResults] = await Promise.all([
+  const [displayCurrencyState, marketSnapshot, predictionHistory] = await Promise.all([
     getDisplayCurrencyState(),
     getMarketSnapshot(),
     listPredictionHistory(),
-    listScannerResults(),
   ]);
   const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
-  const topScannerResult =
-    [...scannerResults].sort((left, right) => right.score - left.score)[0] ?? null;
 
   return (
     <ClerkProvider>
@@ -41,7 +37,6 @@ export default async function RootLayout({
             <AppShell
               marketSnapshot={marketSnapshot}
               predictionAccuracy={predictionAccuracy}
-              topScannerResult={topScannerResult}
             >
               {children}
             </AppShell>

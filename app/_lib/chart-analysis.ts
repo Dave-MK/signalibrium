@@ -179,6 +179,7 @@ function buildOverallRead(input: {
   close: number;
   ema20: number | null;
   ema50: number | null;
+  ema200: number | null;
   rsi: number | null;
   macd: number | null;
   signal: number | null;
@@ -188,6 +189,7 @@ function buildOverallRead(input: {
 }) {
   const aboveEma20 = input.ema20 !== null && input.close > input.ema20;
   const aboveEma50 = input.ema50 !== null && input.close > input.ema50;
+  const aboveEma200 = input.ema200 !== null && input.close > input.ema200;
   const emaStackBullish =
     input.ema20 !== null && input.ema50 !== null && input.ema20 > input.ema50;
   const emaStackBearish =
@@ -207,7 +209,17 @@ function buildOverallRead(input: {
     input.macd < input.signal &&
     input.histogram <= 0;
 
-  if (aboveEma20 && aboveEma50 && emaStackBullish && rsiBullish && macdBullish) {
+  // Short-term bullish checklist passes but price is below EMA 200 — this is a
+  // counter-trend recovery in a broader downtrend, not a clean continuation.
+  if (aboveEma20 && aboveEma50 && emaStackBullish && rsiBullish && macdBullish && input.ema200 !== null && !aboveEma200) {
+    return {
+      bias: "Bear market bounce",
+      signal: "neutral" as const,
+      summary: `${input.symbol} passes the short-term bullish checklist but is still trading below the 200-period average. That means this is a counter-trend recovery, not a clean trend continuation — Siggi treats it with more caution than a full bull signal.`,
+    };
+  }
+
+  if (aboveEma20 && aboveEma50 && emaStackBullish && rsiBullish && macdBullish && (input.ema200 === null || aboveEma200)) {
     return {
       bias: "Bullish continuation",
       signal: "bullish" as const,
@@ -250,6 +262,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const closes = candles.map((candle) => candle.close);
   const ema20 = computeEmaSeries(closes, 20);
   const ema50 = computeEmaSeries(closes, 50);
+  const ema200 = computeEmaSeries(closes, 200);
   const rsi = computeRsiSeries(closes, 14);
   const macdSeries = computeMacdSeries(closes);
   const bollingerBands = computeBollingerBands(closes, 20, 2);
@@ -260,6 +273,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   const latestClose = closes.at(-1) ?? 0;
   const latestEma20 = getLatestDefinedValue(ema20);
   const latestEma50 = getLatestDefinedValue(ema50);
+  const latestEma200 = getLatestDefinedValue(ema200);
   const latestRsi = getLatestDefinedValue(rsi);
   const latestMacd = getLatestDefinedValue(macdSeries.macd);
   const latestSignal = getLatestDefinedValue(macdSeries.signal);
@@ -273,6 +287,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
     close: latestClose,
     ema20: latestEma20,
     ema50: latestEma50,
+    ema200: latestEma200,
     histogram: latestHistogram,
     macd: latestMacd,
     name,
@@ -284,6 +299,7 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
   return {
     ema20,
     ema50,
+    ema200,
     macd: macdSeries.macd,
     macdHistogram: macdSeries.histogram,
     macdSignal: macdSeries.signal,
@@ -334,6 +350,17 @@ export function deriveChartAnalysis(candles: LiveCandle[], symbol: string, name:
               ? "Constructive"
               : "Soft",
         value: latestEma50,
+      },
+      {
+        explanation: latestEma200 === null
+          ? "Not enough candles yet. EMA 200 needs 200 bars to initialise."
+          : latestClose >= latestEma200
+            ? "Price is above the 200-period average — the broad trend backdrop is constructive and Siggi can trust continuation reads more."
+            : "Price is below the 200-period average — the broad trend backdrop is still defensive. Bullish entries need extra confirmation here.",
+        label: "EMA 200",
+        signal: latestEma200 === null ? "neutral" : latestClose >= latestEma200 ? "bullish" : "bearish",
+        tone: latestEma200 === null ? "Balanced" : latestClose >= latestEma200 ? "Constructive" : "Soft",
+        value: latestEma200,
       },
       {
         explanation:

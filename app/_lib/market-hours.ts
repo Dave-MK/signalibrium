@@ -237,3 +237,111 @@ export function getMarketSessionTone(state: MarketSessionState) {
 
   return "text-amber-200";
 }
+
+/**
+ * Returns a human-readable label for when the market next opens, e.g.
+ * "Opens in ~2h 30m" or "Opens Mon 09:30". Returns null for 24/7 assets
+ * or markets that are currently open.
+ *
+ * The time shown is always the scheduled window open minute — never the
+ * arbitrary timestamp of a 30-min polling step.
+ */
+export function getNextSessionOpenLabel(
+  asset: PersistedAssetRecord,
+  now = new Date(),
+): string | null {
+  if (asset.assetClass === "Crypto") return null;
+
+  const current = getMarketSession(asset, now);
+  if (current.state === "Open" || current.state === "24/7") return null;
+
+  const venueSession = resolveVenueSession(asset);
+  if (!venueSession) return null;
+
+  // Walk forward in 30-minute steps to find the first step inside an open window.
+  // Then backtrack to the window's exact openMinute so we show the real session
+  // start time rather than the polling step's inherited timestamp.
+  const stepMs = 30 * 60_000;
+  const maxSteps = 7 * 24 * 2;
+
+  for (let step = 1; step <= maxSteps; step++) {
+    const candidate = new Date(now.getTime() + step * stepMs);
+    const session = getMarketSession(asset, candidate);
+
+    if (session.state !== "Open" && session.state !== "24/7") continue;
+
+    // Determine the exact scheduled open minute for this candidate moment.
+    const localClock = getLocalClockParts(candidate, venueSession.timezone);
+    let actualOpenDate = candidate;
+
+    for (const window of venueSession.windows) {
+      if (
+        localClock.minuteOfDay >= window.openMinute &&
+        localClock.minuteOfDay < window.closeMinute
+      ) {
+        // Subtract the minutes elapsed since the window opened to land precisely
+        // on the window's openMinute (seconds are carried along but not displayed).
+        const minutesIntoWindow = localClock.minuteOfDay - window.openMinute;
+        actualOpenDate = new Date(candidate.getTime() - minutesIntoWindow * 60_000);
+        break;
+      }
+    }
+
+    const diffMs = actualOpenDate.getTime() - now.getTime();
+    const diffHours = diffMs / 3_600_000;
+
+    const venueName = venueSession.venue;
+
+    if (diffHours < 24) {
+      const h = Math.floor(diffHours);
+      const m = Math.round((diffHours - h) * 60);
+      if (h === 0) return `${venueName} opens in ~${Math.max(30, m)}m`;
+      if (m === 0) return `${venueName} opens in ~${h}h`;
+      return `${venueName} opens in ~${h}h ${m}m`;
+    }
+
+    const label = new Intl.DateTimeFormat("en-GB", {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: venueSession.timezone,
+    }).format(actualOpenDate);
+
+    return `${venueName} opens ${label}`;
+  }
+
+  return null;
+}
+
+/**
+ * Returns true when the asset's market is open but within `bufferMinutes`
+ * of its scheduled close — used by Siggi to avoid opening day trades too
+ * late in the session.
+ */
+export function isApproachingMarketClose(
+  asset: PersistedAssetRecord,
+  bufferMinutes = 45,
+  now = new Date(),
+): boolean {
+  if (asset.assetClass === "Crypto" || asset.assetClass === "Forex") return false;
+
+  const session = getMarketSession(asset, now);
+  if (session.state !== "Open") return false;
+
+  const venueSession = resolveVenueSession(asset);
+  if (!venueSession) return false;
+
+  const localClock = getLocalClockParts(now, venueSession.timezone);
+
+  for (const window of venueSession.windows) {
+    if (
+      localClock.minuteOfDay >= window.openMinute &&
+      localClock.minuteOfDay < window.closeMinute
+    ) {
+      return window.closeMinute - localClock.minuteOfDay <= bufferMinutes;
+    }
+  }
+
+  return false;
+}

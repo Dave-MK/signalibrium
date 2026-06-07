@@ -10,6 +10,14 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+
+// --------------------------------------------------------------------------
+// routerRef pattern: keeps a stable ref to the latest router so background
+// effects don't need `router` in their dependency arrays — which would cause
+// them to re-register every navigation and leave stale async callbacks
+// calling router.refresh() before the new instance is ready.
+// --------------------------------------------------------------------------
+import { SiggiChat } from "./siggi-chat";
 import type { PredictionAccuracySummary } from "@/app/_lib/bot-engine";
 import type {
   MarketDataPulseSummary,
@@ -17,7 +25,6 @@ import type {
 } from "@/app/_lib/market-data-contract";
 import type {
   PersistedMarketSnapshot,
-  PersistedScannerResult,
   SupportedDisplayCurrency,
 } from "@/app/_lib/server/workspace-types";
 import { formatPercent } from "../_lib/format";
@@ -33,6 +40,7 @@ import { AffiliateBrokerButton } from "./affiliate-broker-button";
 import { useDisplayCurrency } from "./display-currency-provider";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
+import { GettingStartedChecklist } from "./getting-started-checklist";
 
 const sidebarPreferenceStorageKey = "signalibrium.sidebar-collapsed";
 const sidebarPreferenceChangedEvent = "signalibrium:sidebar-preference-changed";
@@ -91,14 +99,17 @@ export function AppShell({
   children,
   marketSnapshot,
   predictionAccuracy,
-  topScannerResult,
 }: {
   children: ReactNode;
   marketSnapshot: PersistedMarketSnapshot;
   predictionAccuracy: PredictionAccuracySummary;
-  topScannerResult: PersistedScannerResult | null;
 }) {
   const router = useRouter();
+  // Stable ref — effects read routerRef.current so they never need `router`
+  // as a dependency (avoids "router action before initialization" on re-mount).
+  const routerRef = useRef(router);
+  useEffect(() => { routerRef.current = router; });
+
   const { currency: activeCurrency } = useDisplayCurrency();
   const autoSyncInFlightRef = useRef(false);
   const livePulseInFlightRef = useRef(false);
@@ -131,12 +142,15 @@ export function AppShell({
 
       try {
         const summary = await pulseMarketData();
-        window.dispatchEvent(
-          new CustomEvent<MarketDataPulseSummary>("signalibrium:market-data-pulsed", {
-            detail: summary,
-          }),
-        );
-        startTransition(() => router.refresh());
+        // Guard: component may have been cleaned up while request was in-flight
+        if (!cancelled) {
+          window.dispatchEvent(
+            new CustomEvent<MarketDataPulseSummary>("signalibrium:market-data-pulsed", {
+              detail: summary,
+            }),
+          );
+          startTransition(() => routerRef.current.refresh());
+        }
       } catch {
         // Keep the shell quiet on short-cycle pulse failures.
       } finally {
@@ -162,7 +176,8 @@ export function AppShell({
         clearInterval(intervalId);
       }
     };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const syncIntervalMs = 70_000;
@@ -185,23 +200,27 @@ export function AppShell({
 
       try {
         const summary = await syncMarketData();
-        window.dispatchEvent(
-          new CustomEvent<MarketDataSyncSummary>("signalibrium:market-data-synced", {
-            detail: summary,
-          }),
-        );
-        startTransition(() => router.refresh());
+        if (!cancelled) {
+          window.dispatchEvent(
+            new CustomEvent<MarketDataSyncSummary>("signalibrium:market-data-synced", {
+              detail: summary,
+            }),
+          );
+          startTransition(() => routerRef.current.refresh());
+        }
       } catch (error) {
-        window.dispatchEvent(
-          new CustomEvent<{ message: string }>("signalibrium:market-data-sync-error", {
-            detail: {
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to sync live market data",
-            },
-          }),
-        );
+        if (!cancelled) {
+          window.dispatchEvent(
+            new CustomEvent<{ message: string }>("signalibrium:market-data-sync-error", {
+              detail: {
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Unable to sync live market data",
+              },
+            }),
+          );
+        }
       } finally {
         autoSyncInFlightRef.current = false;
       }
@@ -240,7 +259,8 @@ export function AppShell({
         clearInterval(intervalId);
       }
     };
-  }, [marketSnapshot.updatedAt, router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketSnapshot.updatedAt]);
 
   useEffect(() => {
     const intelligenceIntervalMs = 6 * 60_000;
@@ -261,7 +281,9 @@ export function AppShell({
 
       try {
         await syncMarketIntelligence();
-        startTransition(() => router.refresh());
+        if (!cancelled) {
+          startTransition(() => routerRef.current.refresh());
+        }
       } catch {
         // Keep the shell quiet on background intelligence sync failures.
       } finally {
@@ -287,7 +309,8 @@ export function AppShell({
         clearInterval(intervalId);
       }
     };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Dedicated analysis loop — runs every 2 minutes to keep all instruments
   // fresh within the 1-hour window.  Completely independent of the intelligence
@@ -308,7 +331,9 @@ export function AppShell({
 
       try {
         await analyzeStaleResults();
-        startTransition(() => router.refresh());
+        if (!analysisCancelled) {
+          startTransition(() => routerRef.current.refresh());
+        }
       } catch {
         // Non-fatal — analysis failures are logged on the server side.
       } finally {
@@ -335,13 +360,14 @@ export function AppShell({
         clearInterval(analysisIntervalId);
       }
     };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative z-10 min-h-screen">
       <div className="flex min-h-screen flex-col lg:flex-row">
         <aside
-          className={`group/sidebar relative border-b border-white/6 bg-[#06101b]/94 px-2.5 py-2.5 backdrop-blur-xl transition-[width,padding] duration-200 lg:min-h-screen lg:border-b-0 lg:border-r ${
+          className={`group/sidebar relative shrink-0 border-b border-white/6 bg-[#06101b]/94 px-2.5 py-2.5 backdrop-blur-xl transition-[width,padding] duration-200 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r ${
             isSidebarCollapsed
               ? "lg:w-19 lg:px-2 lg:py-3"
               : "lg:w-55 lg:px-3 lg:py-3"
@@ -420,24 +446,6 @@ export function AppShell({
             </div>
           )}
 
-          {!isSidebarCollapsed && topScannerResult ? (
-            <div className="mt-3 hidden lg:block">
-              <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
-                <p className="micro-label">Focus</p>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <p className="truncate text-[0.82rem] font-semibold text-white">
-                    {topScannerResult.symbol} {topScannerResult.strategy}
-                  </p>
-                  <Link
-                    href="/scanner"
-                    className="text-[0.74rem] font-medium text-slate-400 transition hover:text-white"
-                  >
-                    Open
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
@@ -457,22 +465,10 @@ export function AppShell({
               />
 
               <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
-                <svg
-                  viewBox="0 0 20 20"
-                  className="h-4 w-4 shrink-0 text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                >
-                  <circle cx="8.5" cy="8.5" r="5.2" />
-                  <path d="m12.5 12.5 4.5 4.5" />
-                </svg>
-                <span className="truncate text-[0.78rem] text-slate-400">
-                  Search markets, opportunities, event intelligence, or chart analysis...
+                <span className="hidden min-w-0 flex-1 truncate text-[0.72rem] text-slate-500 sm:inline">
+                  {marketSnapshot.tradeableSetups} ready · {formatPercent(marketSnapshot.openRisk)} risk
                 </span>
-                <span className="hidden text-[0.72rem] text-slate-500 sm:inline">
-                  {marketSnapshot.tradeableSetups} ready / {formatPercent(marketSnapshot.openRisk)} risk
-                </span>
+
                 <select
                   aria-label="Display currency"
                   value={activeCurrency}
@@ -501,6 +497,12 @@ export function AppShell({
           <main className="flex-1 px-1.25 py-1.25">{children}</main>
         </div>
       </div>
+
+      {/* Siggi — self-contained FAB + chat panel, fixed bottom-right */}
+      <SiggiChat />
+
+      {/* Getting-started checklist — slides in from right, follows user on every page */}
+      <GettingStartedChecklist />
     </div>
   );
 }

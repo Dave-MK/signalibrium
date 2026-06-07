@@ -1,11 +1,20 @@
+// ─── Stripe webhook — not active ────────────────────────────────────────────
+// Stripe webhook is commented out while billing is not yet configured.
+// To re-enable: add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to .env.local
+// and uncomment the implementation below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function POST() {
+  return Response.json({ received: false, reason: "Billing not configured." }, { status: 503 });
+}
+
+/*
 import Stripe from "stripe";
 import { setUserTier } from "@/app/_lib/auth";
 import type { UserTier } from "@/app/_lib/auth";
-
-export const runtime = "nodejs";
-
-// Stripe sends raw body — must disable body parsing
-export const dynamic = "force-dynamic";
 
 const PRICE_TIER_MAP: Record<string, UserTier> = {
   [process.env.STRIPE_PRO_PRICE_ID ?? "price_pro"]: "pro",
@@ -55,3 +64,4 @@ export async function POST(request: Request) {
 
   return Response.json({ received: true });
 }
+*/

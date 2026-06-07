@@ -10,16 +10,16 @@ import {
  *
  * Finds the N most stale scanner results and runs Siggi's full opportunity
  * analysis on each one sequentially.  Default count is 1 (one per background
- * intelligence-sync tick).  Pass ?count=10 from the manual "Refresh all"
- * button to blast through the backlog quickly.
- *
- * The 1-hour analysis freshness commitment requires analysing ~1 setup every
- * 2 minutes across a 30-instrument universe.  The background loop calls this
- * every 2 minutes with count=1; the manual button calls it with count=10.
+ * intelligence-sync tick).  Pass ?count=all or a large number from the manual
+ * "Refresh all" button to analyse the entire universe in one shot.
  */
 export async function POST(request: NextRequest) {
   const countParam = request.nextUrl.searchParams.get("count");
-  const batchSize = Math.min(15, Math.max(1, Number(countParam) || 1));
+  // "all" or 0 means no cap — analyse every eligible result
+  const batchSize =
+    countParam === "all" || countParam === "0"
+      ? Infinity
+      : Math.max(1, Number(countParam) || 1);
 
   const results = await listScannerResults();
   const eligible = results.filter((r) => r.analysisStatus !== "Analysing");

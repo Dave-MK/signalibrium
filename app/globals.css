@@ -462,6 +462,28 @@ a {
   }
 }
 
+/*
+ * Applied to scanner rows where the market is currently open.
+ * Uses an inset box-shadow to paint a pulsing left-edge glow that is
+ * contained inside the row and never clipped by the panel overflow.
+ */
+@keyframes live-row-pulse {
+  0%,
+  100% {
+    box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.22);
+  }
+
+  50% {
+    box-shadow:
+      inset 3px 0 0 rgba(52, 211, 153, 0.55),
+      0 0 18px rgba(52, 211, 153, 0.04);
+  }
+}
+
+.scanner-row-live {
+  animation: live-row-pulse 2.8s ease-in-out infinite;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

@@ -1,7 +1,21 @@
-import Stripe from "stripe";
-import { requireAuthUser } from "@/app/_lib/auth";
+// ─── Stripe billing — not active ────────────────────────────────────────────
+// Stripe checkout is commented out while billing is not yet configured.
+// To re-enable: add STRIPE_SECRET_KEY, STRIPE_PRO_PRICE_ID, STRIPE_ALGO_PRICE_ID
+// to .env.local and uncomment the implementation below.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const runtime = "nodejs";
+
+export async function POST() {
+  return Response.json(
+    { error: "Billing is not yet configured. Reach out directly to upgrade your plan." },
+    { status: 503 },
+  );
+}
+
+/*
+import Stripe from "stripe";
+import { requireAuthUser } from "@/app/_lib/auth";
 
 const TIER_PRICE_MAP: Record<string, string | undefined> = {
   pro: process.env.STRIPE_PRO_PRICE_ID,
@@ -41,3 +55,4 @@ export async function POST(request: Request) {
 
   return Response.json({ url: session.url });
 }
+*/

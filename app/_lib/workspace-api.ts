@@ -127,10 +127,10 @@ export async function analyzeStaleResults() {
   );
 }
 
-/** Analyse up to `count` stale results in one go — called by the manual "Refresh all" button. */
-export async function analyzeAllStale(count = 10) {
+/** Analyse every stale result in one go — called by the manual "Refresh all" button. */
+export async function analyzeAllStale() {
   return requestJson<{ analysed: number; symbols?: string[]; errors?: string[] }>(
-    `/api/scanner-results/analyze-stale?count=${count}`,
+    `/api/scanner-results/analyze-stale?count=all`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }
@@ -155,6 +155,19 @@ export async function fetchMarketChart(
 export async function resetSiggiAccount() {
   return requestJson<{ success: boolean; startingBalanceGbp: number; resetAt: string }>(
     "/api/siggi/reset",
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function resetPredictionHistory(wipeAll = false) {
+  return requestJson<{
+    success: boolean;
+    wipeAll: boolean;
+    recordsBefore: number;
+    recordsKept: number;
+    recordsRemoved: number;
+  }>(
+    `/api/predictions/reset${wipeAll ? "?wipeAll=true" : ""}`,
     { method: "POST", body: JSON.stringify({}) },
   );
 }

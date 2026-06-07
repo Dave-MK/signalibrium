@@ -229,16 +229,32 @@ function dedupeNearbyLevels(levels: number[], threshold: number) {
 
 function selectLevels(candles: LiveCandle[], kind: "high" | "low", atr: number) {
   const pivotIndices = collectPivotIndices(candles, kind);
-  const candidateLevels = pivotIndices
-    .slice(-6)
-    .map((index) => (kind === "high" ? candles[index].high : candles[index].low));
+
+  // Check whether this feed exposes usable volume data.
+  const hasVolume = candles.some((c) => c.volume !== null && Number.isFinite(c.volume) && c.volume > 0);
+
+  // Score each pivot by the sum of candle volume over the ±2 bar window around it.
+  // High volume at a level means more institutional activity → more reliable S/R.
+  // When volume is unavailable, fall back to recency index so newer pivots rank higher.
+  const scoredPivots = pivotIndices.slice(-8).map((index) => {
+    const price = kind === "high" ? candles[index].high : candles[index].low;
+    const start = Math.max(0, index - 2);
+    const end = Math.min(candles.length - 1, index + 2);
+    const volumeScore = hasVolume
+      ? candles.slice(start, end + 1).reduce((sum, c) => sum + (c.volume ?? 0), 0)
+      : index; // fallback: more recent pivots score higher
+    return { price, volumeScore };
+  });
+
+  // Sort by volume score descending — highest-volume levels are most institutional
+  const byVolume = [...scoredPivots].sort((a, b) => b.volumeScore - a.volumeScore);
+
   const fallbackLevels =
     kind === "high"
       ? candles.slice(-12).map((candle) => candle.high).sort((left, right) => right - left)
       : candles.slice(-12).map((candle) => candle.low).sort((left, right) => left - right);
   const threshold = Math.max(atr * 0.55, candles[candles.length - 1].close * 0.006);
-  const rawLevels =
-    candidateLevels.length > 0 ? candidateLevels : fallbackLevels.slice(0, 3);
+  const rawLevels = byVolume.length > 0 ? byVolume.map((p) => p.price) : fallbackLevels.slice(0, 3);
   const sorted =
     kind === "high"
       ? [...rawLevels].sort((left, right) => right - left)

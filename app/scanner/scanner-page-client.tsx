@@ -13,7 +13,7 @@ import {
   PLATFORM_META,
   type PlatformKey,
 } from "@/app/_lib/instrument-universe";
-import { getMarketSession } from "@/app/_lib/market-hours";
+import { getMarketSession, getNextSessionOpenLabel } from "@/app/_lib/market-hours";
 import { analyzeAllStale } from "@/app/_lib/workspace-api";
 import type {
   PersistedAssetRecord,
@@ -170,6 +170,7 @@ function LeaderboardRow({
   rank,
   setup,
   view,
+  siggiOpenSymbols,
   onOpenAnalysis,
   onOpenEvents,
 }: {
@@ -177,16 +178,20 @@ function LeaderboardRow({
   rank: number;
   setup: PersistedScannerResult;
   view: ReturnType<typeof buildBotOpportunityView>;
+  siggiOpenSymbols: Set<string>;
   onOpenAnalysis: (setupId: string) => void;
   onOpenEvents: (setupId: string) => void;
 }) {
   const { formatPrice } = useDisplayCurrency();
   const marketSession = getMarketSession(asset);
+  const isClosed = marketSession.state === "Closed" || marketSession.state === "Weekend";
+  const nextOpenLabel = asset && isClosed ? getNextSessionOpenLabel(asset) : null;
+  const siggiInTrade = siggiOpenSymbols.has(view.symbol);
   const universeEntry = getInstrumentUniverseEntry(view.symbol);
   const platforms = universeEntry ? getInstrumentPlatforms(universeEntry) : [];
 
   return (
-    <div className="grid gap-x-3 gap-y-0 border-b border-white/[0.05] px-3 py-3 last:border-b-0 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:items-start">
+    <div className={`grid gap-x-3 gap-y-0 border-b border-white/[0.05] px-3 py-3 last:border-b-0 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:items-start${isClosed ? " opacity-50 grayscale-[40%]" : " scanner-row-live"}`}>
 
       {/* Rank */}
       <div className="flex h-full items-center">
@@ -207,6 +212,11 @@ function LeaderboardRow({
           <span className="rounded-[0.25rem] bg-white/[0.06] px-1.5 py-0.5 text-[0.64rem] font-medium uppercase tracking-wide text-slate-400">
             {view.horizon}
           </span>
+          {siggiInTrade && (
+            <span className="rounded-[0.25rem] bg-cyan-500/15 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide text-cyan-400 ring-1 ring-cyan-500/30">
+              Siggi in trade
+            </span>
+          )}
         </div>
         <p className="mt-1 text-[0.68rem] text-slate-600">{setup.strategy}</p>
       </div>
@@ -284,7 +294,11 @@ function LeaderboardRow({
       {/* Timing */}
       <div className="min-w-0">
         <p className="micro-label">Timing</p>
-        <p className={`mt-1 text-[0.74rem] leading-5 ${view.decision.tone}`}>{view.timingWindow}</p>
+        {nextOpenLabel ? (
+          <p className="mt-1 text-[0.74rem] font-semibold leading-5 text-amber-300">{nextOpenLabel}</p>
+        ) : (
+          <p className={`mt-1 text-[0.74rem] leading-5 ${view.decision.tone}`}>{view.timingWindow}</p>
+        )}
         {(() => {
           if (!setup.analysisUpdatedAt) {
             return (
@@ -293,13 +307,25 @@ function LeaderboardRow({
               </span>
             );
           }
-          const hoursAgo = Math.max(0, Math.round((Date.now() - Date.parse(setup.analysisUpdatedAt)) / 3_600_000));
-          const isStale = hoursAgo >= 6;
+          const minsAgo = Math.max(
+            0,
+            Math.floor((Date.now() - Date.parse(setup.analysisUpdatedAt)) / 60_000),
+          );
+          const ageLabel =
+            minsAgo === 0
+              ? "Just now"
+              : minsAgo < 60
+                ? `${minsAgo} min ago`
+                : `${Math.floor(minsAgo / 60)}h ago`;
+          const badgeTone =
+            minsAgo >= 360
+              ? "bg-red-500/15 text-red-400"
+              : minsAgo >= 30
+                ? "bg-amber-400/10 text-amber-300"
+                : "bg-emerald-500/10 text-emerald-400";
           return (
-            <span className={`mt-1 inline-block rounded-[0.22rem] px-1.5 py-0.5 text-[0.62rem] font-medium ${
-              isStale ? "bg-red-500/15 text-red-400" : hoursAgo >= 2 ? "bg-amber-400/10 text-amber-300" : "bg-emerald-500/10 text-emerald-400"
-            }`}>
-              {hoursAgo === 0 ? "Just analysed" : `Analysed ${hoursAgo}h ago`}
+            <span className={`mt-1 inline-block rounded-[0.22rem] px-1.5 py-0.5 text-[0.62rem] font-medium ${badgeTone}`}>
+              {`Analysed (${ageLabel})`}
             </span>
           );
         })()}
@@ -335,6 +361,7 @@ export default function ScannerPageClient({
   marketEvents,
   initialScannerResults,
   predictionHistory,
+  siggiOpenSymbols: siggiOpenSymbolsArray,
 }: {
   assets: PersistedAssetRecord[];
   backtests: PersistedBacktestRecord[];
@@ -344,15 +371,26 @@ export default function ScannerPageClient({
   marketEvents: PersistedMarketEvent[];
   initialScannerResults: PersistedScannerResult[];
   predictionHistory: PersistedPredictionHistoryRecord[];
+  siggiOpenSymbols: string[];
 }) {
   const router = useRouter();
   const { formatPrice } = useDisplayCurrency();
   const [analysisSetupId, setAnalysisSetupId] = useState<string | null>(null);
   const [eventsSetupId, setEventsSetupId] = useState<string | null>(null);
+  const PAGE_SIZE = 50;
   const [activeTab, setActiveTab] = useState<MarketTab>("All");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const [refreshStatus, setRefreshStatus] = useState<string | null>(null);
   const refreshStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const siggiOpenSymbolsSet = useMemo(() => new Set(siggiOpenSymbolsArray), [siggiOpenSymbolsArray]);
+
+  // Minute-resolution tick so analysis staleness badges stay accurate without a full refresh
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setMinuteTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   function handleRefreshAll() {
     if (isRefreshing) return;
@@ -361,7 +399,7 @@ export default function ScannerPageClient({
       setRefreshStatus("Re-analysing all opportunities...");
 
       try {
-        const result = await analyzeAllStale(10);
+        const result = await analyzeAllStale();
         const count = result.analysed ?? 0;
         setRefreshStatus(
           count > 0
@@ -423,8 +461,7 @@ export default function ScannerPageClient({
             predictionHistory,
           ),
         }))
-        .sort((left, right) => right.view.rankScore - left.view.rankScore)
-        .slice(0, 50),
+        .sort((left, right) => right.view.rankScore - left.view.rankScore),
     [assetsBySymbol, backtests, confirmationChecks, initialScannerResults, marketEvents, predictionHistory],
   );
 
@@ -446,7 +483,13 @@ export default function ScannerPageClient({
     return buckets;
   }, [rankedViews]);
 
-  const visibleRows = tabbedRows[activeTab].slice(0, 50);
+  // Reset to page 1 whenever the tab changes
+  useEffect(() => { setCurrentPage(1); }, [activeTab]);
+
+  const tabRows = tabbedRows[activeTab];
+  const totalPages = Math.max(1, Math.ceil(tabRows.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const visibleRows = tabRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const selectedAnalysisItem =
     rankedViews.find((item) => item.setup.id === analysisSetupId) ?? null;
@@ -471,10 +514,10 @@ export default function ScannerPageClient({
   const selectedEventsAsset = selectedEventsItem
     ? assetsBySymbol.get(selectedEventsItem.setup.symbol) ?? null
     : null;
-  const readyNowCount = visibleRows.filter(
+  const readyNowCount = tabRows.filter(
     (item) => item.view.decision.label === "ENTER NOW" && item.view.readiness >= 75,
   ).length;
-  const shortTermCount = visibleRows.filter((item) => item.view.horizon !== "Month").length;
+  const shortTermCount = tabRows.filter((item) => item.view.horizon !== "Month").length;
 
   return (
     <>
@@ -520,8 +563,10 @@ export default function ScannerPageClient({
           <div className="grid gap-[5px] sm:grid-cols-3">
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="micro-label">{activeTab}</p>
-              <p className="mt-1.5 text-[0.96rem] font-semibold text-white">{visibleRows.length}</p>
-              <p className="mt-1 text-[0.76rem] text-slate-400">Ranked in the active market tab</p>
+              <p className="mt-1.5 text-[0.96rem] font-semibold text-white">{tabRows.length}</p>
+              <p className="mt-1 text-[0.76rem] text-slate-400">
+                {totalPages > 1 ? `Page ${safePage} of ${totalPages} · ` : ""}Ranked opportunities
+              </p>
             </div>
             <div className="signal-surface-soft rounded-[0.4rem] p-3">
               <p className="micro-label">Short-term focus</p>
@@ -571,14 +616,67 @@ export default function ScannerPageClient({
               <LeaderboardRow
                 key={setup.id}
                 asset={asset}
-                rank={index + 1}
+                rank={(safePage - 1) * PAGE_SIZE + index + 1}
                 setup={setup}
                 view={view}
+                siggiOpenSymbols={siggiOpenSymbolsSet}
                 onOpenAnalysis={setAnalysisSetupId}
                 onOpenEvents={setEventsSetupId}
               />
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-white/6 px-3 py-2.5">
+              <p className="text-[0.72rem] text-slate-500">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, tabRows.length)} of {tabRows.length} opportunities
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="flex h-7 items-center gap-1 rounded-[0.35rem] px-2.5 text-[0.72rem] font-semibold transition signal-surface-soft text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ← Prev
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("…");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === "…" ? (
+                      <span key={`ellipsis-${i}`} className="px-1 text-[0.72rem] text-slate-600">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setCurrentPage(p as number)}
+                        className={`h-7 min-w-[1.75rem] rounded-[0.35rem] px-2 text-[0.72rem] font-semibold transition ${
+                          p === safePage
+                            ? "signal-button"
+                            : "signal-surface-soft text-white hover:bg-white/[0.08]"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="flex h-7 items-center gap-1 rounded-[0.35rem] px-2.5 text-[0.72rem] font-semibold transition signal-surface-soft text-white disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </Panel>
       </div>
 

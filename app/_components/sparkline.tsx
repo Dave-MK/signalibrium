@@ -1,56 +1,47 @@
 type SparklineProps = {
-  data: number[];
+  data: number[] | undefined;
   className?: string;
-  color?: string;
 };
 
-function buildPoints(data: number[]) {
-  if (data.length === 0) {
-    return "";
+export function Sparkline({ data, className = "" }: SparklineProps) {
+  if (!data || data.length < 2) {
+    return <div className={`rounded-sm bg-white/[0.03] ${className}`} />;
   }
 
-  const max = Math.max(...data);
   const min = Math.min(...data);
+  const max = Math.max(...data);
   const range = max - min || 1;
+  const width = 200;
+  const height = 40;
+  const points = data.map((value, index) => {
+    const x = (index / (data.length - 1)) * width;
+    const y = height - ((value - min) / range) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
 
-  return data
-    .map((value, index) => {
-      const x = (index / (data.length - 1 || 1)) * 100;
-      const y = 100 - ((value - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(" ");
-}
+  const isUp = (data.at(-1) ?? 0) >= (data[0] ?? 0);
+  const strokeColor = isUp ? "#34d399" : "#f59e0b";
+  const fillStart = isUp ? "rgba(52,211,153,0.12)" : "rgba(245,158,11,0.12)";
 
-export function Sparkline({
-  data,
-  className = "",
-  color = "url(#signalGradient)",
-}: SparklineProps) {
-  const points = buildPoints(data);
+  const polyline = points.join(" ");
+  const lastPoint = points.at(-1) ?? `${width},${height / 2}`;
+  const fillPath = `M0,${height} L${polyline} L${lastPoint.split(",")[0]},${height} Z`;
 
   return (
     <svg
-      aria-hidden="true"
-      className={className}
-      viewBox="0 0 100 100"
+      viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
+      className={className}
+      aria-hidden="true"
     >
       <defs>
-        <linearGradient id="signalGradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#00E5FF" />
-          <stop offset="50%" stopColor="#256BFF" />
-          <stop offset="100%" stopColor="#7C3AED" />
+        <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <polyline
-        fill="none"
-        points={points}
-        stroke={color}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3.5"
-      />
+      <path d={fillPath} fill="url(#spark-fill)" />
+      <polyline points={polyline} fill="none" stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

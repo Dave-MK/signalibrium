@@ -142,6 +142,26 @@ export function ActionLink({
   );
 }
 
+export function SummaryCard({
+  label,
+  value,
+  detail,
+  tone = "text-white",
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+}) {
+  return (
+    <div className="signal-surface-soft rounded-[0.4rem] p-3">
+      <p className="micro-label">{label}</p>
+      <p className={`mt-1.5 text-[0.96rem] font-semibold ${tone}`}>{value}</p>
+      <p className="mt-1 text-[0.76rem] leading-5 text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
 export function KeyValue({
   label,
   value,

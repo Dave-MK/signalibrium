@@ -3,7 +3,8 @@ import { summarizePredictionAccuracy } from "@/app/_lib/bot-engine";
 import { formatDateTimeLabel, formatPercent } from "@/app/_lib/format";
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
-import { PageHeader, Panel, StatusChip } from "../_components/ui";
+import { PageHeader, Panel, StatusChip, SummaryCard } from "../_components/ui";
+import { PredictionResetButton } from "./prediction-reset-button";
 
 function ResolutionEvidence({ text }: { text: string | null }) {
   if (!text) {
@@ -13,26 +14,6 @@ function ResolutionEvidence({ text }: { text: string | null }) {
   return <p className="mt-1 text-[0.72rem] leading-4 text-cyan-200">{text}</p>;
 }
 
-function SummaryCell({
-  label,
-  value,
-  detail,
-  tone = "text-white",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: string;
-}) {
-  return (
-    <div className="signal-surface-soft rounded-[0.4rem] p-3">
-      <p className="micro-label">{label}</p>
-      <p className={`mt-1.5 text-[0.98rem] font-semibold ${tone}`}>{value}</p>
-      <p className="mt-1 text-[0.76rem] leading-5 text-slate-400">{detail}</p>
-    </div>
-  );
-}
-
 export default async function HistoryPage() {
   const [predictionHistory, displayCurrencyState] = await Promise.all([
     listPredictionHistory(),
@@ -40,10 +21,10 @@ export default async function HistoryPage() {
   ]);
   const accuracy = summarizePredictionAccuracy(predictionHistory);
   const bestCalls = predictionHistory
-    .filter((item) => item.outcomeAccuracy === "Accurate")
+    .filter((item) => item.outcome === "Hit Target")
     .slice(0, 4);
   const misses = predictionHistory
-    .filter((item) => item.outcomeAccuracy === "Inaccurate")
+    .filter((item) => item.outcome === "Stopped")
     .slice(0, 4);
   const activeCalls = predictionHistory
     .filter((item) => item.monitoringStatus === "Active")
@@ -54,12 +35,13 @@ export default async function HistoryPage() {
     <div className="panel-stack-5">
       <PageHeader
         title="Prediction replay"
-        description="Check how recent enter-now and wait calls actually played out."
+        description="Check how recent enter-now and wait calls actually played out. Only calls that hit target or stopped out count toward accuracy."
+        action={<PredictionResetButton />}
       />
 
       <Panel className="p-3 sm:p-3.5">
         <div className="grid gap-[5px] sm:grid-cols-4">
-          <SummaryCell
+          <SummaryCard
             label="Live accuracy"
             value={accuracy.liveAccuracy !== null ? `${accuracy.liveAccuracy}%` : "Insufficient data"}
             detail={
@@ -69,19 +51,19 @@ export default async function HistoryPage() {
             }
             tone="text-emerald-300"
           />
-          <SummaryCell
+          <SummaryCard
             label="Backtest / seed accuracy"
             value={`${accuracy.seedAccuracy}%`}
             detail={`${accuracy.seedResolved} seeded or replay signals — not counted in live rate`}
             tone="text-amber-300"
           />
-          <SummaryCell
+          <SummaryCard
             label="Recent accuracy"
             value={`${accuracy.recentAccuracy}%`}
             detail="Last 12 resolved predictions (all sources)"
             tone="text-cyan-200"
           />
-          <SummaryCell
+          <SummaryCard
             label="Tracked predictions"
             value={`${predictionHistory.length}`}
             detail={`${ambiguousCalls.length} same-candle clashes logged as ambiguous, not counted as wins or losses`}

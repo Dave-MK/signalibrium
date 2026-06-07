@@ -284,7 +284,7 @@ function getRelevantEvents(events: PersistedMarketEvent[], symbol: string) {
   return [...events]
     .filter((event) => event.relatedSymbols.includes(symbol) || event.scope === "Macro")
     .sort((left, right) => eventSortWeight(right, symbol) - eventSortWeight(left, symbol))
-    .slice(0, 2);
+    .slice(0, 4);
 }
 
 function getHoursUntil(timestamp: string) {
@@ -499,7 +499,8 @@ function buildEventRead(
   symbol: string,
   direction: "Bullish" | "Bearish" | "Neutral",
 ): EventRead {
-  const [primaryEvent] = getRelevantEvents(events, symbol);
+  const allRelevantEvents = getRelevantEvents(events, symbol);
+  const [primaryEvent] = allRelevantEvents;
 
   if (!primaryEvent) {
     return {
@@ -527,6 +528,30 @@ function buildEventRead(
             (primaryEvent.bias === "Bearish" && direction === "Bearish")
           ? "Tailwind"
           : "Headwind";
+
+  // Multi-event consensus: do secondary events reinforce or conflict with the trade direction?
+  // Aligned pile-on boosts conviction; conflicting events add uncertainty and erode confidence.
+  const secondaryEvents = allRelevantEvents.slice(1);
+  const alignedSecondary = secondaryEvents.filter((ev) => {
+    const evBias = ev.bias;
+    return direction !== "Neutral" &&
+      ((evBias === "Bullish" && direction === "Bullish") ||
+       (evBias === "Bearish" && direction === "Bearish"));
+  }).length;
+  const conflictingSecondary = secondaryEvents.filter((ev) => {
+    const evBias = ev.bias;
+    return direction !== "Neutral" &&
+      ((evBias === "Bullish" && direction === "Bearish") ||
+       (evBias === "Bearish" && direction === "Bullish"));
+  }).length;
+  const consensusBonus = alignedSecondary > 0 && conflictingSecondary === 0 ? 2 : 0;
+  const consensusPenalty = conflictingSecondary > 0 ? conflictingSecondary * 3 : 0;
+  const consensusSummaryAppend =
+    alignedSecondary > 0 && conflictingSecondary === 0
+      ? " Multiple events are aligned with this trade direction."
+      : conflictingSecondary > 0
+        ? " Note: other scheduled events conflict with this direction."
+        : "";
 
   const schedule = formatEventSchedule(primaryEvent);
   const hoursUntilEvent = getHoursUntil(primaryEvent.startsAt);
@@ -607,7 +632,7 @@ function buildEventRead(
         : "This raises uncertainty, so Siggi wants extra confirmation before leaning hard.";
 
   return {
-    confidenceDelta,
+    confidenceDelta: confidenceDelta + consensusBonus - consensusPenalty,
     entryGuidance,
     effect: `${primaryEvent.title} is ${schedule.toLowerCase()} and ${directionalRead}`,
     forceWait,
@@ -615,7 +640,7 @@ function buildEventRead(
     likelihood,
     move,
     schedule,
-    summary: `${primaryEvent.summary} ${directionalRead}`.trim(),
+    summary: (`${primaryEvent.summary} ${directionalRead}`.trim() + consensusSummaryAppend).trim(),
     timingPenalty,
     tone: alignment,
     windowSummary:
@@ -939,6 +964,22 @@ export function buildBotOpportunityView(
   const structureScore = clamp(Math.round(setup.score * 0.88), 40, 95);
   const riskDisciplineScore = clamp(100 - Math.round(setup.riskScore * 1.15), 22, 96);
   const readiness = buildReadinessScore(currentPrice, setup, decision, eventRead, freshnessScore);
+
+  // Stop quality penalty — a stop placed in open air (not anchored near a confirmed
+  // support or resistance level) is structurally weak. ATR is estimated from the entry
+  // zone width since the raw ATR value isn't stored on the analysis snapshot.
+  const stopQualityPenalty = (() => {
+    if (!setup.analysis) return 0;
+    const { stopLevel, supportLevels, resistanceLevels, entryZone } = setup.analysis.chartAnnotations;
+    if (!Number.isFinite(stopLevel)) return 0;
+    const estimatedAtr = Math.max((entryZone.high - entryZone.low) * 2.5, stopLevel * 0.008);
+    const halfAtr = estimatedAtr * 0.5;
+    const anchors = direction === "Bearish" ? resistanceLevels : supportLevels;
+    if (anchors.length === 0) return -3; // no structural levels at all
+    const nearestAnchorDistance = Math.min(...anchors.map((level) => Math.abs(level - stopLevel)));
+    return nearestAnchorDistance > halfAtr ? -6 : 0;
+  })();
+
   const preCalibrationConfidence =
     14 +
     Math.round(structureScore * 0.28) +
@@ -951,7 +992,8 @@ export function buildBotOpportunityView(
     Math.round(validationRead.score * 0.08) +
     freshnessScore +
     getTradeabilityScore(setup.tradeability) +
-    eventRead.confidenceDelta;
+    eventRead.confidenceDelta +
+    stopQualityPenalty;
 
   const calibrationRead = buildConfidenceCalibrationRead({
     asset,
@@ -996,7 +1038,7 @@ export function buildBotOpportunityView(
   const scoreBreakdown: BotScoreBreakdownItem[] = [
     {
       detail: setup.analysis
-        ? `${setup.strategy} structure looks ${setup.analysis.bias.toLowerCase()} and ${formatWindow(freshnessHours)}.`
+        ? `${setup.strategy} structure looks ${setup.analysis.bias.toLowerCase()} and ${formatWindow(freshnessHours)}.${stopQualityPenalty < 0 ? " Stop placement is in open air without nearby structural support — confidence trimmed." : ""}`
         : `Base ranking comes from the ${setup.strategy} setup score while fresh chart analysis is still pending.`,
       label: "Structure",
       score: structureScore,
@@ -1171,7 +1213,7 @@ export function summarizePredictionAccuracy(
   );
   const recent = resolved.slice(0, 12);
   const accurate = resolved.filter((item) => item.outcome === "Hit Target");
-  const recentAccurate = recent.filter((item) => item.outcomeAccuracy === "Accurate");
+  const recentAccurate = recent.filter((item) => item.outcome === "Hit Target");
 
   // Live accuracy: only signals resolved by an actual paper trade
   const liveResolved = resolved.filter((item) => item.resolvedSource === "live_trade");

@@ -1,5 +1,6 @@
 import { buildCurrencyRates } from "@/app/_lib/currency";
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
+import { getMarketSession, isApproachingMarketClose } from "@/app/_lib/market-hours";
 import type {
   PersistedAssetRecord,
   PersistedPredictionHistoryRecord,
@@ -13,6 +14,21 @@ import type {
 // Risk discipline is preserved (2% per trade, 5% reserve) but the old penny-ante
 // caps that prevented him from acting on good signals have been removed.
 const maximumConcurrentTrades = 20;   // was 5 — Siggi can now run as many as he qualifies for
+
+// Cross-asset correlation groups — instruments within a group tend to move together.
+// Opening multiple highly-correlated positions concentrates portfolio risk without
+// adding genuine diversification. Siggi caps each group at 2 open trades.
+const CORRELATION_GROUPS: Record<string, string[]> = {
+  "crypto-btc": ["BTC/USD", "BTCUSD", "BTC/USDT", "BTCUSDT", "XBTUSD"],
+  "crypto-major": ["ETH/USD", "ETHUSD", "SOL/USD", "SOLUSD", "BNB/USD", "BNBUSD", "ETH/USDT", "SOL/USDT"],
+  "us-big-tech": ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META"],
+  "us-indices": ["SPX500", "US500", "SP500", "NASDAQ100", "NDX", "QQQ", "SPY", "NAS100", "US100"],
+  "precious-metals": ["GOLD", "XAU/USD", "XAUUSD", "SILVER", "XAG/USD", "XAGUSD"],
+  "energy": ["WTI", "USOIL", "BRENT", "UKOIL", "OIL", "CL=F"],
+  "gbp-pairs": ["GBP/USD", "GBPUSD", "GBP/EUR", "GBPEUR", "GBP/JPY", "GBPJPY"],
+  "eur-pairs": ["EUR/USD", "EURUSD", "EUR/JPY", "EURJPY", "EUR/GBP", "EURGBP"],
+};
+const maxTradesPerCorrelationGroup = 2;
 const maxRiskPerTrade = 0.02;          // 2% per trade — unchanged (this is sensible risk management)
 const minCashReserveRatio = 0.05;      // was 0.20 — only 5% buffer needed; 95% can be deployed
 const maxPortfolioHeatRatio = 0.40;    // was 0.06 — up to 40% of equity at open risk at once
@@ -66,14 +82,60 @@ function buildActivity(input: {
   } satisfies PersistedSiggiActivity;
 }
 
-function buildTradeNarrative(record: PersistedPredictionHistoryRecord) {
-  return [
-    `${record.symbol} ${record.actionAtCall} call locked from ${record.timeframe} / ${record.horizon}.`,
-    record.patternSnapshotAtCall,
-    record.eventContextAtCall,
-  ]
-    .filter(Boolean)
-    .join(" ");
+/**
+ * Counts how many of the most-recent closed trades ended as a loss
+ * (Stopped), stopping as soon as a win (Hit Target) is hit.
+ * closedTrades is newest-first so this naturally counts the current streak.
+ */
+function computeConsecutiveLosses(account: PersistedSiggiAccount): number {
+  let count = 0;
+  for (const trade of account.closedTrades) {
+    if (trade.status === "Stopped") {
+      count++;
+    } else if (trade.status === "Hit Target") {
+      break;
+    }
+  }
+  return count;
+}
+
+/**
+ * Generates a trader-voice narrative for the trade card on Siggi's page.
+ * Sounds like a real person describing their thinking, not a log entry.
+ */
+function buildTradeNarrative(
+  record: PersistedPredictionHistoryRecord,
+  view: ReturnType<typeof buildBotOpportunityView>,
+  rr: number,
+  effectiveMaxRisk: number,
+): string {
+  // Deterministic word choice so the same trade always reads the same
+  const seed = record.id.charCodeAt(record.id.length - 1) % 4;
+  const openPhrase =
+    record.actionAtCall === "SELL"
+      ? (["Fading", "Shorting", "Taking the short on", "Selling"][seed])
+      : (["Stepping into", "Going long on", "Buying", "Entering long on"][seed]);
+
+  const convictionLine =
+    view.confidence >= 88
+      ? "High conviction here."
+      : view.confidence >= 78
+        ? "Good edge, worth the risk."
+        : "Setup passes the bar — taking it.";
+
+  const patternNote = record.patternSnapshotAtCall
+    ? ` ${record.patternSnapshotAtCall}.`
+    : "";
+
+  const eventNote =
+    record.eventContextAtCall && view.eventTone !== "Clear"
+      ? ` Event lean: ${record.eventContextAtCall}.`
+      : "";
+
+  const priceDP = record.stopPriceAtCall < 10 ? 4 : record.stopPriceAtCall < 1000 ? 2 : 0;
+  const levelsLine = ` Stop at ${record.stopPriceAtCall.toFixed(priceDP)}, target ${record.targetPriceAtCall.toFixed(priceDP)} — ${rr.toFixed(1)}R. Risking ${(effectiveMaxRisk * 100).toFixed(1)}% of equity.`;
+
+  return `${openPhrase} ${record.symbol} ${record.actionAtCall === "SELL" ? "short" : "long"} on the ${record.timeframe}. ${convictionLine}${patternNote}${eventNote}${levelsLine}`.trim();
 }
 
 function computeTotalEquityGbp(account: PersistedSiggiAccount) {
@@ -149,6 +211,20 @@ function collapseDuplicateOpenTrades(account: PersistedSiggiAccount, syncedAt: s
   );
 }
 
+/**
+ * Returns the correlation group key for a given symbol, or null if none.
+ * Used to prevent Siggi from doubling up on highly-correlated positions.
+ */
+function getCorrelationGroup(symbol: string): string | null {
+  const upper = symbol.toUpperCase().replace(/\s/g, "");
+  for (const [group, members] of Object.entries(CORRELATION_GROUPS)) {
+    if (members.some((m) => m.toUpperCase().replace(/\s/g, "") === upper)) {
+      return group;
+    }
+  }
+  return null;
+}
+
 const minConfidence = 68;
 const minReadiness = 72;
 const minRiskReward = 1.5;
@@ -185,6 +261,7 @@ const maxTradeHoldHours: Record<string, number> = { Day: 36, Week: 96, Month: 19
 function shouldOpenTrade(input: {
   account: PersistedSiggiAccount;
   analysisAgeHours: number;
+  asset: PersistedAssetRecord | null;
   assetRegime: string | null;
   nowMs: number;
   record: PersistedPredictionHistoryRecord;
@@ -198,6 +275,43 @@ function shouldOpenTrade(input: {
         input.view.timingWindow ||
         `${input.record.symbol} is not enter-now yet — Siggi is watching rather than forcing the trade.`,
     };
+  }
+
+  // ── Real-price gate ──────────────────────────────────────────────────────
+  // Siggi only trades when all price levels are valid real market prices.
+  // This prevents opening a position on stale, zeroed, or synthetically-derived
+  // data — all three levels must be positive, finite, and directionally correct.
+  const { entryLowAtCall, entryHighAtCall, stopPriceAtCall, targetPriceAtCall } = input.record;
+  const entryMid = (entryLowAtCall + entryHighAtCall) / 2;
+  const isBuy  = input.record.actionAtCall === "BUY";
+  const isSell = input.record.actionAtCall === "SELL";
+  const levelsOk =
+    Number.isFinite(entryMid)   && entryMid   > 0 &&
+    Number.isFinite(stopPriceAtCall)   && stopPriceAtCall   > 0 &&
+    Number.isFinite(targetPriceAtCall) && targetPriceAtCall > 0;
+  const directionOk =
+    !levelsOk ? false :
+    isBuy  ? (stopPriceAtCall < entryMid && targetPriceAtCall > entryMid) :
+    isSell ? (stopPriceAtCall > entryMid && targetPriceAtCall < entryMid) :
+    false;
+  if (!levelsOk || !directionOk) {
+    return {
+      allow: false,
+      reason: `${input.record.symbol} price levels are not valid — entry ${entryMid.toFixed(4)}, stop ${stopPriceAtCall.toFixed(4)}, target ${targetPriceAtCall.toFixed(4)}. Siggi will not trade until real levels are confirmed.`,
+    };
+  }
+
+  // Asset price must be live and in the right ballpark of the entry zone
+  if (input.asset) {
+    const livePrice = input.asset.price;
+    const zoneRange = entryHighAtCall - entryLowAtCall;
+    const tolerance = Math.max(zoneRange * 3, entryMid * 0.02); // 2% of price or 3× zone width
+    if (Math.abs(livePrice - entryMid) > tolerance) {
+      return {
+        allow: false,
+        reason: `${input.record.symbol} live price ${livePrice.toFixed(4)} has moved too far from the entry zone ${entryLowAtCall.toFixed(4)}–${entryHighAtCall.toFixed(4)} — Siggi will wait for a fresh signal.`,
+      };
+    }
   }
 
   if (input.view.confidence < minConfidence) {
@@ -276,6 +390,44 @@ function shouldOpenTrade(input: {
     };
   }
 
+  // Market-open gate: never open a new trade on a currently closed market.
+  // This covers weekend FX, after-hours equities, and any other session gap.
+  // An already-open trade is unaffected — only entry is blocked here.
+  if (input.asset) {
+    const session = getMarketSession(input.asset);
+    if (session.state === "Closed" || session.state === "Weekend") {
+      return {
+        allow: false,
+        reason: `${input.record.symbol} market is ${session.state.toLowerCase()} right now — Siggi will not open a new position until the session reopens.`,
+      };
+    }
+  }
+
+  // Session-close gate: don't open Day trades when the market is about to close
+  if (input.record.horizon === "Day" && input.asset) {
+    if (isApproachingMarketClose(input.asset, 45)) {
+      return {
+        allow: false,
+        reason: `${input.record.symbol} market closes in under 45 minutes — not enough runway left in the session for a Day trade to play out properly.`,
+      };
+    }
+  }
+
+  // Anti-tilt gate: after 3 consecutive losses Siggi gets more selective; after 5 he pauses
+  const consecutiveLosses = computeConsecutiveLosses(input.account);
+  if (consecutiveLosses >= 5 && input.view.confidence < 88) {
+    return {
+      allow: false,
+      reason: `${input.record.symbol} skipped — ${consecutiveLosses} losses in a row is a tilt signal. Siggi is sitting on his hands until confidence clears 88% (currently ${input.view.confidence}%).`,
+    };
+  }
+  if (consecutiveLosses >= 3 && input.view.confidence < 80) {
+    return {
+      allow: false,
+      reason: `${input.record.symbol} skipped — ${consecutiveLosses} consecutive stops. Raising the confidence floor to 80% while the streak is live (currently ${input.view.confidence}%).`,
+    };
+  }
+
   // Minimum free cash = 0.5% of total equity (scales with account size)
   const minimumFreeCashToTradeGbp = Math.max(10, computeTotalEquityGbp(input.account) * 0.005);
   if (input.account.cashBalanceGbp < minimumFreeCashToTradeGbp) {
@@ -337,7 +489,7 @@ function openSiggiTrade(input: {
     return input.account;
   }
 
-  // Tier 3 — volatility-adjusted and drawdown-throttled risk sizing
+  // Tier 3 — volatility-adjusted, drawdown-throttled, confidence-weighted, anti-tilt risk sizing
   const volatilityMultiplier =
     input.asset?.volatility === "Fast" ? 0.75
     : input.asset?.volatility === "Elevated" ? 0.875
@@ -345,7 +497,13 @@ function openSiggiTrade(input: {
   const highWatermark = Math.max(input.account.highWatermarkGbp, totalEquityGbp);
   const drawdownFromPeak = highWatermark > 0 ? (highWatermark - totalEquityGbp) / highWatermark : 0;
   const drawdownMultiplier = drawdownFromPeak > 0.08 ? 0.5 : 1.0;
-  const effectiveMaxRisk = maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier;
+  // Scale between 0.85× (min confidence) and 1.20× (95%+ confidence)
+  const confidenceRange = Math.max(0, Math.min(1, (input.view.confidence - minConfidence) / (95 - minConfidence)));
+  const confidenceMultiplier = 0.85 + confidenceRange * 0.35;
+  // Anti-tilt: halve risk after 3 consecutive losses, cap at 40% after 5+
+  const consecutiveLosses = computeConsecutiveLosses(input.account);
+  const antiTiltMultiplier = consecutiveLosses >= 5 ? 0.4 : consecutiveLosses >= 3 ? 0.6 : 1.0;
+  const effectiveMaxRisk = maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier * confidenceMultiplier * antiTiltMultiplier;
 
   // Risk-based sizing: stake = riskAmount / stopDistance
   const riskAmount = totalEquityGbp * effectiveMaxRisk;
@@ -369,9 +527,10 @@ function openSiggiTrade(input: {
       ? (entryPrice - openingMarkPrice) * quantity
       : (openingMarkPrice - entryPrice) * quantity;
   const openingUnrealizedPnlGbp = openingUnrealizedPnlUsd * input.usdToGbpRate;
+  const rr = computeRiskReward(input.record);
   const riskNote =
-    volatilityMultiplier < 1 || drawdownMultiplier < 1
-      ? ` [Reduced: volatility×${volatilityMultiplier}, drawdown×${drawdownMultiplier}]`
+    volatilityMultiplier < 1 || drawdownMultiplier < 1 || antiTiltMultiplier < 1
+      ? ` [Size reduced: vol×${volatilityMultiplier} dd×${drawdownMultiplier} tilt×${antiTiltMultiplier}]`
       : "";
   const trade: PersistedSiggiTrade = {
     id: `siggi-trade-${input.record.id}`,
@@ -400,7 +559,7 @@ function openSiggiTrade(input: {
     realizedPnlGbp: null,
     realizedPnlUsd: null,
     lastMarkedAt: input.syncedAt,
-    narrative: `${buildTradeNarrative(input.record)} ${input.view.priorityReason} [Stake £${roundMoney(stakeGbp).toFixed(2)} = ${(effectiveMaxRisk * 100).toFixed(1)}% risk on £${totalEquityGbp.toFixed(2)} equity, stop distance ${(stopDistanceRatio * 100).toFixed(2)}%${riskNote}]`.trim(),
+    narrative: `${buildTradeNarrative(input.record, input.view, rr, effectiveMaxRisk)}${riskNote} [Stake £${roundMoney(stakeGbp).toFixed(2)} / equity £${totalEquityGbp.toFixed(2)}]`.trim(),
     createdAt: input.syncedAt,
     updatedAt: input.syncedAt,
   };
@@ -413,11 +572,13 @@ function openSiggiTrade(input: {
     updatedAt: input.syncedAt,
   };
 
+  const rrLabel = rr.toFixed(1);
+  const tiltNote = consecutiveLosses >= 3 ? ` (${consecutiveLosses}-loss streak — sizing down to ${(antiTiltMultiplier * 100).toFixed(0)}%)` : "";
   return appendActivity(
     nextAccount,
     buildActivity({
       at: input.syncedAt,
-      detail: `Opened ${trade.symbol} ${trade.side} from a ${input.view.confidence}% / ${input.view.readiness}% ranked enter-now setup.`,
+      detail: `${trade.side === "SELL" ? "Short" : "Long"} ${trade.symbol} — ${input.view.confidence}% confidence, ${rrLabel}R setup, £${roundMoney(stakeGbp).toFixed(2)} stake. ${input.view.priorityReason}${tiltNote}`,
       symbol: trade.symbol,
       type: "Opened",
     }),
@@ -470,15 +631,57 @@ function closeSiggiTrade(input: {
     updatedAt: input.syncedAt,
   };
 
+  const pnlStr = `${totalRealizedPnlGbp >= 0 ? "+" : ""}£${Math.abs(totalRealizedPnlGbp).toFixed(2)}`;
+  const partialNote = closedTrade.partialExitDone ? " (half already locked at 1:1)" : "";
+  const winDetail = `${closedTrade.symbol} hit the target — ${pnlStr}${partialNote}. Thesis played out.`;
+  const lossDetail = `${closedTrade.symbol} stopped out — ${pnlStr}${partialNote}. Thesis invalidated, moving on.`;
   return appendActivity(
     nextAccount,
     buildActivity({
       at: input.syncedAt,
-      detail:
-        input.closeReason === "Hit Target"
-          ? `${closedTrade.symbol} hit target for ${totalRealizedPnlGbp >= 0 ? "+" : ""}GBP ${Math.abs(totalRealizedPnlGbp).toFixed(2)}${closedTrade.partialExitDone ? " (includes partial exit)" : ""}.`
-          : `${closedTrade.symbol} stopped out for ${totalRealizedPnlGbp >= 0 ? "+" : ""}GBP ${Math.abs(totalRealizedPnlGbp).toFixed(2)}${closedTrade.partialExitDone ? " (partial exit already banked)" : ""}.`,
+      detail: input.closeReason === "Hit Target" ? winDetail : lossDetail,
       symbol: closedTrade.symbol,
+      type: "Closed",
+    }),
+  );
+}
+
+/**
+ * Void a trade that was erroneously opened while the market was closed.
+ * Returns the full stake with zero P&L — the position never should have existed.
+ */
+function voidBadTrade(input: {
+  account: PersistedSiggiAccount;
+  trade: PersistedSiggiTrade;
+  syncedAt: string;
+}): PersistedSiggiAccount {
+  const closedTrade: PersistedSiggiTrade = {
+    ...input.trade,
+    status: "Stopped",
+    closedAt: input.syncedAt,
+    currentPriceUsd: input.trade.entryPrice,
+    unrealizedPnlUsd: 0,
+    unrealizedPnlGbp: 0,
+    realizedPnlUsd: 0,
+    realizedPnlGbp: 0,
+    lastMarkedAt: input.syncedAt,
+    updatedAt: input.syncedAt,
+  };
+  const nextAccount: PersistedSiggiAccount = {
+    ...input.account,
+    // Stake returned in full — no gain, no loss
+    cashBalanceGbp: roundMoney(input.account.cashBalanceGbp + input.trade.stakeGbp),
+    openTrades: input.account.openTrades.filter((t) => t.id !== input.trade.id),
+    closedTrades: [closedTrade, ...input.account.closedTrades].slice(0, 180),
+    lastEvaluatedAt: input.syncedAt,
+    updatedAt: input.syncedAt,
+  };
+  return appendActivity(
+    nextAccount,
+    buildActivity({
+      at: input.syncedAt,
+      detail: `${input.trade.symbol} was opened while the market was closed — trade voided and full stake returned. No P&L impact.`,
+      symbol: input.trade.symbol,
       type: "Closed",
     }),
   );
@@ -772,6 +975,16 @@ export function syncSiggiAccountWithOptions(
     const record = recordsById.get(trade.predictionId);
     let closeReason: "Hit Target" | "Stopped" | null = null;
 
+    // Void trades that were opened erroneously while the market was closed.
+    // This cleans up any pre-fix stale positions — stake is returned at no P&L.
+    if (asset) {
+      const sessionAtOpen = getMarketSession(asset, new Date(trade.openedAt));
+      if (sessionAtOpen.state === "Closed" || sessionAtOpen.state === "Weekend") {
+        account = voidBadTrade({ account, trade, syncedAt });
+        continue;
+      }
+    }
+
     if (asset) {
       account = maybePartialExit({
         account,
@@ -926,6 +1139,21 @@ export function syncSiggiAccountWithOptions(
         }
       }
 
+      // Tier 3 — cross-asset correlation filter
+      // If 2+ open trades already sit in the same correlation cluster, skip this
+      // candidate. Adding a third correlated position doesn't diversify risk — it
+      // concentrates it behind a single macro narrative.
+      const candidateGroup = getCorrelationGroup(candidate.setup.symbol);
+      if (candidateGroup !== null) {
+        const groupCount = account.openTrades.filter(
+          (t) => getCorrelationGroup(t.symbol) === candidateGroup,
+        ).length;
+
+        if (groupCount >= maxTradesPerCorrelationGroup) {
+          continue;
+        }
+      }
+
       const record = data.predictionHistory.find(
         (item) =>
           item.sourceScannerResultId === candidate.setup.id &&
@@ -947,6 +1175,7 @@ export function syncSiggiAccountWithOptions(
       const tradeDecision = shouldOpenTrade({
         account,
         analysisAgeHours,
+        asset: candidate.asset,
         assetRegime: candidate.asset?.regime ?? null,
         nowMs,
         record,
