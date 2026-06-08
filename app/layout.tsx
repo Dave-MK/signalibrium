@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     "Siggi monitors markets, weighs event-aware analysis, and helps with visual chart review and short-term trade timing.",
 };
-// This is currently an async server component because it needs to fetch the display currency and market snapshot before rendering the app shell. In the future, we may want to refactor this to be a client component and fetch this data on the client side instead, to improve performance and reduce server load.
+// Layout
 export default async function RootLayout({
   children,
 }: Readonly<{
