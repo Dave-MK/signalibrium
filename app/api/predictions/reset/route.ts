@@ -7,29 +7,31 @@ import {
 /**
  * POST /api/predictions/reset
  *
- * Clears all prediction history records that do NOT have a genuine outcome
- * (i.e., keeps only "Hit Target", "Stopped", and "Breakeven" outcomes — removes "Monitoring",
- * "Ambiguous", "Stayed Flat", "Recovered Late", "Skipped Correctly").
+ * Manages prediction history cleanup.
  *
- * Use this to wipe bad/stale predictions so accuracy reflects only real outcomes.
- *
- * Pass `?wipeAll=true` to remove every prediction and start completely fresh.
+ * Query params:
+ *   ?wipeAll=true        — remove every prediction, start completely fresh
+ *   ?wipeSeedOnly=true   — remove only seed_replay demo records, keep real predictions
+ *   (no params)          — remove unresolved predictions, keep Hit Target / Stopped / Breakeven
  */
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const wipeAll = url.searchParams.get("wipeAll") === "true";
+  const wipeSeedOnly = url.searchParams.get("wipeSeedOnly") === "true";
 
   const data = await readWorkspaceData();
   const before = data.predictionHistory.length;
 
   const kept = wipeAll
     ? []
-    : data.predictionHistory.filter(
-        (record) =>
-          record.outcome === "Hit Target" ||
-          record.outcome === "Stopped" ||
-          record.outcome === "Breakeven",
-      );
+    : wipeSeedOnly
+      ? data.predictionHistory.filter((record) => record.resolvedSource !== "seed_replay")
+      : data.predictionHistory.filter(
+          (record) =>
+            record.outcome === "Hit Target" ||
+            record.outcome === "Stopped" ||
+            record.outcome === "Breakeven",
+        );
 
   const removed = before - kept.length;
 
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    wipeAll,
+    mode: wipeAll ? "wipeAll" : wipeSeedOnly ? "wipeSeedOnly" : "resolvedOnly",
     recordsBefore: before,
     recordsKept: kept.length,
     recordsRemoved: removed,

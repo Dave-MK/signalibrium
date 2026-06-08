@@ -638,7 +638,9 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
   marketEvents: buildMarketEvents(),
   confirmationChecks: seededConfirmationChecks,
   aiOpportunities: seededAiOpportunities,
-  predictionHistory: seededPredictionHistory,
+  // New installs start with zero prediction history — no fake demo wins.
+  // Real predictions accumulate as the system makes live calls.
+  predictionHistory: [],
   siggiAccount: {
     id: "siggi-paper-account",
     botName: "Siggi",

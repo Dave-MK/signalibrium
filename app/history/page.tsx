@@ -9,7 +9,6 @@ import { HistoryTableClient } from "./history-table-client";
 import { Sparkline } from "../_components/sparkline";
 import { DonutChart, StatBar } from "../_components/donut-chart";
 
-// Keep ResolutionEvidence + OutcomeChip for the summary panels (best/miss/BE cards above the table)
 function ResolutionEvidence({ text }: { text: string | null }) {
   if (!text) return null;
   return <p className="mt-1 text-[0.72rem] leading-4 text-cyan-200">{text}</p>;
@@ -30,287 +29,348 @@ export default async function HistoryPage() {
     listJournalEntries(),
   ]);
 
-  // Serialisable map: predictionId → journal entry (plain object, safe to pass to client component)
   const notes: Record<string, typeof journalEntries[0]> = {};
   for (const e of journalEntries) {
     if (e.predictionId) notes[e.predictionId] = e;
   }
-  const accuracy = summarizePredictionAccuracy(predictionHistory);
 
-  // Rolling 10-trade signal accuracy sparkline (oldest → newest)
-  const resolved = [...predictionHistory]
+  // Split real predictions from demo seed data — never mix them in stats
+  const realPredictions = predictionHistory.filter((p) => p.resolvedSource !== "seed_replay");
+  const seedPredictions = predictionHistory.filter((p) => p.resolvedSource === "seed_replay");
+
+  const accuracy = summarizePredictionAccuracy(predictionHistory); // already filters seed_replay internally
+
+  // Rolling 10-trade accuracy sparkline — real predictions only, oldest → newest
+  const resolvedReal = [...realPredictions]
     .filter((p) => p.monitoringStatus === "Resolved" && p.outcome !== "Ambiguous")
     .sort((a, b) => Date.parse(a.resolvedAt ?? a.calledAt) - Date.parse(b.resolvedAt ?? b.calledAt));
   const WINDOW = 10;
-  const rollingAccuracy: number[] = resolved.map((_, i, arr) => {
+  const rollingAccuracy: number[] = resolvedReal.map((_, i, arr) => {
     const window = arr.slice(Math.max(0, i - WINDOW + 1), i + 1);
     const wins = window.filter((p) => p.outcome === "Hit Target" || p.outcome === "Breakeven").length;
     return Math.round((wins / window.length) * 100);
   });
 
-  const bestCalls = predictionHistory
-    .filter((item) => item.outcome === "Hit Target")
-    .slice(0, 4);
-  const breakevenCalls = predictionHistory
-    .filter((item) => item.outcome === "Breakeven")
-    .slice(0, 4);
-  const misses = predictionHistory
-    .filter((item) => item.outcome === "Stopped")
-    .slice(0, 4);
-  const activeCalls = predictionHistory
-    .filter((item) => item.monitoringStatus === "Active")
-    .slice(0, 4);
-  const ambiguousCalls = predictionHistory.filter((item) => item.outcome === "Ambiguous");
+  const bestCalls    = realPredictions.filter((item) => item.outcome === "Hit Target").slice(0, 4);
+  const breakevenCalls = realPredictions.filter((item) => item.outcome === "Breakeven").slice(0, 4);
+  const misses       = realPredictions.filter((item) => item.outcome === "Stopped").slice(0, 4);
+  const activeCalls  = realPredictions.filter((item) => item.monitoringStatus === "Active").slice(0, 4);
+  const ambiguousCalls = realPredictions.filter((item) => item.outcome === "Ambiguous");
+
+  const hasRealHistory = realPredictions.length > 0;
 
   return (
     <div className="panel-stack-5">
       <PageHeader
-        title="Prediction replay"
-        description="Check how recent calls played out. Any call closed in profit = Win. Closed at a loss = Loss. Closed at entry = Breakeven. Win rate = wins ÷ (wins + losses + breakevens)."
+        title="Signal history"
+        description="Every signal the system has locked in — entry price, stop, target, and what actually happened. Stats only count real live predictions, never demo seed data."
         action={<PredictionResetButton />}
       />
 
-      {/* ── Three-metric accuracy breakdown ── */}
-      <Panel className="p-3 sm:p-3.5">
-        <p className="micro-label mb-2.5">Accuracy — three ways to measure it</p>
-        <div className="grid gap-[5px] sm:grid-cols-3">
-          {/* 1. Signal Direction — with rolling accuracy sparkline */}
-          <div className="signal-surface-soft rounded-[0.45rem] p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Signal direction</p>
-                <p className="mt-1 text-[1.3rem] font-bold text-white">{accuracy.signalDirectionAccuracy}%</p>
-                <p className="mt-0.5 text-[0.72rem] text-slate-400">
-                  {accuracy.signalDirectionWins}W / {accuracy.signalDirectionResolved - accuracy.signalDirectionWins}L
-                  {" "}from {accuracy.signalDirectionResolved} resolved
-                </p>
-              </div>
-              {rollingAccuracy.length >= 3 && (
-                <div className="shrink-0">
-                  <p className="mb-1 text-right text-[0.58rem] text-slate-600">Rolling 10</p>
-                  <Sparkline data={rollingAccuracy} className="h-10 w-24" />
-                </div>
-              )}
+      {/* ── No real history yet ── */}
+      {!hasRealHistory && (
+        <Panel className="p-4 sm:p-5">
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/10 ring-1 ring-cyan-500/20">
+              <svg viewBox="0 0 20 20" fill="none" className="h-6 w-6 text-cyan-400" stroke="currentColor" strokeWidth="1.5">
+                <path d="M10 3v7l4 2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="10" cy="10" r="7" />
+              </svg>
             </div>
-            <div className="mt-2">
-              <StatBar
-                label=""
-                value={accuracy.signalDirectionAccuracy}
-                color={accuracy.signalDirectionAccuracy >= 60 ? "#34d399" : "#f59e0b"}
-              />
+            <div>
+              <p className="text-[0.95rem] font-semibold text-white">No real signal history yet</p>
+              <p className="mt-1 max-w-sm text-[0.82rem] leading-5 text-slate-400">
+                Predictions appear here as the system makes live calls. Every entry will show the exact price,
+                stop, target, and resolution — no estimates, no demo data.
+              </p>
             </div>
-            <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
-              Raw directional accuracy of all locked signals, regardless of whether Siggi traded them.
-            </p>
-          </div>
-
-          {/* 2. Siggi Trade Win Rate — with donut */}
-          <div className="signal-surface-soft rounded-[0.45rem] p-3">
-            <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">Siggi's trade win rate</p>
-            <div className="flex items-center gap-3">
-              <DonutChart
-                size={60}
-                thickness={10}
-                centerLabel={accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "—"}
-                segments={[
-                  { value: accuracy.siggiTradesWon, color: "#34d399", label: "W" },
-                  { value: accuracy.siggiTradesResolved - accuracy.siggiTradesWon, color: "#f87171", label: "L" },
-                ]}
-              />
-              <div className="min-w-0">
-                <p className={`text-[1.1rem] font-bold ${accuracy.siggiTradeWinRate !== null ? "text-emerald-300" : "text-slate-500"}`}>
-                  {accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "Building…"}
-                </p>
-                <p className="text-[0.70rem] text-slate-400">
-                  {accuracy.siggiTradesWon}W / {accuracy.siggiTradesResolved - accuracy.siggiTradesWon}L
-                  {accuracy.siggiTradeWinRate === null && " — need 5+"}
-                </p>
-              </div>
-            </div>
-            <p className="mt-2 text-[0.68rem] leading-4 text-slate-600">
-              Only signals Siggi actually executed. Reflects the full entry pipeline — signal + gates + sizing.
-            </p>
-          </div>
-
-          {/* 3. Skip Quality — with bar */}
-          <div className="signal-surface-soft rounded-[0.45rem] p-3">
-            <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Skip quality (gate filter)</p>
-            <p className={`mt-1 text-[1.3rem] font-bold ${accuracy.skipQuality !== null ? (accuracy.skipQuality >= 60 ? "text-emerald-300" : accuracy.skipQuality >= 40 ? "text-amber-300" : "text-red-300") : "text-slate-500"}`}>
-              {accuracy.skipQuality !== null ? `${accuracy.skipQuality}%` : "Building…"}
-            </p>
-            <p className="mt-0.5 text-[0.72rem] text-slate-400">
-              {accuracy.skippedWouldBeLoss} of {accuracy.skippedResolved} skipped would have lost
-              {accuracy.skipQuality === null && " — need 5+"}
-            </p>
-            {accuracy.skipQuality !== null && (
-              <div className="mt-2">
-                <StatBar
-                  label=""
-                  value={accuracy.skipQuality}
-                  color={accuracy.skipQuality >= 60 ? "#34d399" : accuracy.skipQuality >= 40 ? "#f59e0b" : "#f87171"}
-                />
-              </div>
-            )}
-            <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
-              Higher = gates saved you from losses. Lower = Siggi over-filtering and missing wins.
-            </p>
-          </div>
-        </div>
-      </Panel>
-
-      <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-[5px] sm:grid-cols-4">
-          <SummaryCard
-            label="Win rate (live trades)"
-            value={accuracy.liveAccuracy !== null ? `${accuracy.liveAccuracy}%` : "< 20 trades"}
-            detail={
-              accuracy.liveAccuracy !== null
-                ? `${accuracy.liveAccurate} wins from ${accuracy.liveResolved} live paper trades`
-                : `${accuracy.liveResolved} live trade${accuracy.liveResolved === 1 ? "" : "s"} resolved — need 20 for a meaningful rate`
-            }
-            tone="text-emerald-300"
-          />
-          <SummaryCard
-            label="Wins / Losses"
-            value={`${accuracy.accuratePredictions}W · ${accuracy.inaccuratePredictions}L`}
-            detail={`${accuracy.overallAccuracy}% win rate · ${accuracy.breakevenPredictions} breakeven counted as wins`}
-            tone="text-white"
-          />
-          <SummaryCard
-            label="Recent win rate"
-            value={`${accuracy.recentAccuracy}%`}
-            detail="Last 12 resolved predictions (all sources)"
-            tone="text-cyan-200"
-          />
-          <SummaryCard
-            label="Tracked predictions"
-            value={`${predictionHistory.length}`}
-            detail={`${ambiguousCalls.length} ambiguous · ${accuracy.breakevenPredictions} breakeven · not counted as wins or losses`}
-          />
-        </div>
-      </Panel>
-
-      <div className="grid gap-[5px] xl:grid-cols-4">
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Active live calls</p>
-          <div className="mt-3 grid gap-[5px]">
-            {activeCalls.length > 0 ? (
-              activeCalls.map((item) => (
-                <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[0.92rem] font-semibold text-white">
-                        {item.symbol} / {item.actionAtCall} / {item.decisionAtCall}
-                      </p>
-                      <p className="mt-1 text-[0.76rem] text-slate-400">
-                        {item.timeframe} / locked {formatDateTimeLabel(item.calledAt)}
-                      </p>
-                  </div>
-                  <StatusChip label="LIVE" />
-                </div>
-                <ResolutionEvidence text={item.resolutionEvidence} />
-                <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
-              </div>
-            ))
-            ) : (
-              <div className="signal-surface-soft rounded-[0.4rem] p-3">
-                <p className="text-[0.82rem] leading-5 text-slate-300">
-                  No live enter-now calls are currently being tracked against stop and target.
-                </p>
-              </div>
-            )}
           </div>
         </Panel>
+      )}
 
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Best recent calls</p>
-          <div className="mt-3 grid gap-[5px]">
-            {bestCalls.map((item) => (
-              <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
-                <div className="flex items-start justify-between gap-3">
+      {/* ── Accuracy breakdown — only shown once real history exists ── */}
+      {hasRealHistory && (
+        <>
+          <Panel className="p-3 sm:p-3.5">
+            <p className="micro-label mb-2.5">Accuracy — three ways to measure it</p>
+            <div className="grid gap-[5px] sm:grid-cols-3">
+              {/* 1. Signal Direction */}
+              <div className="signal-surface-soft rounded-[0.45rem] p-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-[0.92rem] font-semibold text-white">
-                      {item.symbol} / {item.actionAtCall} / {item.decisionAtCall}
-                    </p>
-                    <p className="mt-1 text-[0.76rem] text-slate-400">
-                      {item.timeframe} / {item.horizon} / called {formatDateTimeLabel(item.calledAt)}
+                    <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Signal direction</p>
+                    <p className="mt-1 text-[1.3rem] font-bold text-white">{accuracy.signalDirectionAccuracy}%</p>
+                    <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                      {accuracy.signalDirectionWins}W / {accuracy.signalDirectionResolved - accuracy.signalDirectionWins}L
+                      {" "}from {accuracy.signalDirectionResolved} resolved
                     </p>
                   </div>
-                  <StatusChip label={item.outcome.toUpperCase()} />
-                </div>
-                <ResolutionEvidence text={item.resolutionEvidence} />
-                <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Breakeven closes</p>
-          <div className="mt-3 grid gap-[5px]">
-            {breakevenCalls.length > 0 ? (
-              breakevenCalls.map((item) => (
-                <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[0.92rem] font-semibold text-white">
-                        {item.symbol} / {item.actionAtCall} / {item.decisionAtCall}
-                      </p>
-                      <p className="mt-1 text-[0.76rem] text-slate-400">
-                        {item.timeframe} / {item.horizon} / resolved {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "Still live"}
-                      </p>
+                  {rollingAccuracy.length >= 3 && (
+                    <div className="shrink-0">
+                      <p className="mb-1 text-right text-[0.58rem] text-slate-600">Rolling 10</p>
+                      <Sparkline data={rollingAccuracy} className="h-10 w-24" />
                     </div>
-                    <span className="shrink-0 rounded-[0.3rem] bg-slate-600/30 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-300 ring-1 ring-slate-500/30">
-                      BE
-                    </span>
-                  </div>
-                  <ResolutionEvidence text={item.resolutionEvidence} />
-                  <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="signal-surface-soft rounded-[0.4rem] p-3">
-                <p className="text-[0.82rem] leading-5 text-slate-300">
-                  No breakeven closes yet — these appear when a call resolves at exactly the entry price.
+                <div className="mt-2">
+                  <StatBar
+                    label=""
+                    value={accuracy.signalDirectionAccuracy}
+                    color={accuracy.signalDirectionAccuracy >= 60 ? "#34d399" : "#f59e0b"}
+                  />
+                </div>
+                <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
+                  Was the signal right? Counts every resolved live call whether Siggi traded it or not.
                 </p>
               </div>
-            )}
-          </div>
-        </Panel>
 
-        <Panel className="p-3 sm:p-3.5">
-          <p className="micro-label">Misses to learn from</p>
-          <div className="mt-3 grid gap-[5px]">
-            {misses.map((item) => (
-              <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[0.92rem] font-semibold text-white">
-                      {item.symbol} / {item.actionAtCall} / {item.decisionAtCall}
+              {/* 2. Siggi Trade Win Rate */}
+              <div className="signal-surface-soft rounded-[0.45rem] p-3">
+                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">Siggi's trade win rate</p>
+                <div className="flex items-center gap-3">
+                  <DonutChart
+                    size={60}
+                    thickness={10}
+                    centerLabel={accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "—"}
+                    segments={[
+                      { value: accuracy.siggiTradesWon, color: "#34d399", label: "W" },
+                      { value: accuracy.siggiTradesResolved - accuracy.siggiTradesWon, color: "#f87171", label: "L" },
+                    ]}
+                  />
+                  <div className="min-w-0">
+                    <p className={`text-[1.1rem] font-bold ${accuracy.siggiTradeWinRate !== null ? "text-emerald-300" : "text-slate-500"}`}>
+                      {accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "Building…"}
                     </p>
-                    <p className="mt-1 text-[0.76rem] text-slate-400">
-                      {item.timeframe} / {item.horizon} / resolved {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "Still live"}
+                    <p className="text-[0.70rem] text-slate-400">
+                      {accuracy.siggiTradesWon}W / {accuracy.siggiTradesResolved - accuracy.siggiTradesWon}L
+                      {accuracy.siggiTradeWinRate === null && " — need 5+"}
                     </p>
                   </div>
-                  <StatusChip label={item.outcome.toUpperCase()} />
                 </div>
-                <ResolutionEvidence text={item.resolutionEvidence} />
-                <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{item.narrative}</p>
+                <p className="mt-2 text-[0.68rem] leading-4 text-slate-600">
+                  Only trades Siggi actually executed. Signal quality + entry gates + sizing combined.
+                </p>
+              </div>
+
+              {/* 3. Skip Quality */}
+              <div className="signal-surface-soft rounded-[0.45rem] p-3">
+                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Skip quality (gate filter)</p>
+                <p className={`mt-1 text-[1.3rem] font-bold ${accuracy.skipQuality !== null ? (accuracy.skipQuality >= 60 ? "text-emerald-300" : accuracy.skipQuality >= 40 ? "text-amber-300" : "text-red-300") : "text-slate-500"}`}>
+                  {accuracy.skipQuality !== null ? `${accuracy.skipQuality}%` : "Building…"}
+                </p>
+                <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                  {accuracy.skippedWouldBeLoss} of {accuracy.skippedResolved} skipped would have lost
+                  {accuracy.skipQuality === null && " — need 5+"}
+                </p>
+                {accuracy.skipQuality !== null && (
+                  <div className="mt-2">
+                    <StatBar
+                      label=""
+                      value={accuracy.skipQuality}
+                      color={accuracy.skipQuality >= 60 ? "#34d399" : accuracy.skipQuality >= 40 ? "#f59e0b" : "#f87171"}
+                    />
+                  </div>
+                )}
+                <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
+                  Higher = gates saved you from losses. Lower = Siggi over-filtering and missing wins.
+                </p>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel className="p-3 sm:p-3.5">
+            <div className="grid gap-[5px] sm:grid-cols-4">
+              <SummaryCard
+                label="Win rate (live trades)"
+                value={accuracy.liveAccuracy !== null ? `${accuracy.liveAccuracy}%` : "< 20 trades"}
+                detail={
+                  accuracy.liveAccuracy !== null
+                    ? `${accuracy.liveAccurate} wins from ${accuracy.liveResolved} live paper trades`
+                    : `${accuracy.liveResolved} live trade${accuracy.liveResolved === 1 ? "" : "s"} resolved — need 20 for a meaningful rate`
+                }
+                tone="text-emerald-300"
+              />
+              <SummaryCard
+                label="Wins / Losses"
+                value={`${accuracy.accuratePredictions}W · ${accuracy.inaccuratePredictions}L`}
+                detail={`${accuracy.overallAccuracy}% win rate · ${accuracy.breakevenPredictions} breakeven`}
+                tone="text-white"
+              />
+              <SummaryCard
+                label="Recent win rate"
+                value={`${accuracy.recentAccuracy}%`}
+                detail="Last 12 resolved real predictions"
+                tone="text-cyan-200"
+              />
+              <SummaryCard
+                label="Real predictions tracked"
+                value={`${realPredictions.length}`}
+                detail={`${ambiguousCalls.length} ambiguous · ${accuracy.breakevenPredictions} breakeven`}
+              />
+            </div>
+          </Panel>
+
+          <div className="grid gap-[5px] xl:grid-cols-4">
+            <Panel className="p-3 sm:p-3.5">
+              <p className="micro-label">Active live calls</p>
+              <div className="mt-3 grid gap-[5px]">
+                {activeCalls.length > 0 ? (
+                  activeCalls.map((item) => (
+                    <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
+                          <p className="mt-0.5 text-[0.76rem] font-medium text-cyan-300">{item.actionAtCall} · {item.timeframe} · {item.decisionAtCall}</p>
+                          <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                            Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
+                          </p>
+                          <p className="mt-0.5 text-[0.70rem] text-slate-500">Locked {formatDateTimeLabel(item.calledAt)}</p>
+                        </div>
+                        <StatusChip label="LIVE" />
+                      </div>
+                      <ResolutionEvidence text={item.resolutionEvidence} />
+                      <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <p className="text-[0.82rem] leading-5 text-slate-400">
+                      No live calls being tracked yet. They appear here the moment Siggi locks in an ENTER NOW signal.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel className="p-3 sm:p-3.5">
+              <p className="micro-label">Best calls</p>
+              <div className="mt-3 grid gap-[5px]">
+                {bestCalls.length > 0 ? bestCalls.map((item) => (
+                  <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
+                        <p className="mt-0.5 text-[0.76rem] font-medium text-emerald-300">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                        <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                          Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
+                        </p>
+                        <p className="mt-0.5 text-[0.70rem] text-slate-500">Called {formatDateTimeLabel(item.calledAt)} · Resolved {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "—"}</p>
+                      </div>
+                      <OutcomeChip outcome={item.outcome} />
+                    </div>
+                    <ResolutionEvidence text={item.resolutionEvidence} />
+                    <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
+                  </div>
+                )) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <p className="text-[0.82rem] leading-5 text-slate-400">Wins appear here as predictions resolve.</p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel className="p-3 sm:p-3.5">
+              <p className="micro-label">Breakeven closes</p>
+              <div className="mt-3 grid gap-[5px]">
+                {breakevenCalls.length > 0 ? (
+                  breakevenCalls.map((item) => (
+                    <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
+                          <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                            Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
+                          </p>
+                          <p className="mt-0.5 text-[0.70rem] text-slate-500">Resolved {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "—"}</p>
+                        </div>
+                        <span className="shrink-0 rounded-[0.3rem] bg-slate-600/30 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-300 ring-1 ring-slate-500/30">BE</span>
+                      </div>
+                      <ResolutionEvidence text={item.resolutionEvidence} />
+                      <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <p className="text-[0.82rem] leading-5 text-slate-400">No breakeven closes yet.</p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel className="p-3 sm:p-3.5">
+              <p className="micro-label">Misses to learn from</p>
+              <div className="mt-3 grid gap-[5px]">
+                {misses.length > 0 ? misses.map((item) => (
+                  <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
+                        <p className="mt-0.5 text-[0.76rem] font-medium text-red-300">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                        <p className="mt-0.5 text-[0.72rem] text-slate-400">
+                          Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
+                        </p>
+                        <p className="mt-0.5 text-[0.70rem] text-slate-500">Called {formatDateTimeLabel(item.calledAt)} · Resolved {item.resolvedAt ? formatDateTimeLabel(item.resolvedAt) : "—"}</p>
+                      </div>
+                      <OutcomeChip outcome={item.outcome} />
+                    </div>
+                    <ResolutionEvidence text={item.resolutionEvidence} />
+                    <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
+                  </div>
+                )) : (
+                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <p className="text-[0.82rem] leading-5 text-slate-400">No losses yet — they appear here when a prediction resolves at the stop.</p>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          </div>
+
+          {/* Full prediction table */}
+          <Panel className="overflow-hidden p-0">
+            <HistoryTableClient
+              items={realPredictions}
+              notes={notes}
+              currency={displayCurrencyState.currency}
+              rates={displayCurrencyState.rates}
+            />
+          </Panel>
+        </>
+      )}
+
+      {/* ── Demo seed data — shown separately, clearly labelled ── */}
+      {seedPredictions.length > 0 && (
+        <Panel className="p-3 sm:p-3.5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="micro-label">Demo data ({seedPredictions.length} records)</p>
+              <p className="mt-1 text-[0.75rem] text-slate-500">
+                Pre-seeded sample records used to populate the app on first launch. These are{" "}
+                <span className="text-amber-400">not counted in any accuracy statistics.</span>{" "}
+                Use the Reset button above to clear them.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-3">
+            {seedPredictions.slice(0, 6).map((item) => (
+              <div key={item.id} className="rounded-[0.4rem] bg-amber-400/4 p-3 ring-1 ring-amber-400/10">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[0.85rem] font-semibold text-slate-300">{item.symbol}</p>
+                    <p className="mt-0.5 text-[0.70rem] text-slate-500">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                    <p className="mt-0.5 text-[0.68rem] text-slate-600">
+                      Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-[0.25rem] bg-amber-400/10 px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider text-amber-500 ring-1 ring-amber-400/20">DEMO</span>
+                </div>
               </div>
             ))}
           </div>
+          {seedPredictions.length > 6 && (
+            <p className="mt-2 text-[0.72rem] text-slate-600">+{seedPredictions.length - 6} more demo records — reset to clear all of them.</p>
+          )}
         </Panel>
-      </div>
-
-      <Panel className="overflow-hidden p-0">
-        <HistoryTableClient
-          items={predictionHistory}
-          notes={notes}
-          currency={displayCurrencyState.currency}
-          rates={displayCurrencyState.rates}
-        />
-      </Panel>
+      )}
     </div>
   );
 }
-

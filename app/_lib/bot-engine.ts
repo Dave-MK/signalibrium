@@ -1247,8 +1247,14 @@ export function buildBotOpportunityView(
 export function summarizePredictionAccuracy(
   predictionHistory: PersistedPredictionHistoryRecord[],
 ): PredictionAccuracySummary {
-  // Resolved = any call with a definitive close: Win, Loss, or Breakeven
-  const resolved = predictionHistory.filter(
+  // Only count real system predictions — never seed_replay demo records.
+  // seed_replay records are pre-seeded demo data, not live signal calls.
+  const realPredictions = predictionHistory.filter(
+    (item) => item.resolvedSource !== "seed_replay",
+  );
+
+  // Resolved = any real call with a definitive close: Win, Loss, or Breakeven
+  const resolved = realPredictions.filter(
     (item) =>
       item.outcome === "Hit Target" ||
       item.outcome === "Stopped" ||
