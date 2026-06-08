@@ -2,11 +2,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "regions": ["lhr1"],
-  "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "regions": ["lhr1"]
 }
