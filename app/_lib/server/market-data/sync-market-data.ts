@@ -14,11 +14,17 @@ import {
 import type {
   PersistedAssetRecord,
   PersistedMarketSnapshot,
+  PersistedSiggiTrade,
   PersistedWorkspaceData,
 } from "../workspace-types";
 import { roundPriceValue } from "@/app/_lib/market-prices";
 import { getMarketDataAssetDefinition } from "./asset-catalog";
 import { fetchLiveQuoteForSymbol, getConfiguredProviderName } from "./market-data";
+import {
+  sendTelegramMessage,
+  formatTradeOpenedMessage,
+  formatTradeClosedMessage,
+} from "../telegram";
 
 const minimumSyncIntervalMs = 65_000;
 const minimumPulseIntervalMs = 12_000;
@@ -352,6 +358,66 @@ function getPulseSymbols(data: PersistedWorkspaceData) {
   return [...symbols];
 }
 
+/**
+ * Diff Siggi's trade state before/after a sync and fire Telegram notifications
+ * for any newly opened or newly closed trades.
+ */
+async function fireSiggiTradeNotifications(
+  data: PersistedWorkspaceData,
+  openIdsBefore: Set<string>,
+  closedIdsBefore: Set<string>,
+) {
+  const notifications: Promise<void>[] = [];
+
+  // Newly opened trades
+  for (const trade of data.siggiAccount.openTrades) {
+    if (!openIdsBefore.has(trade.id)) {
+      const asset = data.assets.find((a) => a.symbol === trade.symbol);
+      notifications.push(
+        sendTelegramMessage(
+          formatTradeOpenedMessage({
+            symbol: trade.symbol,
+            instrumentName: trade.instrumentName,
+            side: trade.side,
+            entryPrice: trade.entryPrice,
+            stopPrice: trade.stopPrice,
+            targetPrice: trade.targetPrice,
+            stakeGbp: trade.stakeGbp,
+            confidenceAtOpen: trade.confidenceAtOpen,
+            narrative: trade.narrative,
+            strategy: asset?.activeStrategy,
+            timeframe: data.scannerResults.find((r) => r.symbol === trade.symbol)?.timeframe,
+          }),
+        ),
+      );
+    }
+  }
+
+  // Newly closed trades
+  for (const trade of data.siggiAccount.closedTrades) {
+    if (!closedIdsBefore.has(trade.id)) {
+      notifications.push(
+        sendTelegramMessage(
+          formatTradeClosedMessage({
+            symbol: trade.symbol,
+            instrumentName: trade.instrumentName,
+            side: trade.side,
+            status: trade.status,
+            entryPrice: trade.entryPrice,
+            stopPrice: trade.stopPrice,
+            targetPrice: trade.targetPrice,
+            realizedPnlGbp: trade.realizedPnlGbp,
+            openedAt: trade.openedAt,
+            closedAt: trade.closedAt,
+          }),
+        ),
+      );
+    }
+  }
+
+  await Promise.allSettled(notifications);
+}
+
 export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   const provider = getConfiguredProvider();
   const syncedAt = new Date().toISOString();
@@ -452,7 +518,19 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
   data.marketSnapshot = buildMarketSnapshot(data, nextAssets, syncedAt);
   recordPricePulsePoints(data, nextAssets, syncedAt);
   await refreshPredictionMemory(data, syncedAt);
+
+  // Snapshot trade state before Siggi runs so we can diff for notifications
+  const openTradeIdsBefore = new Set(data.siggiAccount.openTrades.map((t) => t.id));
+  const closedTradeIdsBefore = new Set(data.siggiAccount.closedTrades.map((t) => t.id));
+
   syncSiggiAccount(data, syncedAt);
+
+  // Fire Telegram notifications for any new opens or closes
+  await fireSiggiTradeNotifications(
+    data,
+    openTradeIdsBefore,
+    closedTradeIdsBefore,
+  );
 
   const persisted = await writeWorkspaceData(data);
 
