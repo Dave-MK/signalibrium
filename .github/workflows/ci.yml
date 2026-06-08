@@ -31,20 +31,33 @@ jobs:
         run: npm run build
         env:
           # ── Clerk ────────────────────────────────────────────────────────────
-          # Add these in GitHub → Settings → Secrets → Actions.
-          # Your test keys from .env.local work fine here.
+          # Add these in GitHub → Settings → Secrets and variables → Actions.
+          # Your test keys from .env.local work fine for CI.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
           NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
 
           # ── Anthropic ─────────────────────────────────────────────────────────
-          # The build doesn't make live AI calls — this placeholder stops the
-          # workspace-store from erroring during static page generation.
+          # The build doesn't make live AI calls; this stops module-level guards
+          # from throwing during static page generation.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-          # ── Everything else — placeholders sufficient for a build pass ────────
-          NEXT_PUBLIC_APP_URL: https://example.com
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+          # ── Upstash Redis ──────────────────────────────────────────────────────
+          # Placeholder values stop the workspace-store guard from throwing.
+          # The build never makes real Redis calls (all pages are dynamic).
+          UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
+          UPSTASH_REDIS_REST_TOKEN: placeholder_token_for_build
+
+          # ── Stripe ────────────────────────────────────────────────────────────
+          STRIPE_SECRET_KEY: sk_test_placeholder
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          STRIPE_WEBHOOK_SECRET: whsec_placeholder
+          STRIPE_PRO_PRICE_ID: price_placeholder
+          STRIPE_ALGO_PRICE_ID: price_placeholder
+
+          # ── Everything else — static placeholders sufficient for a build pass ──
+          NEXT_PUBLIC_APP_URL: https://signalibrium.vercel.app
           NEXT_PUBLIC_BROKER_NAME: Broker
           NEXT_PUBLIC_BROKER_REFERRAL_URL: https://example.com
+          SIGNAL_API_SECRET: placeholder_signal_secret
