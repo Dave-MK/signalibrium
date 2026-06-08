@@ -74,6 +74,29 @@ const links = [
       </svg>
     ),
   },
+  {
+    href: "/journal",
+    label: "Journal",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="4" y="2.5" width="12" height="15" rx="1.3" />
+        <path d="M7 7h6" />
+        <path d="M7 10h6" />
+        <path d="M7 13h3.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/alerts",
+    label: "Alerts",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M10 2.5A5.5 5.5 0 0 0 4.5 8v3l-1.5 2h14l-1.5-2V8A5.5 5.5 0 0 0 10 2.5Z" />
+        <path d="M8.5 15.5a1.5 1.5 0 0 0 3 0" />
+        <path d="M10 2.5V1" />
+      </svg>
+    ),
+  },
 ];
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {

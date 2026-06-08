@@ -10,6 +10,7 @@ import type {
   PersistedBrokerConnection,
   OpportunityAnalysisSnapshot,
   PersistedPredictionHistoryRecord,
+  PersistedPriceAlert,
   PersistedScannerResult,
   PersistedSiggiAccount,
   PersistedSiggiActivity,
@@ -703,6 +704,7 @@ function normalizePredictionHistoryRecord(
       record.tradedStatus === "not_traded"
         ? record.tradedStatus
         : null,
+    siggiSkipReason: typeof record.siggiSkipReason === "string" ? record.siggiSkipReason : null,
     narrative: normalizedNarrative,
     createdAt: typeof record.createdAt === "string" ? record.createdAt : now,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : now,
@@ -1253,13 +1255,18 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
       normalizedBacktests,
     ),
   );
+  // Only seed prediction history on first-ever boot (field absent entirely).
+  // An explicit empty array means the user cleared it — don't re-seed.
+  const predictionHistorySeed = Array.isArray(candidate.predictionHistory)
+    ? []
+    : defaultWorkspaceData.predictionHistory;
   const normalizedPredictionHistory = mergeByKey(
     Array.isArray(candidate.predictionHistory)
       ? candidate.predictionHistory.map((record) =>
           normalizePredictionHistoryRecord(record as PersistedPredictionHistoryRecord),
         )
       : undefined,
-    defaultWorkspaceData.predictionHistory,
+    predictionHistorySeed,
     (record) => record.id,
   ).map((record) =>
     normalizePredictionHistoryAgainstScanner(
@@ -1270,7 +1277,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   );
 
   const normalized: PersistedWorkspaceData = {
-    schemaVersion: 12,
+    schemaVersion: 13,
     updatedAt:
       typeof candidate.updatedAt === "string"
         ? candidate.updatedAt
@@ -1356,6 +1363,15 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
     aiOpportunities: normalizedAiOpportunities,
     predictionHistory: normalizedPredictionHistory,
     siggiAccount: normalizeSiggiAccount(candidate.siggiAccount),
+    priceAlerts: Array.isArray((candidate as PersistedWorkspaceData).priceAlerts)
+      ? ((candidate as PersistedWorkspaceData).priceAlerts as PersistedPriceAlert[]).filter(
+          (a) =>
+            a &&
+            typeof a.id === "string" &&
+            typeof a.symbol === "string" &&
+            typeof a.targetPrice === "number",
+        )
+      : [],
   };
 
   // Reconcile prediction accuracy against actual trade outcomes (idempotent backfill)

@@ -696,6 +696,7 @@ function createPredictionRecord(input: {
     resolutionEvidence: null,
     resolvedSource: null,
     tradedStatus: null,
+    siggiSkipReason: null,
     narrative: buildPredictionNarrative({
       eventContext,
       outcome: "Monitoring",
@@ -883,13 +884,25 @@ export async function refreshPredictionMemory(
   const scannerResults = [...data.scannerResults];
   let analysisRefreshBudget = refreshAnalyses ? 4 : 0;
 
+  const nowMs = Date.now();
+  // Analyses older than this are considered stale and queued for re-generation
+  // so Siggi's per-horizon freshness gates (Day ≤3h, Week ≤12h) are always met.
+  const ANALYSIS_STALE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
   for (let index = 0; index < scannerResults.length; index += 1) {
     const scannerResult = scannerResults[index];
+    const analysisAgeMs = (() => {
+      const ts = scannerResult.analysisUpdatedAt ?? scannerResult.analysis?.analyzedAt ?? null;
+      if (!ts) return Infinity;
+      const parsed = Date.parse(ts);
+      return Number.isFinite(parsed) ? nowMs - parsed : Infinity;
+    })();
     const needsAnalysisRefresh =
       !scannerResult.analysis ||
       !scannerResult.analysis.multiTimeframeChecks?.length ||
       scannerResult.analysis.multiTimeframeSummary.includes("not available yet") ||
-      scannerResult.analysis.regimeSummary.includes("not available yet");
+      scannerResult.analysis.regimeSummary.includes("not available yet") ||
+      (scannerResult.tradeability === "TRADEABLE" && analysisAgeMs > ANALYSIS_STALE_MS);
 
     if (
       needsAnalysisRefresh &&

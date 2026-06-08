@@ -25,7 +25,10 @@ export type InstrumentStrategy =
   | "Fibonacci Pullback Confluence"
   | "M/W Reversal Break"
   | "Inefficiency Fill Reversal"
-  | "Event Volatility Breakout";
+  | "Event Volatility Breakout"
+  | "Bollinger Band Reversal"
+  | "RSI Overbought Oversold"
+  | "Trend Reversal Method";
 
 export type InstrumentLiquidity = "High" | "Moderate" | "Thin";
 export type InstrumentVolatility = "Contained" | "Elevated" | "Fast";

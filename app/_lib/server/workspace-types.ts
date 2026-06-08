@@ -42,8 +42,30 @@ export type PersistedTradeTicket = TradeTicket & {
   updatedAt: string;
 };
 
+export type TradeNoteOutcome = "Win" | "Loss" | "Breakeven" | "Skipped";
+
 export type PersistedJournalEntry = JournalEntry & {
   ticketId: string | null;
+  /** Link to a PersistedPredictionHistoryRecord — set when reviewing a signal call */
+  predictionId: string | null;
+  /** Link to a PersistedSiggiTrade — set when reviewing an actual trade */
+  tradeId: string | null;
+  /** What kind of review this entry is */
+  entryType: "trade_review" | "signal_review" | "general";
+  /** What the chart/setup looked like when you took notice */
+  whatISaw: string;
+  /** Why you took it, or why you skipped it */
+  reasoning: string;
+  /** What you'd do differently next time */
+  improvement: string;
+  /** Quick emotion / discipline tags — e.g. "Patient", "FOMO", "Followed plan" */
+  tags: string[];
+  /** Self-assessed decision quality, 1–5 */
+  rating: number | null;
+  /** Would you take this exact trade again given the same information? */
+  wouldTakeAgain: boolean | null;
+  /** Outcome as you experienced it (separate from Siggi's automated result) */
+  taggedOutcome: TradeNoteOutcome | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -236,7 +258,7 @@ export type PersistedSiggiTrade = {
   symbol: string;
   instrumentName: string;
   side: "BUY" | "SELL";
-  status: "Open" | "Hit Target" | "Stopped";
+  status: "Open" | "Hit Target" | "Stopped" | "Breakeven";
   confidenceAtOpen: number;
   openedAt: string;
   closedAt: string | null;
@@ -340,6 +362,7 @@ export type PersistedPredictionHistoryRecord = {
   outcome:
     | "Hit Target"
     | "Stopped"
+    | "Breakeven"
     | "Ambiguous"
     | "Recovered Late"
     | "Stayed Flat"
@@ -353,13 +376,29 @@ export type PersistedPredictionHistoryRecord = {
   resolutionEvidence: string | null;
   resolvedSource: "live_trade" | "seed_replay" | "candle_range" | "price_snapshot" | null;
   tradedStatus: "traded" | "skipped" | "not_traded" | null;
+  /** Why Siggi skipped this prediction — set when tradedStatus === "skipped" */
+  siggiSkipReason: string | null;
   narrative: string;
   createdAt: string;
   updatedAt: string;
 };
 
+export type PersistedPriceAlert = {
+  id: string;
+  symbol: string;
+  /** Human-readable label, e.g. "Gold breaks 2400" */
+  label: string;
+  condition: "above" | "below";
+  targetPrice: number;
+  enabled: boolean;
+  /** Set when the alert fires — null while still watching */
+  triggeredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PersistedWorkspaceData = {
-  schemaVersion: 12;
+  schemaVersion: 13;
   updatedAt: string;
   workspace: {
     id: string;
@@ -386,4 +425,5 @@ export type PersistedWorkspaceData = {
   aiOpportunities: PersistedAiOpportunity[];
   predictionHistory: PersistedPredictionHistoryRecord[];
   siggiAccount: PersistedSiggiAccount;
+  priceAlerts: PersistedPriceAlert[];
 };

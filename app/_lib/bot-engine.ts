@@ -90,15 +90,54 @@ type EventRead = {
 };
 
 export type PredictionAccuracySummary = {
+  // ── Aggregate ──────────────────────────────────────────────────────────────
+  /** Win rate across ALL resolved predictions (BE = win). Legacy field. */
   overallAccuracy: number;
   resolvedPredictions: number;
+  /** Wins (incl. breakeven) across all resolved */
   accuratePredictions: number;
+  /** Losses across all resolved */
+  inaccuratePredictions: number;
+  /** Count of breakeven closes (counted as wins above) */
+  breakevenPredictions: number;
   recentAccuracy: number;
+
+  // ── Existing live / seed split ─────────────────────────────────────────────
   liveAccuracy: number | null;
   liveResolved: number;
   liveAccurate: number;
   seedAccuracy: number;
   seedResolved: number;
+
+  // ── Three-metric breakdown ─────────────────────────────────────────────────
+
+  /**
+   * 1. Signal Direction Accuracy — all resolved predictions regardless of
+   *    whether Siggi traded them. Answers: "was the underlying signal right?"
+   */
+  signalDirectionAccuracy: number;
+  signalDirectionResolved: number;
+  signalDirectionWins: number;
+
+  /**
+   * 2. Siggi's Trade Win Rate — only predictions where Siggi actually opened
+   *    a live paper trade (tradedStatus === "traded"). Answers: "when Siggi
+   *    pulled the trigger, how often did it pay off?"
+   *    null when fewer than 5 resolved trades (not yet meaningful).
+   */
+  siggiTradeWinRate: number | null;
+  siggiTradesResolved: number;
+  siggiTradesWon: number;
+
+  /**
+   * 3. Skip Quality — of the predictions Siggi declined to trade
+   *    (tradedStatus === "skipped"), what % would have been losses?
+   *    Higher = the gates correctly filtered out bad setups.
+   *    null when fewer than 5 resolved skips.
+   */
+  skipQuality: number | null;
+  skippedResolved: number;
+  skippedWouldBeLoss: number;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -736,7 +775,7 @@ function buildPredictionMemorySummary(
     const sameAssetClass = asset ? record.assetClass === asset.assetClass : false;
     const sameDirection = record.trendAtCall === direction;
     const resolvedForAccuracy =
-      record.outcome === "Hit Target" || record.outcome === "Stopped";
+      record.outcome === "Hit Target" || record.outcome === "Stopped" || record.outcome === "Breakeven";
 
     return resolvedForAccuracy && (sameSymbol || (sameAssetClass && sameDirection));
   });
@@ -815,7 +854,7 @@ function buildConfidenceCalibrationRead(input: {
   setup: PersistedScannerResult;
 }) {
   const relevant = input.predictionHistory.filter((record) => {
-    if (!(record.outcome === "Hit Target" || record.outcome === "Stopped")) {
+    if (!(record.outcome === "Hit Target" || record.outcome === "Stopped" || record.outcome === "Breakeven")) {
       return false;
     }
 
@@ -1208,16 +1247,24 @@ export function buildBotOpportunityView(
 export function summarizePredictionAccuracy(
   predictionHistory: PersistedPredictionHistoryRecord[],
 ): PredictionAccuracySummary {
+  // Resolved = any call with a definitive close: Win, Loss, or Breakeven
   const resolved = predictionHistory.filter(
-    (item) => item.outcome === "Hit Target" || item.outcome === "Stopped",
+    (item) =>
+      item.outcome === "Hit Target" ||
+      item.outcome === "Stopped" ||
+      item.outcome === "Breakeven",
   );
   const recent = resolved.slice(0, 12);
-  const accurate = resolved.filter((item) => item.outcome === "Hit Target");
-  const recentAccurate = recent.filter((item) => item.outcome === "Hit Target");
+  // Win = Hit Target OR Breakeven (both count); Loss = Stopped only
+  const wins    = resolved.filter((item) => item.outcome === "Hit Target" || item.outcome === "Breakeven");
+  const losses  = resolved.filter((item) => item.outcome === "Stopped");
+  const beItems = resolved.filter((item) => item.outcome === "Breakeven"); // kept for display info only
+
+  const recentWins = recent.filter((item) => item.outcome === "Hit Target" || item.outcome === "Breakeven");
 
   // Live accuracy: only signals resolved by an actual paper trade
   const liveResolved = resolved.filter((item) => item.resolvedSource === "live_trade");
-  const liveAccurate = liveResolved.filter((item) => item.outcome === "Hit Target");
+  const liveAccurate = liveResolved.filter((item) => item.outcome === "Hit Target" || item.outcome === "Breakeven");
   const liveAccuracy =
     liveResolved.length >= 20
       ? Math.round((liveAccurate.length / liveResolved.length) * 1000) / 10
@@ -1227,18 +1274,44 @@ export function summarizePredictionAccuracy(
   const seedResolved = resolved.filter(
     (item) => !item.resolvedSource || item.resolvedSource !== "live_trade",
   );
-  const seedAccurate = seedResolved.filter((item) => item.outcome === "Hit Target");
+  const seedAccurate = seedResolved.filter((item) => item.outcome === "Hit Target" || item.outcome === "Breakeven");
+
+  // ── Three-metric breakdown ──────────────────────────────────────────────────
+
+  // 1. Signal direction: ALL resolved predictions (traded or not)
+  const sigDirResolved = resolved; // same as `resolved` — every definitively closed call
+  const sigDirWins     = wins;     // already includes BE
+
+  // 2. Siggi's trade win rate: predictions Siggi actually traded
+  const tradedResolved = resolved.filter((item) => item.tradedStatus === "traded");
+  const tradedWon      = tradedResolved.filter(
+    (item) => item.outcome === "Hit Target" || item.outcome === "Breakeven",
+  );
+  const siggiTradeWinRate =
+    tradedResolved.length >= 5
+      ? Math.round((tradedWon.length / tradedResolved.length) * 1000) / 10
+      : null;
+
+  // 3. Skip quality: predictions Siggi skipped — what % would have been losses?
+  const skippedResolved = resolved.filter((item) => item.tradedStatus === "skipped");
+  const skippedWouldBeLoss = skippedResolved.filter((item) => item.outcome === "Stopped");
+  const skipQuality =
+    skippedResolved.length >= 5
+      ? Math.round((skippedWouldBeLoss.length / skippedResolved.length) * 1000) / 10
+      : null;
 
   return {
     overallAccuracy:
       resolved.length > 0
-        ? Math.round((accurate.length / resolved.length) * 1000) / 10
+        ? Math.round((wins.length / resolved.length) * 1000) / 10
         : 0,
     resolvedPredictions: resolved.length,
-    accuratePredictions: accurate.length,
+    accuratePredictions: wins.length,
+    inaccuratePredictions: losses.length,
+    breakevenPredictions: beItems.length,
     recentAccuracy:
       recent.length > 0
-        ? Math.round((recentAccurate.length / recent.length) * 1000) / 10
+        ? Math.round((recentWins.length / recent.length) * 1000) / 10
         : 0,
     liveAccuracy,
     liveResolved: liveResolved.length,
@@ -1248,5 +1321,18 @@ export function summarizePredictionAccuracy(
         ? Math.round((seedAccurate.length / seedResolved.length) * 1000) / 10
         : 0,
     seedResolved: seedResolved.length,
+    // Three-metric breakdown
+    signalDirectionAccuracy:
+      sigDirResolved.length > 0
+        ? Math.round((sigDirWins.length / sigDirResolved.length) * 1000) / 10
+        : 0,
+    signalDirectionResolved: sigDirResolved.length,
+    signalDirectionWins:     sigDirWins.length,
+    siggiTradeWinRate,
+    siggiTradesResolved: tradedResolved.length,
+    siggiTradesWon:      tradedWon.length,
+    skipQuality,
+    skippedResolved:     skippedResolved.length,
+    skippedWouldBeLoss:  skippedWouldBeLoss.length,
   };
 }

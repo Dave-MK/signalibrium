@@ -319,6 +319,17 @@ export function parseCreateJournalEntryInput(body: unknown) {
     emotionTags: body.emotionTags ? asStringArray(body.emotionTags, "emotionTags") : [],
     aiReview: asString(body.aiReview, "aiReview"),
     ticketId: asNullableString(body.ticketId),
+    // Extended trade-note fields (optional, default to empty)
+    predictionId:   "predictionId"   in body ? asNullableString(body.predictionId)   : null,
+    tradeId:        "tradeId"        in body ? asNullableString(body.tradeId)         : null,
+    entryType:      ("entryType"     in body ? asOptionalString(body.entryType) : undefined) as "trade_review" | "signal_review" | "general" ?? "general",
+    whatISaw:       "whatISaw"       in body ? asString(body.whatISaw, "whatISaw")    : "",
+    reasoning:      "reasoning"      in body ? asString(body.reasoning, "reasoning")  : "",
+    improvement:    "improvement"    in body ? asString(body.improvement, "improvement") : "",
+    tags:           "tags"           in body && body.tags ? asStringArray(body.tags, "tags") : [],
+    rating:         "rating"         in body && body.rating !== undefined && body.rating !== null ? asNumber(body.rating as unknown, "rating") : null,
+    wouldTakeAgain: "wouldTakeAgain" in body && body.wouldTakeAgain !== undefined && body.wouldTakeAgain !== null ? (body.wouldTakeAgain as boolean) : null,
+    taggedOutcome:  "taggedOutcome"  in body ? (body.taggedOutcome as "Win" | "Loss" | "Breakeven" | "Skipped" | null ?? null) : null,
   } satisfies Omit<PersistedJournalEntry, "id" | "createdAt" | "updatedAt">;
 }
 

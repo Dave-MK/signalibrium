@@ -10,7 +10,9 @@ const GONE_KEY    = "siggi.guide.gone";     // true = tab hidden permanently
 const CHECKED_KEY = "siggi.guide.checked";
 const OPEN_KEY    = "siggi.guide.open";
 
-const PANEL_WIDTH = 304; // px — keep in sync with w-[304px] below
+// Default panel width in px. On small phones the mount effect shrinks this
+// so the guide tab (≈44 px) always stays partially visible.
+const DEFAULT_PANEL_WIDTH = 304;
 
 const STEPS = [
   {
@@ -82,14 +84,19 @@ function isCurrentPage(href: string | null, pathname: string) {
 export function GettingStartedChecklist() {
   const pathname = usePathname();
 
-  const [mounted, setMounted] = useState(false);
-  // gone = tab permanently hidden by the user
-  const [gone, setGone]       = useState(false);
-  const [open, setOpen]       = useState(false);
-  const [checked, setChecked] = useState<Set<StepId>>(new Set());
+  const [mounted, setMounted]       = useState(false);
+  const [gone, setGone]             = useState(false);
+  const [open, setOpen]             = useState(false);
+  const [checked, setChecked]       = useState<Set<StepId>>(new Set());
+  // Responsive: shrink on small phones so the tab remains visible
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
 
   // Hydrate from localStorage once on the client
   useEffect(() => {
+    // Compute responsive panel width now that window is available
+    const vw = window.innerWidth;
+    setPanelWidth(vw < 420 ? Math.max(vw - 44, 260) : DEFAULT_PANEL_WIDTH);
+
     const isGone  = localStorage.getItem(GONE_KEY) === "true";
     const wasOpen = localStorage.getItem(OPEN_KEY) !== "false"; // open by default on first visit
     const raw     = localStorage.getItem(CHECKED_KEY);
@@ -103,32 +110,32 @@ export function GettingStartedChecklist() {
     setMounted(true);
   }, []);
 
-  // Auto-mark a step when the user navigates to its page
+  // Auto-mark a step when the user navigates to its page.
+  // localStorage.setItem is kept outside the state updater — updaters must be
+  // pure (React Strict Mode invokes them twice to detect side-effects).
   useEffect(() => {
     if (!mounted || gone) return;
     const matchingStep = STEPS.find((s) => s.href && isCurrentPage(s.href, pathname));
     if (matchingStep && !checked.has(matchingStep.id)) {
-      setChecked((prev) => {
-        const next = new Set(prev);
-        next.add(matchingStep.id);
-        localStorage.setItem(CHECKED_KEY, JSON.stringify([...next]));
-        return next;
-      });
+      const next = new Set([...checked, matchingStep.id]);
+      setChecked(next);
+      localStorage.setItem(CHECKED_KEY, JSON.stringify([...next]));
     }
+  // checked intentionally excluded — this effect only fires on navigation, not
+  // on every check toggle. Reading `checked` directly is safe here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, mounted]);
 
   function toggle(id: StepId) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem(CHECKED_KEY, JSON.stringify([...next]));
-      return next;
-    });
+    // Compute new set imperatively so we can persist it without a side-effect
+    // inside the updater function.
+    const next = new Set(checked);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setChecked(next);
+    localStorage.setItem(CHECKED_KEY, JSON.stringify([...next]));
   }
 
   function openGuide() {
-    // If user had permanently hidden it, unhide first
     if (gone) {
       localStorage.removeItem(GONE_KEY);
       setGone(false);
@@ -138,10 +145,9 @@ export function GettingStartedChecklist() {
   }
 
   function toggleOpen() {
-    setOpen((prev) => {
-      localStorage.setItem(OPEN_KEY, String(!prev));
-      return !prev;
-    });
+    const next = !open;
+    setOpen(next);
+    localStorage.setItem(OPEN_KEY, String(next));
   }
 
   function closePanel() {
@@ -174,7 +180,7 @@ export function GettingStartedChecklist() {
         onClick={toggleOpen}
         aria-label={open ? "Close guide" : "Open getting-started guide"}
         style={{
-          right: open ? PANEL_WIDTH : 0,
+          right: open ? panelWidth : 0,
           transition: "right 300ms cubic-bezier(0.4,0,0.2,1)",
         }}
         className="fixed top-1/2 z-50 -translate-y-1/2 cursor-pointer select-none rounded-l-[0.55rem] border border-r-0 border-cyan-400/25 bg-gradient-to-b from-[#0d2236] to-[#091a2b] shadow-[0_4px_24px_rgba(0,0,0,0.55),-2px_0_12px_rgba(6,182,212,0.08)] backdrop-blur-xl"
@@ -238,7 +244,7 @@ export function GettingStartedChecklist() {
 
       {/* ── Slide-out panel ───────────────────────────────────────────── */}
       <div
-        style={{ width: PANEL_WIDTH }}
+        style={{ width: panelWidth }}
         className={`fixed top-0 right-0 z-40 flex h-full flex-col border-l border-white/8 bg-[#07111d]/98 shadow-[0_0_60px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}

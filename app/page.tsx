@@ -5,11 +5,13 @@ import { listAssets } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
 import { listConfirmationChecks } from "@/app/_lib/server/repositories/confirmation-checks";
 import { listMarketEvents } from "@/app/_lib/server/repositories/market-events";
+import type { PersistedMarketEvent } from "@/app/_lib/server/workspace-types";
 import { getMarketSnapshot } from "@/app/_lib/server/repositories/market-snapshot";
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
 import { ActionLink, PageHeader, Panel, StatusChip, SummaryCard } from "./_components/ui";
+import { DonutWithLegend, StatBar } from "./_components/donut-chart";
 
 function MarketStatusBadge({ state, venue }: { state: MarketSessionState; venue: string }) {
   if (state === "Open" || state === "24/7") {
@@ -246,12 +248,21 @@ export default async function DashboardPage() {
             detail="Live trades running right now"
             tone="text-cyan-200"
           />
-          <SummaryCard
-            label="Accuracy"
-            value={`${predictionAccuracy.overallAccuracy}%`}
-            detail={`${predictionAccuracy.accuratePredictions}/${predictionAccuracy.resolvedPredictions} calls correct`}
-            tone={predictionAccuracy.overallAccuracy >= 60 ? "text-emerald-300" : "text-amber-200"}
-          />
+          {/* Win/Loss donut replacing the flat accuracy card */}
+          <div className="signal-surface-soft rounded-[0.46rem] p-3">
+            <DonutWithLegend
+              size={72}
+              thickness={12}
+              centerLabel={`${predictionAccuracy.overallAccuracy}%`}
+              centerSublabel="accuracy"
+              title="Signal accuracy"
+              segments={[
+                { value: predictionAccuracy.accuratePredictions,   color: "#34d399", label: "Wins" },
+                { value: predictionAccuracy.inaccuratePredictions, color: "#f87171", label: "Losses" },
+                { value: predictionAccuracy.breakevenPredictions,  color: "#64748b", label: "Breakeven" },
+              ]}
+            />
+          </div>
         </div>
       </Panel>
 
@@ -292,6 +303,79 @@ export default async function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Market events calendar — this week */}
+      {marketEvents.length > 0 && (() => {
+        // Build a 7-day calendar centred on today
+        const todayMs = Date.now();
+        const startOfToday = new Date(todayMs);
+        startOfToday.setHours(0, 0, 0, 0);
+        const days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(startOfToday.getTime() + i * 86_400_000);
+          return d;
+        });
+
+        const fmtDay = (d: Date) =>
+          d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/London" });
+
+        const eventsByDay = days.map((day) => {
+          const dayStart = day.getTime();
+          const dayEnd = dayStart + 86_400_000;
+          const events = marketEvents.filter((e) => {
+            const t = Date.parse(e.startsAt);
+            return t >= dayStart && t < dayEnd;
+          });
+          return { day, events };
+        });
+
+        const impactColor = (impact: PersistedMarketEvent["impact"]) =>
+          impact === "High" ? "#f87171" : impact === "Medium" ? "#fbbf24" : "#64748b";
+
+        return (
+          <Panel className="p-3 sm:p-3.5">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="micro-label">Market events — next 7 days</p>
+              <span className="text-[0.72rem] text-slate-500">{marketEvents.filter(e => e.status !== "Recent").length} upcoming</span>
+            </div>
+            <div className="grid gap-[5px] sm:grid-cols-7">
+              {eventsByDay.map(({ day, events }, i) => {
+                const isToday = i === 0;
+                return (
+                  <div
+                    key={day.toISOString()}
+                    className={`rounded-[0.38rem] p-2 ${isToday ? "bg-cyan-500/[0.07] ring-1 ring-cyan-500/20" : "bg-white/[0.02]"}`}
+                  >
+                    <p className={`text-[0.60rem] font-semibold uppercase tracking-wider mb-1.5 ${isToday ? "text-cyan-300" : "text-slate-500"}`}>
+                      {isToday ? "Today" : fmtDay(day).split(",")[0]}
+                      <span className="ml-1 font-normal text-slate-600">{fmtDay(day).split(",")[1]?.trim()}</span>
+                    </p>
+                    {events.length === 0 ? (
+                      <p className="text-[0.62rem] text-slate-700">—</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {events.slice(0, 3).map((ev) => (
+                          <div key={ev.id} className="flex items-start gap-1">
+                            <span
+                              className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full"
+                              style={{ background: impactColor(ev.impact) }}
+                            />
+                            <p className="text-[0.62rem] leading-[1.35] text-slate-300 line-clamp-2">
+                              {ev.title}
+                            </p>
+                          </div>
+                        ))}
+                        {events.length > 3 && (
+                          <p className="text-[0.60rem] text-slate-600">+{events.length - 3} more</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        );
+      })()}
 
       {/* Performance + score breakdown */}
       <Panel className="p-3 sm:p-3.5">
@@ -334,21 +418,16 @@ export default async function DashboardPage() {
         </div>
 
         {nowEntry ? (
-          <div className="mt-3 grid gap-[5px] sm:grid-cols-4">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {nowEntry.scoreBreakdown.map((item) => (
-              <SummaryCard
-                key={item.label}
-                label={item.label}
-                value={`${item.score}%`}
-                detail={item.detail}
-                tone={
-                  item.score >= 72
-                    ? "text-emerald-300"
-                    : item.score <= 44
-                      ? "text-amber-200"
-                      : "text-white"
-                }
-              />
+              <div key={item.label} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <StatBar
+                  label={item.label}
+                  value={item.score}
+                  detail={item.detail}
+                  color={item.score >= 72 ? "#34d399" : item.score <= 44 ? "#f59e0b" : "#22d3ee"}
+                />
+              </div>
             ))}
           </div>
         ) : null}

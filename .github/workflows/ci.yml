@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Type-check & build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript — type check
+        run: npx tsc --noEmit
+
+      - name: Next.js — production build
+        run: npm run build
+        env:
+          # ── Clerk ────────────────────────────────────────────────────────────
+          # Add these in GitHub → Settings → Secrets → Actions.
+          # Your test keys from .env.local work fine here.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+
+          # ── Anthropic ─────────────────────────────────────────────────────────
+          # The build doesn't make live AI calls — this placeholder stops the
+          # workspace-store from erroring during static page generation.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # ── Everything else — placeholders sufficient for a build pass ────────
+          NEXT_PUBLIC_APP_URL: https://example.com
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+          NEXT_PUBLIC_BROKER_NAME: Broker
+          NEXT_PUBLIC_BROKER_REFERRAL_URL: https://example.com

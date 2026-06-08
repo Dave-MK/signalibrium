@@ -375,6 +375,111 @@ export const strategyProfiles: StrategyProfile[] = [
     ],
   },
   {
+    id: "bollinger-band-reversal",
+    name: "Bollinger Band Reversal",
+    thesis:
+      "Use Bollinger Bands (20-period, 2σ) to identify statistically extreme price extensions and trade the mean-reversion back toward the midline — but only when a confirming reversal candle or momentum divergence anchors the entry.",
+    supportedAssets: ["Crypto", "ETF", "Equity", "Forex", "Commodity", "Index"],
+    supportedTimeframes: ["15M", "1H", "4H"],
+    bestRegimes: ["Balanced"],
+    worstRegimes: ["Risk-On", "Risk-Off"],
+    typicalHoldHours: { minimum: 1, maximum: 14 },
+    rules: [
+      "Only trade band touches in a ranging or balanced market. In a strong trend, price can 'walk the band' indefinitely — fading is dangerous.",
+      "Require a confirming candle at the band: a pinbar, engulfing, or rejection wick that closes back inside the band.",
+      "For squeeze plays (bands narrowing to a multi-week low), wait for the first decisive close outside the band with volume, then trade continuation rather than fading.",
+      "Use the 20-period midline (simple moving average) as the first profit target on band-touch reversions; the opposite band is secondary.",
+      "RSI or momentum divergence at the band significantly increases confidence: price makes a new extreme but momentum does not.",
+      "If price closes beyond the band on two consecutive candles, the reversion thesis is invalidated — stand aside.",
+    ],
+    visualModel: {
+      pattern:
+        "Upper band touch → rejection wick or bearish engulfing → reversion toward midline. Lower band touch → hammer or bullish engulfing → reversion toward midline. Squeeze (band width < 12-period average) → expansion candle → continuation.",
+      entry:
+        "On the confirming candle close back inside the band, or on the first retest after the squeeze-breakout candle.",
+      invalidation:
+        "Two consecutive closes beyond the band in the touch direction, or a squeeze candle that fails to follow through after one candle.",
+    },
+    confluenceChecks: [
+      "Market regime is Balanced — avoid in trending conditions",
+      "Confirming reversal candle prints at the band",
+      "RSI or momentum divergence is present",
+      "No upcoming high-impact event within the expected hold window",
+      "For squeeze entries: band width is below 12-period average width",
+    ],
+  },
+  {
+    id: "rsi-overbought-oversold",
+    name: "RSI Overbought Oversold",
+    thesis:
+      "Trade RSI(14) extremes — below 30 for longs, above 70 for shorts — but only when price structure, location, and a reversal candle all align. RSI alone is not a signal; it is a filter that identifies where the market may be emotionally exhausted.",
+    supportedAssets: ["Crypto", "ETF", "Equity", "Forex", "Commodity", "Index"],
+    supportedTimeframes: ["15M", "1H", "4H"],
+    bestRegimes: ["Balanced"],
+    worstRegimes: ["Risk-On", "Risk-Off"],
+    typicalHoldHours: { minimum: 1, maximum: 12 },
+    rules: [
+      "RSI below 30 (oversold) or above 70 (overbought) is a necessary but not sufficient condition — always wait for price structure confirmation.",
+      "Hidden divergence (trend continuation) outperforms standard divergence in trending markets; standard (reversal) divergence works better in ranges.",
+      "Standard divergence: price makes a new extreme but RSI does not confirm it — this indicates weakening momentum and raises reversal probability.",
+      "Price structure requirement: the RSI extreme must occur at a known support (for longs) or resistance (for shorts) level — VWAP, Fibonacci, prior swing, or session extreme.",
+      "Avoid fading RSI extremes in strong trending markets — a market can stay overbought or oversold for many candles during a sustained move.",
+      "Best used when RSI approaches 30/70 from moderate levels rather than whipping between extremes repeatedly.",
+      "Exit rule: close the position when RSI crosses back through the 50 midline, or when price reaches the opposing structure level.",
+    ],
+    visualModel: {
+      pattern:
+        "RSI dips below 30 at a known support level → bullish candle prints → RSI turns up. RSI spikes above 70 at a known resistance level → bearish candle prints → RSI turns down. Divergence variant: price makes new low but RSI prints a higher low → reversal signal.",
+      entry:
+        "On the confirmation candle close after RSI has turned direction, not on the first touch of 30/70.",
+      invalidation:
+        "RSI continues deeper beyond 25 (for longs) or 75 (for shorts) without price recovering — the exhaustion is not yet complete.",
+    },
+    confluenceChecks: [
+      "RSI is at a genuine extreme (below 30 / above 70), not just approaching it",
+      "Price is at a meaningful structural level — support, resistance, VWAP, or Fibonacci",
+      "Standard divergence confirms: price extreme is NOT matched by RSI extreme",
+      "Confirming reversal candle (pinbar, engulfing) has printed",
+      "Regime is Balanced — avoid pure RSI fades in clearly trending markets",
+    ],
+  },
+  {
+    id: "trend-reversal-method",
+    name: "Trend Reversal Method",
+    thesis:
+      "Identify the four-phase anatomy of a genuine trend reversal — exhaustion, structural break, retest, and continuation in the new direction — and enter only at the retest, not on the first reversal candle.",
+    supportedAssets: ["Crypto", "ETF", "Equity", "Forex", "Commodity", "Index"],
+    supportedTimeframes: ["1H", "4H"],
+    bestRegimes: ["Balanced", "Risk-Off"],
+    worstRegimes: ["Risk-On"],
+    typicalHoldHours: { minimum: 4, maximum: 36 },
+    rules: [
+      "Phase 1 — Exhaustion: look for momentum divergence (price makes a new trend extreme but RSI/MACD does not), climax candles (large candle with extreme volume that fails to hold), or multiple failed breaks at the same level.",
+      "Phase 2 — Structural break: price must break the last significant swing low (for bearish reversal) or swing high (for bullish reversal) on the trigger timeframe. This is the minimum threshold before a reversal is considered.",
+      "Phase 3 — Retest: after the structural break, wait for price to return and test the broken level from the other side. The broken support should now act as resistance (or vice versa). This is the primary entry point.",
+      "Phase 4 — Confirmation and continuation: enter only when the retest candle confirms rejection at the retested level. The trade targets the next major structural level in the reversal direction.",
+      "Higher-timeframe structure must agree — do not fight a powerful 4H or daily trend on a 15M reversal. Align at minimum two timeframes.",
+      "The retest candle is the entry anchor. If price ploughs through the retested level without rejection, the reversal has failed and risk is capped immediately.",
+      "Volume divergence strengthens the exhaustion signal: climax volume during the last push, then reduced volume during the failed continuation, then expanding volume on the break.",
+    ],
+    visualModel: {
+      pattern:
+        "Trend pushes to new extreme → momentum divergence + climax candle → structural break of last swing → retest of broken swing from other side → rejection candle at retest → continuation in reversal direction.",
+      entry:
+        "On the rejection candle at the retest level (Phase 3), with stop just beyond the retest high/low.",
+      invalidation:
+        "Price closes back through the retested level, negating the role reversal, or momentum continues in the original trend direction past the Phase 1 extreme.",
+    },
+    confluenceChecks: [
+      "Momentum divergence is visible on the trigger timeframe",
+      "Structural break has occurred — not just a wick through, but a candle close",
+      "Retest of the broken level is clean and finds rejection",
+      "Higher timeframe (4H or daily) structure supports the reversal direction",
+      "Volume expands on the break and contracts on the retest, then expands again on entry",
+      "No major event scheduled that could override the structural read",
+    ],
+  },
+  {
     id: "event-volatility-breakout",
     name: "Event Volatility Breakout",
     thesis:
@@ -418,6 +523,21 @@ export function selectStrategyProfile(input: {
 }) {
   if (input.score >= 90 && input.volatility === "Fast") {
     return getStrategyProfileByName("Event Volatility Breakout")!;
+  }
+
+  // Trend Reversal Method: Short setups with elevated momentum / confirmed structure break
+  if (input.stance === "Short" && input.volatility === "Elevated" && input.regime !== "Risk-On" && input.score >= 80) {
+    return getStrategyProfileByName("Trend Reversal Method")!;
+  }
+
+  // Bollinger Band Reversal: balanced market, elevated-but-not-fast volatility, good score
+  if (input.regime === "Balanced" && input.volatility === "Elevated" && input.score >= 72) {
+    return getStrategyProfileByName("Bollinger Band Reversal")!;
+  }
+
+  // RSI Overbought/Oversold: balanced regime, contained volatility, moderate score range
+  if (input.regime === "Balanced" && input.volatility === "Contained" && input.score >= 65 && input.score < 78) {
+    return getStrategyProfileByName("RSI Overbought Oversold")!;
   }
 
   if (input.regime === "Balanced" && input.volatility === "Contained" && input.score >= 78) {

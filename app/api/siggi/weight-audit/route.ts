@@ -25,7 +25,7 @@ export async function GET() {
   const resolved = history.filter(
     (r) =>
       r.monitoringStatus === "Resolved" &&
-      (r.outcome === "Hit Target" || r.outcome === "Stopped"),
+      (r.outcome === "Hit Target" || r.outcome === "Stopped" || r.outcome === "Breakeven"),
   );
 
   if (resolved.length === 0) {

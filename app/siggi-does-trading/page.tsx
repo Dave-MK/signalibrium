@@ -4,10 +4,28 @@ import {
 } from "@/app/_lib/currency";
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
+import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
 import { PageHeader, Panel, StatusChip, SummaryCard } from "../_components/ui";
 import { TradePlanChart } from "../_components/trade-plan-chart";
 import { EquityCurveChart } from "../_components/equity-curve-chart";
+import { TradesCsvExportButton } from "../_components/csv-export-button";
+import { DonutWithLegend, DonutChart, StatBar } from "../_components/donut-chart";
+import { Sparkline } from "../_components/sparkline";
 import { SiggiResetButton } from "./siggi-reset-button";
+import { InlineNoteButton } from "@/app/_components/trade-note-form";
+import type { TradeNoteOutcome } from "@/app/_lib/server/workspace-types";
+
+// Correlation groups — mirrors siggi-simulation.ts CORRELATION_GROUPS
+const CORRELATION_GROUPS: Record<string, string[]> = {
+  "crypto-btc":       ["BTC/USD","BTCUSD","BTC/USDT","BTCUSDT","XBTUSD"],
+  "crypto-major":     ["ETH/USD","ETHUSD","SOL/USD","SOLUSD","BNB/USD","BNBUSD","ETH/USDT","SOL/USDT"],
+  "us-big-tech":      ["AAPL","MSFT","NVDA","GOOGL","GOOG","AMZN","META"],
+  "us-indices":       ["SPX500","US500","SP500","NASDAQ100","NDX","QQQ","SPY","NAS100","US100"],
+  "precious-metals":  ["GOLD","XAU/USD","XAUUSD","SILVER","XAG/USD","XAGUSD"],
+  "energy":           ["WTI","USOIL","BRENT","UKOIL","OIL","CL=F"],
+  "gbp-pairs":        ["GBP/USD","GBPUSD","GBP/EUR","GBPEUR","GBP/JPY","GBPJPY"],
+  "eur-pairs":        ["EUR/USD","EURUSD","EUR/JPY","EURJPY","EUR/GBP","EURGBP"],
+};
 
 function formatCompactTimestamp(timestamp: string | null) {
   if (!timestamp) return "Awaiting mark";
@@ -36,11 +54,26 @@ const ACCOUNT_FLOW_SECTIONS = [
   },
 ];
 
+function tradeStatusToNoteOutcome(status: string): TradeNoteOutcome | undefined {
+  if (status === "Hit Target") return "Win";
+  if (status === "Stopped")    return "Loss";
+  if (status === "Breakeven")  return "Breakeven";
+  return undefined;
+}
+
 export default async function SiggiDoesTradingPage() {
-  const [siggiAccount, displayCurrencyState] = await Promise.all([
+  const [siggiAccount, displayCurrencyState, journalEntries] = await Promise.all([
     getSiggiAccount(),
     getDisplayCurrencyState(),
+    listJournalEntries(),
   ]);
+
+  // Map tradeId → journal entry for O(1) lookup per row
+  const noteByTradeId = new Map(
+    journalEntries
+      .filter((e) => e.tradeId)
+      .map((e) => [e.tradeId!, e]),
+  );
 
   const liveOpenPnlGbp = siggiAccount.openTrades.reduce(
     (total, trade) => total + (trade.unrealizedPnlGbp ?? 0),
@@ -67,11 +100,136 @@ export default async function SiggiDoesTradingPage() {
   // Use up to 40 equity snapshots for the chart — newest last
   const equityCurve = [...siggiAccount.equityCurve].reverse().slice(-40);
 
+  // Portfolio heat: sum of current-stop-distance × quantity × usdToGbp for all open trades
+  const usdToGbpRate = displayCurrencyState.rates.GBP ?? 0.79;
+  const openRiskGbp  = siggiAccount.openTrades.reduce((total, trade) => {
+    const riskPerUnit = Math.abs(trade.entryPrice - trade.stopPrice);
+    return total + riskPerUnit * trade.quantity * usdToGbpRate;
+  }, 0);
+  const heatPct         = totalBalanceGbp > 0 ? (openRiskGbp / totalBalanceGbp) * 100 : 0;
+  const maxHeatPct      = 40; // matches maxPortfolioHeatRatio in siggi-simulation.ts
+  const heatFillPct     = Math.min(100, (heatPct / maxHeatPct) * 100);
+  const heatTone        = heatPct > 30 ? "bg-red-400" : heatPct > 20 ? "bg-amber-400" : "bg-emerald-400";
+
   const latestOpenMarkAt =
     siggiAccount.openTrades
       .map((t) => t.lastMarkedAt)
       .filter((v): v is string => typeof v === "string")
       .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+
+  // ── Streak + performance stats ──────────────────────────────────────────────
+  // Sort closed trades newest-first for streak calculation
+  const sortedClosedNewest = [...siggiAccount.closedTrades].sort(
+    (a, b) => Date.parse(b.closedAt ?? "0") - Date.parse(a.closedAt ?? "0"),
+  );
+  let currentStreak = 0;
+  let currentStreakIsWin = true;
+  for (const t of sortedClosedNewest) {
+    const isWin = t.status === "Hit Target" || t.status === "Breakeven";
+    if (currentStreak === 0) { currentStreakIsWin = isWin; currentStreak = 1; }
+    else if (isWin === currentStreakIsWin) currentStreak++;
+    else break;
+  }
+
+  let longestWinStreak = 0;
+  let tempWin = 0;
+  for (const t of [...sortedClosedNewest].reverse()) {
+    if (t.status === "Hit Target" || t.status === "Breakeven") {
+      tempWin++;
+      longestWinStreak = Math.max(longestWinStreak, tempWin);
+    } else {
+      tempWin = 0;
+    }
+  }
+
+  const holdTimesHours = siggiAccount.closedTrades
+    .filter((t) => t.openedAt && t.closedAt)
+    .map((t) => (Date.parse(t.closedAt!) - Date.parse(t.openedAt)) / 3_600_000)
+    .filter((h) => h > 0);
+  const avgHoldHours = holdTimesHours.length > 0
+    ? holdTimesHours.reduce((a, b) => a + b) / holdTimesHours.length
+    : null;
+  const avgHoldLabel = avgHoldHours === null ? null
+    : avgHoldHours < 48 ? `${Math.round(avgHoldHours)}h avg hold`
+    : `${Math.round(avgHoldHours / 24)}d avg hold`;
+
+  // ── Drawdown analytics ─────────────────────────────────────────────────────
+  const equityValues = equityCurve.map((s) => s.equityGbp);
+  let maxDrawdownPct = 0;
+  let peak = equityValues[0] ?? siggiAccount.startingBalanceGbp;
+  for (const v of equityValues) {
+    if (v > peak) peak = v;
+    const dd = peak > 0 ? ((peak - v) / peak) * 100 : 0;
+    if (dd > maxDrawdownPct) maxDrawdownPct = dd;
+  }
+  const hwm = siggiAccount.highWatermarkGbp;
+  const currentDrawdownPct = hwm > 0 ? Math.max(0, ((hwm - totalBalanceGbp) / hwm) * 100) : 0;
+  const closedPnl = siggiAccount.closedTrades.reduce((s, t) => s + (t.realizedPnlGbp ?? 0), 0);
+  const grossLoss = siggiAccount.closedTrades
+    .filter((t) => (t.realizedPnlGbp ?? 0) < 0)
+    .reduce((s, t) => s + Math.abs(t.realizedPnlGbp ?? 0), 0);
+  const recoveryFactor = grossLoss > 0 ? (closedPnl / grossLoss) : null;
+
+  // ── Per-symbol P&L breakdown ────────────────────────────────────────────────
+  type SymbolRow = { wins: number; losses: number; breakeven: number; pnl: number };
+  const bySymbol = new Map<string, SymbolRow>();
+  for (const t of siggiAccount.closedTrades) {
+    const row = bySymbol.get(t.symbol) ?? { wins: 0, losses: 0, breakeven: 0, pnl: 0 };
+    if (t.status === "Hit Target") row.wins++;
+    else if (t.status === "Stopped") row.losses++;
+    else row.breakeven++;
+    row.pnl += t.realizedPnlGbp ?? 0;
+    bySymbol.set(t.symbol, row);
+  }
+  const symbolRows = [...bySymbol.entries()]
+    .map(([symbol, row]) => ({ symbol, ...row }))
+    .sort((a, b) => b.pnl - a.pnl);
+
+  // ── Confidence trend (closed trades oldest → newest) ───────────────────────
+  const confidenceTrend = [...siggiAccount.closedTrades]
+    .filter((t) => typeof t.confidenceAtOpen === "number")
+    .sort((a, b) => Date.parse(a.openedAt) - Date.parse(b.openedAt))
+    .map((t) => t.confidenceAtOpen!)
+    .slice(-30);
+
+  // ── Correlated open trades ──────────────────────────────────────────────────
+  const openSymbols = siggiAccount.openTrades.map((t) => t.symbol);
+  // For each open trade, determine which correlation group it's in (if any), and if
+  // another open trade is also in that group
+  const correlationWarnings = new Map<string, string>(); // tradeId → groupName
+  for (const trade of siggiAccount.openTrades) {
+    for (const [groupName, members] of Object.entries(CORRELATION_GROUPS)) {
+      if (members.includes(trade.symbol)) {
+        const sibling = openSymbols.find(
+          (s) => s !== trade.symbol && members.includes(s),
+        );
+        if (sibling) {
+          correlationWarnings.set(trade.id, `${groupName} (also ${sibling})`);
+        }
+        break;
+      }
+    }
+  }
+
+  // ── One-line performance summary
+  const pnlLine = growthPct === 0 && resolvedTrades === 0
+    ? "No trades placed yet — Siggi is watching for qualifying setups."
+    : growthPct >= 0
+      ? `Up ${formatGbp(totalBalanceGbp - siggiAccount.startingBalanceGbp)} (+${growthPct.toFixed(1)}%) from start`
+      : `Down ${formatGbp(Math.abs(totalBalanceGbp - siggiAccount.startingBalanceGbp))} (${growthPct.toFixed(1)}%) from start`;
+  const streakLine = currentStreak === 0 ? null
+    : currentStreakIsWin
+      ? `${currentStreak}-trade win streak`
+      : `${currentStreak}-trade loss streak`;
+  const performanceSummary = [
+    pnlLine,
+    streakLine,
+    resolvedTrades > 0 ? `${winRate}% win rate over ${resolvedTrades} trade${resolvedTrades === 1 ? "" : "s"}` : null,
+    avgHoldLabel,
+  ].filter(Boolean).join(" · ");
+
+  // Now the page renders (formatGbp is already defined above, so this is fine)
+  const nowMs = Date.now();
 
   return (
     <div className="panel-stack-5">
@@ -82,47 +240,155 @@ export default async function SiggiDoesTradingPage() {
         action={<SiggiResetButton />}
       />
 
-      {/* ── Summary metrics ── */}
-      <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-[5px] sm:grid-cols-2 xl:grid-cols-6">
-          <SummaryCard
-            label="Live equity"
-            value={formatGbp(totalBalanceGbp)}
-            detail={`${siggiAccount.openTrades.length} open · free cash ${formatGbp(siggiAccount.cashBalanceGbp)}`}
-            tone="text-cyan-200"
-          />
-          <SummaryCard
-            label="Open P&L"
-            value={`${liveOpenPnlGbp >= 0 ? "+" : ""}${formatGbp(liveOpenPnlGbp)}`}
-            detail={`Pulse-marked · latest ${formatCompactTimestamp(latestOpenMarkAt)}`}
-            tone={liveOpenPnlGbp >= 0 ? "text-emerald-300" : "text-red-200"}
-          />
-          <SummaryCard
-            label="High watermark"
-            value={formatGbp(siggiAccount.highWatermarkGbp)}
-            detail="Best paper-equity level so far"
-            tone="text-emerald-300"
-          />
-          <SummaryCard
-            label="Growth vs start"
-            value={`${growthPct >= 0 ? "+" : ""}${growthPct.toFixed(1)}%`}
-            detail={`Started from ${formatGbp(siggiAccount.startingBalanceGbp)}`}
-            tone={growthPct >= 0 ? "text-emerald-300" : "text-red-200"}
-          />
-          <SummaryCard
-            label="Win rate"
-            value={`${winRate}%`}
-            detail={`${siggiAccount.successfulTrades} wins / ${siggiAccount.failedTrades} losses`}
-            tone="text-white"
-          />
-          <SummaryCard
-            label="Resets"
-            value={`${siggiAccount.resetCount}`}
-            detail="Times Siggi had to reload after a bust"
-            tone="text-amber-200"
-          />
-        </div>
+      {/* ── One-line performance commentary ── */}
+      <Panel className="px-3.5 py-2.5 sm:px-4">
+        <p className="text-[0.80rem] leading-5 text-slate-300">{performanceSummary}</p>
       </Panel>
+
+      {/* ── Dashboard: two-column metrics ── */}
+      <div className="grid gap-[5px] lg:grid-cols-[1fr_1fr]">
+
+        {/* Left — Win/loss donut + key stats */}
+        <Panel className="p-3 sm:p-4">
+          <p className="micro-label mb-3">Performance overview</p>
+          <div className="flex items-start gap-4">
+            <DonutChart
+              size={108}
+              thickness={16}
+              centerLabel={resolvedTrades > 0 ? `${winRate}%` : "—"}
+              centerSublabel="win rate"
+              segments={[
+                { value: siggiAccount.successfulTrades, color: "#34d399", label: "Wins" },
+                { value: siggiAccount.failedTrades,     color: "#f87171", label: "Losses" },
+              ]}
+            />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              {[
+                {
+                  label: "Wins",
+                  value: siggiAccount.successfulTrades,
+                  pct: resolvedTrades > 0 ? Math.round((siggiAccount.successfulTrades / resolvedTrades) * 100) : 0,
+                  color: "#34d399",
+                },
+                {
+                  label: "Losses",
+                  value: siggiAccount.failedTrades,
+                  pct: resolvedTrades > 0 ? Math.round((siggiAccount.failedTrades / resolvedTrades) * 100) : 0,
+                  color: "#f87171",
+                },
+              ].map((row) => (
+                <div key={row.label}>
+                  <div className="mb-1 flex items-center justify-between text-[0.69rem]">
+                    <span className="text-slate-400">{row.label}</span>
+                    <span className="font-semibold text-white">{row.value}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                    <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: row.color }} />
+                  </div>
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-[5px] pt-1">
+                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                  <p className="text-[0.60rem] text-slate-500">Streak</p>
+                  <p className={`text-[0.82rem] font-bold ${currentStreak === 0 ? "text-slate-500" : currentStreakIsWin ? "text-emerald-300" : "text-red-300"}`}>
+                    {currentStreak === 0 ? "—" : `${currentStreak}${currentStreakIsWin ? "W" : "L"}`}
+                  </p>
+                </div>
+                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                  <p className="text-[0.60rem] text-slate-500">Best streak</p>
+                  <p className="text-[0.82rem] font-bold text-cyan-200">{longestWinStreak > 0 ? `${longestWinStreak}W` : "—"}</p>
+                </div>
+                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                  <p className="text-[0.60rem] text-slate-500">Avg hold</p>
+                  <p className="text-[0.82rem] font-bold text-slate-300">
+                    {avgHoldHours === null ? "—" : avgHoldHours < 48 ? `${Math.round(avgHoldHours)}h` : `${Math.round(avgHoldHours / 24)}d`}
+                  </p>
+                </div>
+                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                  <p className="text-[0.60rem] text-slate-500">Resets</p>
+                  <p className="text-[0.82rem] font-bold text-amber-200">{siggiAccount.resetCount}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Right — Equity + portfolio composition */}
+        <Panel className="p-3 sm:p-4">
+          <p className="micro-label mb-3">Capital allocation</p>
+
+          {/* Portfolio composition donut */}
+          <div className="flex items-start gap-4 mb-3">
+            <DonutChart
+              size={108}
+              thickness={16}
+              centerLabel={formatGbp(totalBalanceGbp)}
+              centerSublabel="equity"
+              segments={[
+                { value: siggiAccount.cashBalanceGbp,
+                  color: "#64748b", label: "Free cash" },
+                { value: siggiAccount.openTrades.reduce((s, t) => s + t.stakeGbp, 0),
+                  color: "#22d3ee", label: "Open stakes" },
+                { value: Math.max(0, liveOpenPnlGbp),
+                  color: "#34d399", label: "Unrealised gain" },
+              ]}
+            />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              {[
+                { label: "Free cash",        value: formatGbp(siggiAccount.cashBalanceGbp), color: "#64748b" },
+                { label: "Open stakes",      value: formatGbp(siggiAccount.openTrades.reduce((s,t)=>s+t.stakeGbp,0)), color: "#22d3ee" },
+                { label: "Unrealised P&L",   value: `${liveOpenPnlGbp >= 0 ? "+" : ""}${formatGbp(liveOpenPnlGbp)}`, color: liveOpenPnlGbp >= 0 ? "#34d399" : "#f87171" },
+                { label: "High watermark",   value: formatGbp(siggiAccount.highWatermarkGbp), color: "#a78bfa" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: row.color }} />
+                    <span className="text-[0.68rem] text-slate-400">{row.label}</span>
+                  </div>
+                  <span className="text-[0.72rem] font-semibold text-white">{row.value}</span>
+                </div>
+              ))}
+              <div className="pt-1">
+                <div className="flex items-center justify-between text-[0.68rem] mb-1">
+                  <span className="font-semibold text-slate-400">Growth vs start</span>
+                  <span className={`font-bold ${growthPct >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    {growthPct >= 0 ? "+" : ""}{growthPct.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.abs(growthPct))}%`,
+                      background: growthPct >= 0 ? "#34d399" : "#f87171",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Portfolio heat */}
+          <div className="border-t border-white/6 pt-3">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Portfolio heat</p>
+              <p className={`text-[0.72rem] font-semibold ${heatPct > 30 ? "text-red-300" : heatPct > 20 ? "text-amber-300" : "text-emerald-300"}`}>
+                {heatPct.toFixed(1)}%
+                <span className="ml-1.5 font-normal text-slate-500">/ {maxHeatPct}% cap · {formatGbp(openRiskGbp)} at risk</span>
+              </p>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${heatTone}`}
+                style={{ width: `${heatFillPct}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[0.62rem] text-slate-600">
+              Open risk as % of equity. Siggi caps new entries when heat would exceed {maxHeatPct}%.
+            </p>
+          </div>
+        </Panel>
+      </div>
 
       {/* ── Open trades with embedded plan charts ── */}
       <Panel className="p-3 sm:p-3.5">
@@ -132,6 +398,11 @@ export default async function SiggiDoesTradingPage() {
             siggiAccount.openTrades.map((trade) => {
               const pnl = trade.unrealizedPnlGbp ?? 0;
               const dp = trade.symbol.includes("JPY") ? 3 : trade.entryPrice < 10 ? 4 : trade.entryPrice < 1000 ? 2 : 0;
+              const rr = Math.abs(trade.entryPrice - trade.stopPrice) > 0
+                ? (Math.abs(trade.targetPrice - trade.entryPrice) / Math.abs(trade.entryPrice - trade.stopPrice))
+                : 0;
+              const ageHours = (nowMs - Date.parse(trade.openedAt)) / 3_600_000;
+              const ageLabel = ageHours < 48 ? `${Math.round(ageHours)}h` : `${Math.round(ageHours / 24)}d`;
               return (
                 <div key={trade.id} className="signal-surface-soft rounded-[0.4rem]">
                   <div className="grid lg:grid-cols-[1fr_260px]">
@@ -178,6 +449,16 @@ export default async function SiggiDoesTradingPage() {
                           <StatusChip label="LIVE" />
                           <StatusChip label={`${trade.confidenceAtOpen}% CONF`} />
                           <StatusChip label={trade.stopMode.toUpperCase()} />
+                          {rr > 0 && <StatusChip label={`${rr.toFixed(1)}R`} />}
+                          <StatusChip label={ageLabel} />
+                          {correlationWarnings.has(trade.id) && (
+                            <span
+                              title={`Correlated exposure: ${correlationWarnings.get(trade.id)}`}
+                              className="inline-flex items-center gap-1 rounded-[0.25rem] bg-amber-400/10 px-1.5 py-0.5 text-[0.60rem] font-semibold text-amber-300 ring-1 ring-amber-400/20"
+                            >
+                              ⚠ CORRELATED
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -214,7 +495,7 @@ export default async function SiggiDoesTradingPage() {
                     </div>
 
                     {/* ── Right: trade plan chart (overflow-hidden here, not on outer card, so tooltip isn't clipped) ── */}
-                    <div className="flex items-stretch overflow-hidden rounded-br-[0.4rem] rounded-tr-[0.4rem] border-t border-white/6 lg:border-l lg:border-t-0">
+                    <div className="flex min-h-[160px] items-stretch overflow-hidden rounded-br-[0.4rem] rounded-tr-[0.4rem] border-t border-white/6 lg:min-h-0 lg:border-l lg:border-t-0">
                       <div className="flex w-full flex-col">
                         <p className="px-3 pt-2.5 text-[0.64rem] font-semibold uppercase tracking-wider text-slate-600">
                           Trade plan
@@ -281,6 +562,49 @@ export default async function SiggiDoesTradingPage() {
               />
             </div>
           )}
+
+          {/* Drawdown analytics strip */}
+          <div className="mt-3 border-t border-white/6 pt-3 grid gap-[5px] sm:grid-cols-3">
+            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+              <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Max drawdown</p>
+              <p className={`text-[0.86rem] font-bold ${maxDrawdownPct > 20 ? "text-red-300" : maxDrawdownPct > 10 ? "text-amber-200" : "text-emerald-300"}`}>
+                {maxDrawdownPct > 0 ? `-${maxDrawdownPct.toFixed(1)}%` : "—"}
+              </p>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${Math.min(100, maxDrawdownPct * 2)}%`, background: maxDrawdownPct > 20 ? "#f87171" : maxDrawdownPct > 10 ? "#fbbf24" : "#34d399" }}
+                />
+              </div>
+            </div>
+            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+              <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Current drawdown</p>
+              <p className={`text-[0.86rem] font-bold ${currentDrawdownPct > 15 ? "text-red-300" : currentDrawdownPct > 7 ? "text-amber-200" : "text-emerald-300"}`}>
+                {currentDrawdownPct > 0.05 ? `-${currentDrawdownPct.toFixed(1)}%` : "At HWM"}
+              </p>
+              <p className="mt-0.5 text-[0.62rem] text-slate-600">from high watermark</p>
+            </div>
+            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+              <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Recovery factor</p>
+              <p className={`text-[0.86rem] font-bold ${recoveryFactor === null ? "text-slate-500" : recoveryFactor >= 1.5 ? "text-emerald-300" : recoveryFactor >= 0.8 ? "text-amber-200" : "text-red-300"}`}>
+                {recoveryFactor === null ? "—" : recoveryFactor.toFixed(2)}
+              </p>
+              <p className="mt-0.5 text-[0.62rem] text-slate-600">net P&amp;L ÷ gross loss</p>
+            </div>
+          </div>
+
+          {/* Confidence trend sparkline */}
+          {confidenceTrend.length >= 3 && (
+            <div className="mt-3 border-t border-white/6 pt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[0.60rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Confidence trend (last {confidenceTrend.length} trades)</p>
+                <span className="text-[0.68rem] text-slate-500">
+                  avg {Math.round(confidenceTrend.reduce((a, b) => a + b, 0) / confidenceTrend.length)}%
+                </span>
+              </div>
+              <Sparkline data={confidenceTrend} className="h-7 w-full" />
+            </div>
+          )}
         </Panel>
 
         <Panel className="p-3 sm:p-3.5">
@@ -307,14 +631,115 @@ export default async function SiggiDoesTradingPage() {
         </Panel>
       </div>
 
+      {/* ── Per-symbol P&L breakdown ── */}
+      {symbolRows.length > 0 && (
+        <div className="grid gap-[5px] xl:grid-cols-[1.2fr_0.8fr]">
+          <Panel className="p-3 sm:p-3.5">
+            <p className="micro-label mb-3">Performance by instrument</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[0.76rem]">
+                <thead>
+                  <tr className="border-b border-white/6 text-[0.63rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                    <th className="pb-1.5 text-left">Symbol</th>
+                    <th className="pb-1.5 text-center">W</th>
+                    <th className="pb-1.5 text-center">L</th>
+                    <th className="pb-1.5 text-center">BE</th>
+                    <th className="pb-1.5 text-right">Win%</th>
+                    <th className="pb-1.5 text-right">P&amp;L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {symbolRows.slice(0, 12).map((row) => {
+                    const total = row.wins + row.losses + row.breakeven;
+                    const wr = total > 0 ? Math.round(((row.wins + row.breakeven) / total) * 100) : 0;
+                    return (
+                      <tr key={row.symbol} className="border-b border-white/4 last:border-b-0">
+                        <td className="py-2 font-semibold text-white">{row.symbol}</td>
+                        <td className="py-2 text-center text-emerald-300">{row.wins}</td>
+                        <td className="py-2 text-center text-red-300">{row.losses}</td>
+                        <td className="py-2 text-center text-slate-400">{row.breakeven}</td>
+                        <td className="py-2 text-right">
+                          <span className={wr >= 60 ? "text-emerald-300" : wr <= 40 ? "text-red-300" : "text-amber-200"}>
+                            {total > 0 ? `${wr}%` : "—"}
+                          </span>
+                        </td>
+                        <td className={`py-2 text-right font-semibold ${row.pnl >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                          {row.pnl >= 0 ? "+" : ""}{formatGbp(row.pnl)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+
+          {/* Strategy taxonomy — win rate by outcome pattern */}
+          <Panel className="p-3 sm:p-3.5">
+            <p className="micro-label mb-3">Setup taxonomy</p>
+            <div className="space-y-2.5">
+              {[
+                {
+                  label: "High conviction (≥80% conf)",
+                  trades: siggiAccount.closedTrades.filter((t) => (t.confidenceAtOpen ?? 0) >= 80),
+                  color: "#34d399",
+                },
+                {
+                  label: "Standard (65–79% conf)",
+                  trades: siggiAccount.closedTrades.filter(
+                    (t) => (t.confidenceAtOpen ?? 0) >= 65 && (t.confidenceAtOpen ?? 0) < 80,
+                  ),
+                  color: "#22d3ee",
+                },
+                {
+                  label: "Speculative (<65% conf)",
+                  trades: siggiAccount.closedTrades.filter((t) => (t.confidenceAtOpen ?? 0) < 65),
+                  color: "#a78bfa",
+                },
+              ].map((group) => {
+                const wins = group.trades.filter(
+                  (t) => t.status === "Hit Target" || t.status === "Breakeven",
+                ).length;
+                const total = group.trades.length;
+                const wr = total > 0 ? Math.round((wins / total) * 100) : 0;
+                return (
+                  <div key={group.label}>
+                    <div className="flex items-center justify-between text-[0.70rem] mb-1">
+                      <span className="text-slate-400">{group.label}</span>
+                      <span className="font-semibold text-white">
+                        {total > 0 ? `${wr}% · ${total}T` : "No data"}
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${wr}%`,
+                          background: group.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="pt-1 text-[0.64rem] leading-4 text-slate-600">
+                Confidence tier at open → win rate. High-conviction setups should outperform over a large sample.
+              </p>
+            </div>
+          </Panel>
+        </div>
+      )}
+
       {/* ── Closed trades table ── */}
       <Panel className="overflow-hidden p-0">
-        <div className="border-b border-white/8 bg-white/[0.02] px-3 py-2.5">
+        <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.02] px-3 py-2.5">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Closed trades
           </p>
+          <TradesCsvExportButton trades={siggiAccount.closedTrades} />
         </div>
-        <div className="grid gap-x-3 border-b border-white/6 bg-white/[0.015] px-3 py-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.13em] text-slate-600 lg:grid-cols-[minmax(0,1.05fr)_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr_0.85fr]">
+        {/* Desktop column headers */}
+        <div className="hidden border-b border-white/6 bg-white/[0.015] px-3 py-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.13em] text-slate-600 lg:grid lg:grid-cols-[minmax(0,1.05fr)_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr_0.85fr_auto] lg:gap-3">
           <span>Instrument</span>
           <span>Side</span>
           <span>Entry</span>
@@ -322,36 +747,88 @@ export default async function SiggiDoesTradingPage() {
           <span>Target</span>
           <span>P&L</span>
           <span>Status</span>
+          <span>Note</span>
         </div>
         <div>
           {siggiAccount.closedTrades.slice(0, 30).map((trade) => {
-            const dp = trade.symbol.includes("JPY") ? 3 : trade.entryPrice < 10 ? 4 : trade.entryPrice < 1000 ? 2 : 0;
+            const dp  = trade.symbol.includes("JPY") ? 3 : trade.entryPrice < 10 ? 4 : trade.entryPrice < 1000 ? 2 : 0;
             const pnl = trade.realizedPnlGbp ?? 0;
+            const statusLabel =
+              trade.status === "Hit Target" ? "WIN" :
+              trade.status === "Stopped"    ? "LOSS" :
+              trade.status === "Breakeven"  ? "BREAKEVEN" :
+              trade.status.toUpperCase();
+            const existingNote   = noteByTradeId.get(trade.id);
+            const defaultOutcome = tradeStatusToNoteOutcome(trade.status);
             return (
-              <div
-                key={trade.id}
-                className="grid gap-[5px] border-b border-white/5 px-3 py-2.5 last:border-b-0 lg:grid-cols-[minmax(0,1.05fr)_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr_0.85fr] lg:items-center"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[0.84rem] font-semibold text-white">
-                    {trade.symbol}
-                    <span className="ml-1.5 text-[0.74rem] font-normal text-slate-500">{trade.instrumentName}</span>
-                  </p>
-                  <p className="mt-0.5 text-[0.70rem] text-slate-500">
-                    {trade.closedAt ? formatCompactTimestamp(trade.closedAt) : "Open"}
-                  </p>
+              <div key={trade.id} className="border-b border-white/5 px-3 py-2.5 last:border-b-0">
+                {/* Mobile card */}
+                <div className="lg:hidden">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-[0.86rem] font-semibold text-white">{trade.symbol}</p>
+                        <span className={`text-[0.78rem] font-semibold ${trade.side === "BUY" ? "text-emerald-300" : "text-amber-200"}`}>
+                          {trade.side}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[0.70rem] text-slate-500">
+                        {trade.instrumentName} · {trade.closedAt ? formatCompactTimestamp(trade.closedAt) : "Open"}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <StatusChip label={statusLabel} />
+                      <p className={`mt-1 text-[0.82rem] font-semibold ${pnl >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                        {pnl >= 0 ? "+" : ""}{formatGbp(pnl)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.70rem] text-slate-500">
+                    <span>Entry <span className="text-slate-300">{formatUsd(trade.entryPrice, dp)}</span></span>
+                    <span>Stop <span className="text-slate-300">{formatUsd(trade.stopPrice, dp)}</span></span>
+                    <span>Target <span className="text-slate-300">{formatUsd(trade.targetPrice, dp)}</span></span>
+                  </div>
+                  <div className="mt-2">
+                    <InlineNoteButton
+                      tradeId={trade.id}
+                      symbol={trade.symbol}
+                      defaultOutcome={defaultOutcome}
+                      existingEntry={existingNote}
+                    />
+                  </div>
                 </div>
-                <div className={`text-[0.82rem] font-semibold ${trade.side === "BUY" ? "text-emerald-300" : "text-amber-200"}`}>
-                  {trade.side}
-                </div>
-                <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.entryPrice, dp)}</div>
-                <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.stopPrice, dp)}</div>
-                <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.targetPrice, dp)}</div>
-                <div className={`text-[0.82rem] font-semibold ${pnl >= 0 ? "text-emerald-300" : "text-red-200"}`}>
-                  {pnl >= 0 ? "+" : ""}{formatGbp(pnl)}
-                </div>
-                <div>
-                  <StatusChip label={trade.status === "Hit Target" ? "HIT TARGET" : trade.status === "Stopped" ? "STOPPED" : trade.status.toUpperCase()} />
+
+                {/* Desktop table row */}
+                <div className="hidden lg:grid lg:grid-cols-[minmax(0,1.05fr)_0.7fr_0.8fr_0.8fr_0.8fr_0.8fr_0.85fr_auto] lg:items-start lg:gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.84rem] font-semibold text-white">
+                      {trade.symbol}
+                      <span className="ml-1.5 text-[0.74rem] font-normal text-slate-500">{trade.instrumentName}</span>
+                    </p>
+                    <p className="mt-0.5 text-[0.70rem] text-slate-500">
+                      {trade.closedAt ? formatCompactTimestamp(trade.closedAt) : "Open"}
+                    </p>
+                  </div>
+                  <div className={`text-[0.82rem] font-semibold ${trade.side === "BUY" ? "text-emerald-300" : "text-amber-200"}`}>
+                    {trade.side}
+                  </div>
+                  <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.entryPrice, dp)}</div>
+                  <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.stopPrice, dp)}</div>
+                  <div className="text-[0.80rem] text-slate-300">{formatUsd(trade.targetPrice, dp)}</div>
+                  <div className={`text-[0.82rem] font-semibold ${pnl >= 0 ? "text-emerald-300" : "text-red-200"}`}>
+                    {pnl >= 0 ? "+" : ""}{formatGbp(pnl)}
+                  </div>
+                  <div>
+                    <StatusChip label={statusLabel} />
+                  </div>
+                  <div className="pt-0.5">
+                    <InlineNoteButton
+                      tradeId={trade.id}
+                      symbol={trade.symbol}
+                      defaultOutcome={defaultOutcome}
+                      existingEntry={existingNote}
+                    />
+                  </div>
                 </div>
               </div>
             );

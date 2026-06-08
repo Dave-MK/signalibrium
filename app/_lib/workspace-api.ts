@@ -5,6 +5,7 @@ import type {
   MarketDataSyncSummary,
 } from "./market-data-contract";
 import type {
+  PersistedJournalEntry,
   PersistedScannerResult,
   SupportedDisplayCurrency,
   PersistedWatchlist,
@@ -182,4 +183,34 @@ export async function updateDisplayCurrency(currency: SupportedDisplayCurrency) 
   );
 
   return payload.currency;
+}
+
+
+// ── Journal / Trade Notes ─────────────────────────────────────────────────────
+
+export type CreateJournalEntryInput = Partial<Omit<PersistedJournalEntry, "id" | "createdAt" | "updatedAt">>;
+
+export async function listJournalEntriesApi() {
+  return requestJson<{ entries: PersistedJournalEntry[] }>("/api/journal-entries");
+}
+
+export async function createJournalEntryApi(data: CreateJournalEntryInput) {
+  return requestJson<{ entry: PersistedJournalEntry }>("/api/journal-entries", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateJournalEntryApi(id: string, patch: CreateJournalEntryInput) {
+  return requestJson<{ entry: PersistedJournalEntry }>(`/api/journal-entries/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteJournalEntryApi(id: string) {
+  return requestJson<{ success: boolean }>(`/api/journal-entries/${id}`, {
+    method: "DELETE",
+    body: JSON.stringify({}),
+  });
 }

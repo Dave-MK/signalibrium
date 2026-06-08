@@ -83,8 +83,22 @@ function buildActivity(input: {
 }
 
 /**
+ * Classify a closed trade's result purely from its realised P&L.
+ * "Hit Target"  = closed in profit  (P&L > 0) — any method: TP, trailing stop, manual close
+ * "Stopped"     = closed at a loss  (P&L < 0)
+ * "Breakeven"   = closed at entry   (P&L = 0, within a £0.01 rounding tolerance)
+ */
+function pnlToTradeStatus(
+  realizedPnlGbp: number,
+): "Hit Target" | "Stopped" | "Breakeven" {
+  if (realizedPnlGbp > 0.01)  return "Hit Target";
+  if (realizedPnlGbp < -0.01) return "Stopped";
+  return "Breakeven";
+}
+
+/**
  * Counts how many of the most-recent closed trades ended as a loss
- * (Stopped), stopping as soon as a win (Hit Target) is hit.
+ * (Stopped), stopping as soon as a win (Hit Target) or Breakeven is hit.
  * closedTrades is newest-first so this naturally counts the current streak.
  */
 function computeConsecutiveLosses(account: PersistedSiggiAccount): number {
@@ -92,7 +106,7 @@ function computeConsecutiveLosses(account: PersistedSiggiAccount): number {
   for (const trade of account.closedTrades) {
     if (trade.status === "Stopped") {
       count++;
-    } else if (trade.status === "Hit Target") {
+    } else if (trade.status === "Hit Target" || trade.status === "Breakeven") {
       break;
     }
   }
@@ -253,7 +267,9 @@ function isSignalFresh(record: PersistedPredictionHistoryRecord, nowMs: number) 
 
 // Analysis must be fresh — Siggi won't enter a trade on stale chart data.
 // Max 1h for Day setups, 4h for Week setups, 12h for Monthly setups.
-const maxAnalysisAgeHours: Record<string, number> = { Day: 1, Week: 4, Month: 12 };
+// Day analysis refreshes automatically every 2 h during full syncs, so 3 h here
+// gives a comfortable buffer.  Week/Month setups change slowly; 12 h / 24 h is fine.
+const maxAnalysisAgeHours: Record<string, number> = { Day: 3, Week: 12, Month: 24 };
 
 // Maximum time a trade can stay on its initial stop before Siggi calls time — 3× the signal window
 const maxTradeHoldHours: Record<string, number> = { Day: 36, Week: 96, Month: 192 };
@@ -599,9 +615,12 @@ function closeSiggiTrade(input: {
   // Accumulate any partial-exit P&L already banked so the closed record shows the full picture
   const totalRealizedPnlUsd = roundMoney((input.trade.realizedPnlUsd ?? 0) + finalLegPnlUsd);
   const totalRealizedPnlGbp = roundMoney((input.trade.realizedPnlGbp ?? 0) + finalLegPnlGbp);
+  // Classify purely from realised P&L — not from which level price touched.
+  // A trade stopped out by a trailing stop in profit is a Win, not a Loss.
+  const closeStatus = pnlToTradeStatus(totalRealizedPnlGbp);
   const closedTrade: PersistedSiggiTrade = {
     ...input.trade,
-    status: input.closeReason,
+    status: closeStatus,
     closedAt: input.syncedAt,
     currentPriceUsd: exitPrice,
     unrealizedPnlUsd: 0,
@@ -622,9 +641,9 @@ function closeSiggiTrade(input: {
     ),
     successfulTrades:
       input.account.successfulTrades +
-      (closedTrade.status === "Hit Target" ? 1 : 0),
+      (closeStatus === "Hit Target" || closeStatus === "Breakeven" ? 1 : 0),
     failedTrades:
-      input.account.failedTrades + (closedTrade.status === "Stopped" ? 1 : 0),
+      input.account.failedTrades + (closeStatus === "Stopped" ? 1 : 0),
     openTrades: remainingOpenTrades,
     closedTrades,
     lastEvaluatedAt: input.syncedAt,
@@ -633,13 +652,17 @@ function closeSiggiTrade(input: {
 
   const pnlStr = `${totalRealizedPnlGbp >= 0 ? "+" : ""}£${Math.abs(totalRealizedPnlGbp).toFixed(2)}`;
   const partialNote = closedTrade.partialExitDone ? " (half already locked at 1:1)" : "";
-  const winDetail = `${closedTrade.symbol} hit the target — ${pnlStr}${partialNote}. Thesis played out.`;
-  const lossDetail = `${closedTrade.symbol} stopped out — ${pnlStr}${partialNote}. Thesis invalidated, moving on.`;
+  const closeDetail =
+    closeStatus === "Hit Target"
+      ? `${closedTrade.symbol} closed in profit — ${pnlStr}${partialNote}. Thesis played out.`
+      : closeStatus === "Breakeven"
+        ? `${closedTrade.symbol} closed at breakeven — ${pnlStr}${partialNote}. Thesis neutralised, no loss taken.`
+        : `${closedTrade.symbol} closed at a loss — ${pnlStr}${partialNote}. Thesis invalidated, moving on.`;
   return appendActivity(
     nextAccount,
     buildActivity({
       at: input.syncedAt,
-      detail: input.closeReason === "Hit Target" ? winDetail : lossDetail,
+      detail: closeDetail,
       symbol: closedTrade.symbol,
       type: "Closed",
     }),
@@ -657,7 +680,7 @@ function voidBadTrade(input: {
 }): PersistedSiggiAccount {
   const closedTrade: PersistedSiggiTrade = {
     ...input.trade,
-    status: "Stopped",
+    status: "Breakeven",
     closedAt: input.syncedAt,
     currentPriceUsd: input.trade.entryPrice,
     unrealizedPnlUsd: 0,
@@ -857,9 +880,10 @@ function maybeTimeoutTrade(input: {
   const totalRealizedPnlUsd = roundMoney((input.trade.realizedPnlUsd ?? 0) + finalLegPnlUsd);
   const totalRealizedPnlGbp = roundMoney((input.trade.realizedPnlGbp ?? 0) + finalLegPnlGbp);
 
+  const timeoutStatus = pnlToTradeStatus(totalRealizedPnlGbp);
   const closedTrade: PersistedSiggiTrade = {
     ...input.trade,
-    status: "Stopped",
+    status: timeoutStatus,
     closedAt: input.syncedAt,
     currentPriceUsd: exitPrice,
     unrealizedPnlUsd: 0,
@@ -873,7 +897,8 @@ function maybeTimeoutTrade(input: {
   const nextAccount = {
     ...input.account,
     cashBalanceGbp: roundMoney(input.account.cashBalanceGbp + input.trade.stakeGbp + roundMoney(finalLegPnlGbp)),
-    failedTrades: input.account.failedTrades + 1,
+    successfulTrades: input.account.successfulTrades + (timeoutStatus === "Hit Target" || timeoutStatus === "Breakeven" ? 1 : 0),
+    failedTrades: input.account.failedTrades + (timeoutStatus === "Stopped" ? 1 : 0),
     openTrades: input.account.openTrades.filter((t) => t.id !== input.trade.id),
     closedTrades: [closedTrade, ...input.account.closedTrades].slice(0, 180),
     lastEvaluatedAt: input.syncedAt,
@@ -1047,18 +1072,30 @@ export function syncSiggiAccountWithOptions(
       closeReason = record.outcome;
     }
 
-    // Bug Fix 1: write trade outcome back to the originating signal record
+    // Write trade outcome back to the originating signal record.
+    // We look up the trade's final status (which is P&L-based) from closedTrades
+    // so a stop-out in profit is recorded as "Hit Target", not "Stopped".
     if (closeReason) {
+      const closedTrade = account.closedTrades.find((t) => t.id === trade.id);
+      const tradeStatus = closedTrade?.status ?? (closeReason === "Hit Target" ? "Hit Target" : "Stopped");
+      const resolvedOutcome: PersistedPredictionHistoryRecord["outcome"] =
+        tradeStatus === "Hit Target" ? "Hit Target"
+        : tradeStatus === "Breakeven" ? "Breakeven"
+        : "Stopped";
+      const resolvedAccuracy: PersistedPredictionHistoryRecord["outcomeAccuracy"] =
+        tradeStatus === "Hit Target" || tradeStatus === "Breakeven" ? "Accurate"
+        : "Inaccurate";
+      const resolvedScore = tradeStatus === "Hit Target" || tradeStatus === "Breakeven" ? 100 : 0;
+
       data.predictionHistory = data.predictionHistory.map((item) => {
         if (item.id !== trade.predictionId) return item;
         return {
           ...item,
-          tradeOutcome: closeReason,
           resolvedSource: "live_trade",
           resolvedAt: item.resolvedAt ?? syncedAt,
-          outcome: closeReason === "Hit Target" ? "Hit Target" : "Stopped",
-          outcomeAccuracy: closeReason === "Hit Target" ? "Accurate" : "Inaccurate",
-          accuracyScore: closeReason === "Hit Target" ? 100 : 0,
+          outcome: resolvedOutcome,
+          outcomeAccuracy: resolvedAccuracy,
+          accuracyScore: resolvedScore,
           tradedStatus: "traded",
           monitoringStatus: "Resolved",
           updatedAt: syncedAt,
@@ -1204,10 +1241,12 @@ export function syncSiggiAccountWithOptions(
           skipLogsAdded += 1;
         }
 
-        // Mark the prediction record as skipped so it's excluded from live accuracy
+        // Mark the prediction record as skipped and store Siggi's reason
         if (record) {
           data.predictionHistory = data.predictionHistory.map((item) =>
-            item.id === record.id ? { ...item, tradedStatus: "skipped", updatedAt: syncedAt } : item,
+            item.id === record.id
+              ? { ...item, tradedStatus: "skipped", siggiSkipReason: tradeDecision.reason ?? null, updatedAt: syncedAt }
+              : item,
           );
         }
         continue;

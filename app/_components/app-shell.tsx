@@ -41,6 +41,8 @@ import { useDisplayCurrency } from "./display-currency-provider";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
 import { GettingStartedChecklist } from "./getting-started-checklist";
+import { ToastProvider } from "./toast-provider";
+import { NotificationBell, NotificationProvider } from "./notification-manager";
 
 const sidebarPreferenceStorageKey = "signalibrium.sidebar-collapsed";
 const sidebarPreferenceChangedEvent = "signalibrium:sidebar-preference-changed";
@@ -364,6 +366,8 @@ export function AppShell({
   }, []);
 
   return (
+    <ToastProvider>
+    <NotificationProvider>
     <div className="relative z-10 min-h-screen">
       <div className="flex min-h-screen flex-col lg:flex-row">
         <aside
@@ -450,32 +454,73 @@ export function AppShell({
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-white/6 bg-[#07111d]/90 backdrop-blur-xl">
-            <div className="grid gap-1 px-1.25 py-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.2fr)]">
-              <HeaderMetric
-                label="Live Market"
-                value={marketSnapshot.state}
-                detail={`Live pulse + auto-sync active / ${latestSyncLabel}`}
-                tone="text-cyan-200"
-              />
-              <HeaderMetric
-                label="Prediction Accuracy"
-                value={`${predictionAccuracy.overallAccuracy}%`}
-                detail={`${predictionAccuracy.accuratePredictions} of ${predictionAccuracy.resolvedPredictions} resolved calls accurate / recent ${predictionAccuracy.recentAccuracy}%`}
-                tone="text-emerald-300"
-              />
-
-              <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
-                <span className="hidden min-w-0 flex-1 truncate text-[0.72rem] text-slate-500 sm:inline">
-                  {marketSnapshot.tradeableSetups} ready · {formatPercent(marketSnapshot.openRisk)} risk
-                </span>
-
+            {/* ── Mobile header: single compact row ── */}
+            <div className="flex items-center justify-between gap-2 px-3 py-2 sm:hidden">
+              <div className="min-w-0">
+                <p className="truncate text-[0.72rem] font-semibold text-cyan-200">{marketSnapshot.state}</p>
+                <p className="text-[0.62rem] text-slate-500">
+                  Signal {predictionAccuracy.signalDirectionAccuracy}%
+                  {predictionAccuracy.siggiTradeWinRate !== null
+                    ? ` · Siggi ${predictionAccuracy.siggiTradeWinRate}%`
+                    : " · Siggi building…"}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 <select
                   aria-label="Display currency"
                   value={activeCurrency}
                   onChange={(event) => {
                     void updateDisplayCurrency(
                       event.target.value as SupportedDisplayCurrency,
-                    ).then(() => startTransition(() => router.refresh()));
+                    ).then(() => startTransition(() => routerRef.current.refresh()));
+                  }}
+                  className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.68rem] font-medium text-slate-200 outline-none"
+                >
+                  {(["GBP", "USD", "EUR"] as const).map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <StatusChip label="LIVE" />
+                <NotificationBell />
+                <UserButton
+                  appearance={{ variables: { colorPrimary: "#10b981" } }}
+                  userProfileUrl="/billing"
+                />
+              </div>
+            </div>
+
+            {/* ── Desktop header: four metric cards ── */}
+            <div className="hidden gap-1 px-1.25 py-1 sm:grid sm:grid-cols-[minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1fr)]">
+              <HeaderMetric
+                label="Live Market"
+                value={marketSnapshot.state}
+                detail={`Live pulse + auto-sync / ${latestSyncLabel}`}
+                tone="text-cyan-200"
+              />
+              <HeaderMetric
+                label="Signal Accuracy"
+                value={`${predictionAccuracy.signalDirectionAccuracy}%`}
+                detail={`${predictionAccuracy.signalDirectionWins}W / ${predictionAccuracy.signalDirectionResolved - predictionAccuracy.signalDirectionWins}L from ${predictionAccuracy.signalDirectionResolved} resolved`}
+                tone="text-emerald-300"
+              />
+              <HeaderMetric
+                label="Siggi Win Rate"
+                value={predictionAccuracy.siggiTradeWinRate !== null ? `${predictionAccuracy.siggiTradeWinRate}%` : "Building…"}
+                detail={
+                  predictionAccuracy.siggiTradeWinRate !== null
+                    ? `${predictionAccuracy.siggiTradesWon}W / ${predictionAccuracy.siggiTradesResolved - predictionAccuracy.siggiTradesWon}L from ${predictionAccuracy.siggiTradesResolved} trades`
+                    : `${predictionAccuracy.siggiTradesResolved} trade${predictionAccuracy.siggiTradesResolved === 1 ? "" : "s"} — needs 5+ to show rate`
+                }
+                tone={predictionAccuracy.siggiTradeWinRate !== null ? "text-cyan-200" : "text-slate-500"}
+              />
+              <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
+                <select
+                  aria-label="Display currency"
+                  value={activeCurrency}
+                  onChange={(event) => {
+                    void updateDisplayCurrency(
+                      event.target.value as SupportedDisplayCurrency,
+                    ).then(() => startTransition(() => routerRef.current.refresh()));
                   }}
                   className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.72rem] font-medium text-slate-200 outline-none"
                 >
@@ -486,6 +531,7 @@ export function AppShell({
                   ))}
                 </select>
                 <StatusChip label="LIVE" />
+                <NotificationBell />
                 <UserButton
                   appearance={{ variables: { colorPrimary: "#10b981" } }}
                   userProfileUrl="/billing"
@@ -504,5 +550,7 @@ export function AppShell({
       {/* Getting-started checklist — slides in from right, follows user on every page */}
       <GettingStartedChecklist />
     </div>
+    </NotificationProvider>
+    </ToastProvider>
   );
 }

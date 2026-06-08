@@ -5,6 +5,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/health(.*)",
   "/api/stripe/webhook(.*)",
+  // Algo signal API — guards itself with SIGNAL_API_SECRET
+  "/api/signals(.*)",
+  // Vercel cron — guards itself with CRON_SECRET
+  "/api/cron(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

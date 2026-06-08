@@ -191,8 +191,43 @@ function LeaderboardRow({
   const platforms = universeEntry ? getInstrumentPlatforms(universeEntry) : [];
 
   return (
-    <div className={`grid gap-x-3 gap-y-0 border-b border-white/[0.05] px-3 py-3 last:border-b-0 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:items-start${isClosed ? " opacity-50 grayscale-[40%]" : " scanner-row-live"}`}>
+    <div className={`border-b border-white/[0.05] last:border-b-0${isClosed ? " opacity-50 grayscale-[40%]" : " scanner-row-live"}`}>
 
+      {/* ── Mobile compact card ── */}
+      <div className="px-3 py-2.5 lg:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[0.66rem] font-semibold tabular-nums text-slate-600">#{rank}</span>
+              <p className="truncate text-[0.90rem] font-semibold text-white">{view.symbol}</p>
+              <p className={`text-[0.80rem] font-bold ${view.signal === "BUY NOW" ? "text-emerald-400" : view.signal === "SELL NOW" ? "text-rose-400" : "text-amber-300"}`}>
+                {view.signal}
+              </p>
+            </div>
+            <p className="mt-0.5 truncate text-[0.72rem] text-slate-400">{view.instrumentName}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
+              <span className="rounded-[0.22rem] bg-white/[0.06] px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-wide text-slate-400">{view.timeframe}</span>
+              {siggiInTrade && (
+                <span className="rounded-[0.22rem] bg-cyan-500/15 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-cyan-400 ring-1 ring-cyan-500/30">🤖 Siggi</span>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-[0.96rem] font-bold tabular-nums text-cyan-200">{view.confidence}%</p>
+            <p className="text-[0.62rem] text-slate-500">confidence</p>
+            <p className="mt-1 text-[0.78rem] font-semibold text-white">{view.exactEntry}</p>
+            <p className="text-[0.62rem] text-slate-500">enter at</p>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => onOpenAnalysis(setup.id)} className="signal-button rounded-[0.4rem] px-2.5 py-1.5 text-[0.73rem] font-semibold">Analysis</button>
+          <button type="button" onClick={() => onOpenEvents(setup.id)} className="signal-surface-soft rounded-[0.4rem] px-2.5 py-1.5 text-[0.73rem] font-semibold text-white">Events</button>
+        </div>
+      </div>
+
+      {/* ── Desktop full row ── */}
+      <div className={`hidden gap-x-3 px-3 py-3 lg:grid lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:items-start`}>
       {/* Rank */}
       <div className="flex h-full items-center">
         <span className="text-[0.78rem] font-semibold tabular-nums text-slate-600">#{rank}</span>
@@ -348,6 +383,7 @@ function LeaderboardRow({
           Events
         </button>
       </div>
+      </div>{/* end desktop grid */}
     </div>
   );
 }
@@ -543,9 +579,13 @@ export default function ScannerPageClient({
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
+                  {/* ~300° clockwise arc */}
                   <path d="M13.6 2.4A7 7 0 1 1 2.8 13" />
-                  <path d="M14 1v4h-4" />
+                  {/* Arrowhead at arc-start: tip at (13.6 2.4), arms angled with the clockwise tangent */}
+                  <path d="M15.4 0.7L13.6 2.4L11.8 4.1" />
                 </svg>
                 {isRefreshing ? "Re-analysing..." : "Refresh all"}
               </button>
@@ -599,7 +639,7 @@ export default function ScannerPageClient({
         </Panel>
 
         <Panel className="overflow-hidden p-0">
-          <div className="grid gap-x-3 border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-600 lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem]">
+          <div className="hidden border-b border-white/8 bg-white/[0.02] px-3 py-2 text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-600 lg:grid lg:grid-cols-[2.6rem_minmax(0,1.18fr)_minmax(0,1.0fr)_0.78fr_0.76fr_0.9fr_0.68fr_1.0fr_9rem] lg:gap-x-3">
             <span>Rank</span>
             <span>Instrument</span>
             <span>Trade on</span>

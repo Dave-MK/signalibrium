@@ -574,6 +574,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
             : "The seeded replay could not produce a decisive win/loss resolution.",
       resolvedSource: "seed_replay",
       tradedStatus: "not_traded",
+      siggiSkipReason: null,
       narrative:
         outcomeAccuracy === "Accurate"
           ? `${entry.symbol} respected the planned ${entry.timeframe} setup after the call, and the move developed in the forecast direction before invalidation was threatened.`
@@ -586,7 +587,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
   });
 
 export const defaultWorkspaceData: PersistedWorkspaceData = {
-  schemaVersion: 12,
+  schemaVersion: 13,
   updatedAt: seededAt,
   workspace: {
     id: "workspace-signalibrium-mvp",
@@ -671,4 +672,5 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     createdAt: seededAt,
     updatedAt: seededAt,
   },
+  priceAlerts: [],
 };

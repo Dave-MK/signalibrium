@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   // Recent closed trades (last 5) for performance context
   const recentClosed = siggiAccount.closedTrades.slice(0, 5).map(
-    (t) => `${t.symbol} ${t.side} ${t.status === "Hit Target" ? "✓ won" : "✗ stopped"} (${t.status})`,
+    (t) => `${t.symbol} ${t.side} ${t.status === "Hit Target" ? "✓ win" : t.status === "Breakeven" ? "↔ breakeven" : "✗ loss"} (${t.status})`,
   );
 
   // Upcoming market events
