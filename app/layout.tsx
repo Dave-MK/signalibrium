@@ -13,17 +13,18 @@ export const metadata: Metadata = {
   description:
     "Siggi monitors markets, weighs event-aware analysis, and helps with visual chart review and short-term trade timing.",
 };
-/* App layout */
+// This is a Server Component by default, which allows us to fetch data directly in the layout and pass it down to child components without needing to lift state up or use client-side data fetching. This is ideal for things like user preferences and market snapshots that we want to be available globally across the app.
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [displayCurrencyState, marketSnapshot, predictionHistory] = await Promise.all([
-    getDisplayCurrencyState(),
-    getMarketSnapshot(),
-    listPredictionHistory(),
-  ]);
+  const [displayCurrencyState, marketSnapshot, predictionHistory] =
+    await Promise.all([
+      getDisplayCurrencyState(),
+      getMarketSnapshot(),
+      listPredictionHistory(),
+    ]);
   const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
 
   return (
