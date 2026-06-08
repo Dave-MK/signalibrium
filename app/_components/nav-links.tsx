@@ -113,6 +113,28 @@ const links = [
       </svg>
     ),
   },
+  {
+    href: "/strategy-performance",
+    label: "Strategy Stats",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M3 14.5 7 9l3 3 3.5-5 3.5 3" />
+        <path d="M16 5.5h-3.5V9" />
+        <path d="M3 17h14" />
+      </svg>
+    ),
+  },
+  {
+    href: "/api-access",
+    label: "API Access",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M7.5 7 4 10l3.5 3" />
+        <path d="M12.5 7 16 10l-3.5 3" />
+        <path d="M11 5.5 9 14.5" />
+      </svg>
+    ),
+  },
 ];
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {

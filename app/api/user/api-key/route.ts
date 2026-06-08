@@ -1,13 +1,24 @@
-import { generateSignalApiKey, getUserSignalApiKey, requireTier } from "@/app/_lib/auth";
+import {
+  generateSignalApiKey,
+  getUserSignalApiKey,
+  requireAuthUser,
+} from "@/app/_lib/auth";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
+/**
+ * GET — returns the current user's Signal API key (null if none generated yet).
+ * POST — generates (or rotates) the key and returns the new value.
+ * Both require authentication only — tier is managed separately via
+ * /api/admin/enable-api-access.
+ */
 export async function GET() {
   let user;
   try {
-    user = await requireTier("algo");
+    user = await requireAuthUser();
   } catch {
-    return Response.json({ error: "Requires Algo plan." }, { status: 403 });
+    return Response.json({ error: "Unauthenticated." }, { status: 401 });
   }
 
   const key = await getUserSignalApiKey(user.userId);
@@ -17,9 +28,9 @@ export async function GET() {
 export async function POST() {
   let user;
   try {
-    user = await requireTier("algo");
+    user = await requireAuthUser();
   } catch {
-    return Response.json({ error: "Requires Algo plan." }, { status: 403 });
+    return Response.json({ error: "Unauthenticated." }, { status: 401 });
   }
 
   const key = await generateSignalApiKey(user.userId);
