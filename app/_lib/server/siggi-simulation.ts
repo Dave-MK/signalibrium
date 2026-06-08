@@ -240,13 +240,13 @@ function getCorrelationGroup(symbol: string): string | null {
 }
 
 const minConfidence = 68;
-const minReadiness = 72;
+const minReadiness = 65;
 const minRiskReward = 1.5;
 
 const signalMaxAgeHours: Record<string, number> = {
-  Day: 2,    // Day signals expire quickly — re-analysis every hour keeps them current
-  Week: 24,
-  Month: 72,
+  Day: 8,    // Day signals valid for the full trading session; re-analysis refreshes quality
+  Week: 48,
+  Month: 96,
 };
 
 function computeRiskReward(record: PersistedPredictionHistoryRecord) {
@@ -321,7 +321,7 @@ function shouldOpenTrade(input: {
   if (input.asset) {
     const livePrice = input.asset.price;
     const zoneRange = entryHighAtCall - entryLowAtCall;
-    const tolerance = Math.max(zoneRange * 3, entryMid * 0.02); // 2% of price or 3× zone width
+    const tolerance = Math.max(zoneRange * 4, entryMid * 0.04); // 4% of price or 4× zone width
     if (Math.abs(livePrice - entryMid) > tolerance) {
       return {
         allow: false,
