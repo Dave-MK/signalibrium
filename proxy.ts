@@ -9,6 +9,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/signals(.*)",
   // Vercel cron — guards itself with CRON_SECRET
   "/api/cron(.*)",
+  // Telegram connection test
+  "/api/notifications/telegram",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
