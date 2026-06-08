@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     "Siggi monitors markets, weighs event-aware analysis, and helps with visual chart review and short-term trade timing.",
 };
-
+/* App layout */
 export default async function RootLayout({
   children,
 }: Readonly<{
