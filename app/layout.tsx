@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     "Siggi monitors markets, weighs event-aware analysis, and helps with visual chart review and short-term trade timing.",
 };
-// This is a Server Component by default, which allows us to fetch data directly in the layout and pass it down to child components without needing to lift state up or use client-side data fetching. This is ideal for things like user preferences and market snapshots that we want to be available globally across the app.
+// This is currently an async server component because it needs to fetch the display currency and market snapshot before rendering the app shell. In the future, we may want to refactor this to be a client component and fetch this data on the client side instead, to improve performance and reduce server load.
 export default async function RootLayout({
   children,
 }: Readonly<{
