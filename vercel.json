@@ -2,7 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "nodeVersion": "20.x",
   "regions": ["lhr1"],
   "crons": [
     {
