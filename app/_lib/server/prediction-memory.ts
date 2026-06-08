@@ -391,10 +391,12 @@ function inferOutcomeFromCandleSequence(
   const bullishOrFlat = candle.close >= candle.open;
 
   if (record.actionAtCall === "SELL") {
-    return bullishOrFlat ? "Hit Target" : "Stopped";
+    // Short: bullish candle = price went up = stop hit (bad); bearish = target hit (good)
+    return bullishOrFlat ? "Stopped" : "Hit Target";
   }
 
-  return bullishOrFlat ? "Stopped" : "Hit Target";
+  // Long: bullish candle = price went up = target hit (good); bearish = stop hit (bad)
+  return bullishOrFlat ? "Hit Target" : "Stopped";
 }
 
 function formatEvidenceTimestamp(timestamp: string) {

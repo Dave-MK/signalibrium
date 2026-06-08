@@ -178,18 +178,18 @@ function normalizeAsset(asset: PersistedAssetRecord): PersistedAssetRecord {
 }
 
 function normalizeExecutionMode(mode: string | null | undefined) {
-  if (mode === "IG Live") {
-    return "IBKR Live";
-  }
-
-  if (mode === "IG Demo") {
-    return "IBKR Demo";
-  }
-
-  if (mode === "IBKR Live" || mode === "IBKR Demo" || mode === "Paper") {
+  if (mode === "IG Live") return "IBKR Live";
+  if (mode === "IG Demo") return "IBKR Demo";
+  if (
+    mode === "IBKR Live"     || mode === "IBKR Demo"     ||
+    mode === "Alpaca Live"   || mode === "Alpaca Demo"   ||
+    mode === "OANDA Live"    || mode === "OANDA Demo"    ||
+    mode === "Binance Spot"  || mode === "Binance Futures" ||
+    mode === "Kraken Spot"   ||
+    mode === "Paper"
+  ) {
     return mode;
   }
-
   return "Paper";
 }
 
@@ -316,6 +316,7 @@ async function writeKvNamespacedSlices(data: PersistedWorkspaceData) {
       tradeTickets: data.tradeTickets,
       journalEntries: data.journalEntries,
       marketSnapshot: data.marketSnapshot,
+      priceAlerts: data.priceAlerts,
     })],
     ["SET", kvAssetsKey, JSON.stringify({ assets: data.assets })],
     ["SET", kvIntelligenceKey, JSON.stringify({
@@ -509,10 +510,18 @@ function dedupeScannerResults(results: PersistedScannerResult[]) {
 function normalizeBrokerConnection(
   connection: Partial<PersistedBrokerConnection>,
 ): PersistedBrokerConnection {
+  const provider: PersistedBrokerConnection["provider"] =
+    connection.provider === "Alpaca"  ||
+    connection.provider === "OANDA"   ||
+    connection.provider === "Binance" ||
+    connection.provider === "Kraken"
+      ? connection.provider
+      : "IBKR";
+  const env = connection.environment ?? "demo";
   const rawLabel =
     typeof connection.label === "string" && connection.label.trim().length > 0
       ? connection.label.trim()
-      : `IBKR ${connection.environment ?? "demo"}`;
+      : `${provider} ${env}`;
   const label =
     rawLabel === "IG Demo"
       ? "IBKR Demo"
@@ -520,13 +529,20 @@ function normalizeBrokerConnection(
         ? "IBKR Live"
         : rawLabel;
 
+  const defaultMode: PersistedBrokerConnection["executionModes"][number] =
+    provider === "Alpaca"   ? (env === "live" ? "Alpaca Live"    : "Alpaca Demo") :
+    provider === "OANDA"    ? (env === "live" ? "OANDA Live"     : "OANDA Demo") :
+    provider === "Binance"  ? "Binance Spot" :
+    provider === "Kraken"   ? "Kraken Spot" :
+    env === "live"          ? "IBKR Live" : "IBKR Demo";
+
   return {
     id:
       typeof connection.id === "string" && connection.id.trim().length > 0
         ? connection.id
         : crypto.randomUUID(),
-    provider: "IBKR",
-    environment: connection.environment ?? "demo",
+    provider,
+    environment: env,
     label,
     status: connection.status ?? "disconnected",
     accountRef:
@@ -537,10 +553,11 @@ function normalizeBrokerConnection(
       Array.isArray(connection.executionModes) && connection.executionModes.length > 0
         ? connection.executionModes
             .map((mode) => normalizeExecutionMode(typeof mode === "string" ? mode : undefined))
-            .filter((mode): mode is "IBKR Demo" | "IBKR Live" => mode !== "Paper")
-        : connection.environment === "live"
-          ? ["IBKR Live"]
-          : ["IBKR Demo"],
+            .filter(
+              (mode): mode is PersistedBrokerConnection["executionModes"][number] =>
+                mode !== "Paper",
+            )
+        : [defaultMode],
     lastError:
       typeof connection.lastError === "string" && connection.lastError.trim().length > 0
         ? connection.lastError
@@ -906,7 +923,9 @@ function normalizeSiggiTrade(
     instrumentName: trade.instrumentName ?? trade.symbol ?? "Unknown instrument",
     side: trade.side === "SELL" ? "SELL" : "BUY",
     status:
-      trade.status === "Hit Target" || trade.status === "Stopped" ? trade.status : "Open",
+      trade.status === "Hit Target" || trade.status === "Stopped" || trade.status === "Breakeven"
+        ? trade.status
+        : "Open",
     confidenceAtOpen:
       typeof trade.confidenceAtOpen === "number" ? trade.confidenceAtOpen : 50,
     openedAt: typeof trade.openedAt === "string" ? trade.openedAt : now,
@@ -1073,15 +1092,18 @@ function reconcilePredictionHistoryWithTrades(
       }
 
       // Closed trade: the trade outcome is the ground truth, override the signal
-      const tradeOutcome = trade.status as "Hit Target" | "Stopped";
+      const tradeOutcome = trade.status as "Hit Target" | "Stopped" | "Breakeven";
       return {
         ...record,
         resolvedSource: "live_trade",
         tradedStatus: "traded",
         monitoringStatus: "Resolved" as const,
         outcome: tradeOutcome,
-        outcomeAccuracy: tradeOutcome === "Hit Target" ? ("Accurate" as const) : ("Inaccurate" as const),
-        accuracyScore: tradeOutcome === "Hit Target" ? 100 : 0,
+        outcomeAccuracy:
+          tradeOutcome === "Hit Target" || tradeOutcome === "Breakeven"
+            ? ("Accurate" as const)
+            : ("Inaccurate" as const),
+        accuracyScore: tradeOutcome === "Hit Target" ? 100 : tradeOutcome === "Breakeven" ? 50 : 0,
         resolvedAt: record.resolvedAt ?? trade.closedAt ?? trade.updatedAt,
       };
     }
@@ -1277,7 +1299,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   );
 
   const normalized: PersistedWorkspaceData = {
-    schemaVersion: 13,
+    schemaVersion: 15,
     updatedAt:
       typeof candidate.updatedAt === "string"
         ? candidate.updatedAt

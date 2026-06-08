@@ -24,6 +24,7 @@ import type {
   MarketDataSyncSummary,
 } from "@/app/_lib/market-data-contract";
 import type {
+  PersistedBrokerConnection,
   PersistedMarketSnapshot,
   SupportedDisplayCurrency,
 } from "@/app/_lib/server/workspace-types";
@@ -37,6 +38,7 @@ import {
 } from "../_lib/workspace-api";
 import { UserButton } from "@clerk/nextjs";
 import { AffiliateBrokerButton } from "./affiliate-broker-button";
+import { BrokerStatusChip } from "./broker-status-chip";
 import { useDisplayCurrency } from "./display-currency-provider";
 import { NavLinks } from "./nav-links";
 import { StatusChip } from "./ui";
@@ -80,31 +82,43 @@ function HeaderMetric({
   value,
   detail,
   tone = "text-white",
+  href,
 }: {
   label: string;
   value: string;
   detail: string;
   tone?: string;
+  href?: string;
 }) {
-  return (
-    <div className="signal-toolbar-card px-3 py-1.5">
+  const inner = (
+    <>
       <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
         {label}
       </p>
       <p className={`mt-0.5 text-[0.84rem] font-semibold ${tone}`}>{value}</p>
       <p className="mt-0.5 text-[0.72rem] text-slate-400">{detail}</p>
-    </div>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="signal-toolbar-card px-3 py-1.5 transition hover:bg-white/[0.04]">
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="signal-toolbar-card px-3 py-1.5">{inner}</div>;
 }
 
 export function AppShell({
   children,
   marketSnapshot,
   predictionAccuracy,
+  brokerConnections,
 }: {
   children: ReactNode;
   marketSnapshot: PersistedMarketSnapshot;
   predictionAccuracy: PredictionAccuracySummary;
+  brokerConnections: PersistedBrokerConnection[];
 }) {
   const router = useRouter();
   // Stable ref — effects read routerRef.current so they never need `router`
@@ -481,6 +495,7 @@ export function AppShell({
                   ))}
                 </select>
                 <StatusChip label="LIVE" />
+                <BrokerStatusChip initialConnections={brokerConnections} />
                 <NotificationBell />
                 <UserButton
                   appearance={{ variables: { colorPrimary: "#10b981" } }}
@@ -502,6 +517,7 @@ export function AppShell({
                 value={`${predictionAccuracy.signalDirectionAccuracy}%`}
                 detail={`${predictionAccuracy.signalDirectionWins}W / ${predictionAccuracy.signalDirectionResolved - predictionAccuracy.signalDirectionWins}L from ${predictionAccuracy.signalDirectionResolved} resolved`}
                 tone="text-emerald-300"
+                href="/history"
               />
               <HeaderMetric
                 label="Siggi Win Rate"
@@ -512,6 +528,7 @@ export function AppShell({
                     : `${predictionAccuracy.siggiTradesResolved} trade${predictionAccuracy.siggiTradesResolved === 1 ? "" : "s"} — needs 5+ to show rate`
                 }
                 tone={predictionAccuracy.siggiTradeWinRate !== null ? "text-cyan-200" : "text-slate-500"}
+                href="/siggis-trades"
               />
               <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
                 <select
@@ -531,6 +548,7 @@ export function AppShell({
                   ))}
                 </select>
                 <StatusChip label="LIVE" />
+                <BrokerStatusChip initialConnections={brokerConnections} />
                 <NotificationBell />
                 <UserButton
                   appearance={{ variables: { colorPrimary: "#10b981" } }}

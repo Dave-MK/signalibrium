@@ -156,7 +156,7 @@ function EntryCard({
                 </a>
               )}
               {entry.tradeId && (
-                <a href="/siggi-does-trading" className="text-[0.72rem] text-cyan-400 underline underline-offset-2 hover:text-cyan-200">
+                <a href="/siggis-trades" className="text-[0.72rem] text-cyan-400 underline underline-offset-2 hover:text-cyan-200">
                   → View trade
                 </a>
               )}
@@ -328,7 +328,7 @@ function BulkReviewModal({
                 <div className="flex items-center gap-2">
                   <p className="text-[0.96rem] font-bold text-white">{current.symbol}</p>
                   <span className={`text-[0.75rem] font-semibold ${current.side === "BUY" ? "text-emerald-300" : "text-amber-200"}`}>
-                    {current.side}
+                    {current.side === "BUY" ? "LONG" : current.side === "SELL" ? "SHORT" : current.side}
                   </span>
                   <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-white/[0.05] text-slate-400">
                     {current.type === "trade" ? "Siggi trade" : "Signal"}

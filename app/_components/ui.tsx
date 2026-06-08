@@ -44,6 +44,16 @@ const toneMap = {
   "RISK-ON": "border border-cyan-300/18 bg-cyan-400/10 text-cyan-100",
   "RISK-OFF": "border border-violet-300/20 bg-violet-400/10 text-violet-100",
   BACKTESTED: "border border-blue-400/20 bg-blue-500/10 text-blue-100",
+  BUY: "border border-emerald-400/22 bg-emerald-400/10 text-emerald-100",
+  "BUY NOW": "border border-emerald-400/25 bg-emerald-500/15 text-emerald-100",
+  LONG: "border border-emerald-400/22 bg-emerald-400/10 text-emerald-100",
+  SELL: "border border-red-400/22 bg-red-400/10 text-red-100",
+  "SELL NOW": "border border-red-400/25 bg-red-500/15 text-red-100",
+  SHORT: "border border-red-400/22 bg-red-400/10 text-red-100",
+  WAIT: "border border-amber-300/20 bg-amber-400/10 text-amber-100",
+  WIN: "border border-emerald-400/22 bg-emerald-400/10 text-emerald-100",
+  LOSS: "border border-red-400/22 bg-red-400/10 text-red-100",
+  BREAKEVEN: "border border-slate-400/22 bg-slate-400/10 text-slate-200",
 };
 
 const accentMap = {

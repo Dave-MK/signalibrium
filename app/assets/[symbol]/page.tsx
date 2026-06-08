@@ -156,7 +156,7 @@ export default async function AssetDetailPage({
                 <div className="flex flex-wrap gap-2">
                   <StatusChip label={selectedView.decision.label} />
                   <StatusChip label={selectedSetup.timeframe} />
-                  <StatusChip label={selectedView.opportunityAction} />
+                  <StatusChip label={selectedView.opportunityAction === "BUY" ? "LONG" : selectedView.opportunityAction === "SELL" ? "SHORT" : selectedView.opportunityAction} />
                   <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
                 </div>
               </div>

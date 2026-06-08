@@ -5,11 +5,20 @@ import type {
   MarketDataSyncSummary,
 } from "./market-data-contract";
 import type {
+  BrokerEnvironment,
+  BrokerProvider,
+  PersistedBrokerConnection,
   PersistedJournalEntry,
   PersistedScannerResult,
   SupportedDisplayCurrency,
   PersistedWatchlist,
 } from "./server/workspace-types";
+import type {
+  AlpacaAccountData,
+  OandaAccountData,
+  BinanceAccountData,
+  KrakenAccountData,
+} from "./server/broker-api";
 import type { SupportedChartInterval } from "./server/market-data/provider-types";
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
@@ -213,4 +222,66 @@ export async function deleteJournalEntryApi(id: string) {
     method: "DELETE",
     body: JSON.stringify({}),
   });
+}
+
+
+// ── Broker Connections ─────────────────────────────────────────────────────────
+
+export type CreateBrokerConnectionInput = {
+  provider: BrokerProvider;
+  environment: BrokerEnvironment;
+  label: string;
+  apiKey: string;
+  apiSecret?: string;
+};
+
+export type BrokerAccountPayload =
+  | AlpacaAccountData
+  | OandaAccountData
+  | BinanceAccountData
+  | KrakenAccountData;
+
+export async function listBrokerConnectionsApi() {
+  return requestJson<{ connections: PersistedBrokerConnection[] }>("/api/broker-connections");
+}
+
+export async function createBrokerConnectionApi(input: CreateBrokerConnectionInput) {
+  return requestJson<{ connection: PersistedBrokerConnection }>("/api/broker-connections", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteBrokerConnectionApi(connectionId: string) {
+  return requestJson<{ success: true }>(`/api/broker-connections/${connectionId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function verifyBrokerConnectionApi(connectionId: string) {
+  return requestJson<{ connection: PersistedBrokerConnection; verified: boolean }>(
+    `/api/broker-connections/${connectionId}/verify`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function fetchBrokerAccountApi(connectionId: string) {
+  return requestJson<{ account: BrokerAccountPayload }>(
+    `/api/broker-connections/${connectionId}/account`,
+  );
+}
+
+/**
+ * Starts an OAuth flow for the given provider + environment.
+ * Returns { authUrl } — open this in a popup window.
+ * May return { error, code: "oauth_not_configured" } if the server
+ * doesn't have the required OAuth env vars set.
+ */
+export async function startBrokerOAuthApi(
+  provider: BrokerProvider,
+  environment: BrokerEnvironment,
+): Promise<{ authUrl: string }> {
+  return requestJson<{ authUrl: string }>(
+    `/api/broker-connections/oauth/start?provider=${encodeURIComponent(provider)}&environment=${encodeURIComponent(environment)}`,
+  );
 }

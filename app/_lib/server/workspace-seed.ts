@@ -587,7 +587,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
   });
 
 export const defaultWorkspaceData: PersistedWorkspaceData = {
-  schemaVersion: 13,
+  schemaVersion: 15,
   updatedAt: seededAt,
   workspace: {
     id: "workspace-signalibrium-mvp",

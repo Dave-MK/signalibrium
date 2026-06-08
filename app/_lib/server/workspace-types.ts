@@ -16,9 +16,30 @@ export type PersistedWatchlist = {
   updatedAt: string;
 };
 
-export type BrokerProvider = "IBKR";
+export type BrokerProvider =
+  // Traditional brokers (OAuth)
+  | "Alpaca"
+  | "OANDA"
+  // Crypto exchanges (API key + HMAC)
+  | "Binance"
+  | "Kraken"
+  // Coming soon
+  | "IBKR";
+
 export type BrokerEnvironment = "demo" | "live";
 export type BrokerConnectionStatus = "connected" | "disconnected" | "error";
+
+/** All execution modes that can be mapped to a real broker connection. */
+export type BrokerExecutionMode =
+  | "IBKR Demo"
+  | "IBKR Live"
+  | "Alpaca Demo"
+  | "Alpaca Live"
+  | "OANDA Demo"
+  | "OANDA Live"
+  | "Binance Spot"
+  | "Binance Futures"
+  | "Kraken Spot";
 
 export type PersistedBrokerConnection = {
   id: string;
@@ -27,7 +48,7 @@ export type PersistedBrokerConnection = {
   label: string;
   status: BrokerConnectionStatus;
   accountRef: string | null;
-  executionModes: Array<Extract<TradeTicket["executionMode"], "IBKR Demo" | "IBKR Live">>;
+  executionModes: BrokerExecutionMode[];
   lastError: string | null;
   lastSyncedAt: string | null;
   createdAt: string;
@@ -398,7 +419,7 @@ export type PersistedPriceAlert = {
 };
 
 export type PersistedWorkspaceData = {
-  schemaVersion: 13;
+  schemaVersion: 15;
   updatedAt: string;
   workspace: {
     id: string;

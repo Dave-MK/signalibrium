@@ -91,92 +91,69 @@ export default async function HistoryPage() {
       {/* ── Accuracy breakdown — only shown once real history exists ── */}
       {hasRealHistory && (
         <>
-          <Panel className="p-3 sm:p-3.5">
-            <p className="micro-label mb-2.5">Accuracy — three ways to measure it</p>
-            <div className="grid gap-[5px] sm:grid-cols-3">
-              {/* 1. Signal Direction */}
-              <div className="signal-surface-soft rounded-[0.45rem] p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Signal direction</p>
-                    <p className="mt-1 text-[1.3rem] font-bold text-white">{accuracy.signalDirectionAccuracy}%</p>
-                    <p className="mt-0.5 text-[0.72rem] text-slate-400">
-                      {accuracy.signalDirectionWins}W / {accuracy.signalDirectionResolved - accuracy.signalDirectionWins}L
-                      {" "}from {accuracy.signalDirectionResolved} resolved
-                    </p>
-                  </div>
-                  {rollingAccuracy.length >= 3 && (
-                    <div className="shrink-0">
-                      <p className="mb-1 text-right text-[0.58rem] text-slate-600">Rolling 10</p>
-                      <Sparkline data={rollingAccuracy} className="h-10 w-24" />
-                    </div>
-                  )}
-                </div>
-                <div className="mt-2">
-                  <StatBar
-                    label=""
-                    value={accuracy.signalDirectionAccuracy}
-                    color={accuracy.signalDirectionAccuracy >= 60 ? "#34d399" : "#f59e0b"}
-                  />
-                </div>
-                <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
-                  Was the signal right? Counts every resolved live call whether Siggi traded it or not.
-                </p>
-              </div>
-
-              {/* 2. Siggi Trade Win Rate */}
-              <div className="signal-surface-soft rounded-[0.45rem] p-3">
-                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500 mb-2">Siggi's trade win rate</p>
-                <div className="flex items-center gap-3">
-                  <DonutChart
-                    size={60}
-                    thickness={10}
-                    centerLabel={accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "—"}
-                    segments={[
-                      { value: accuracy.siggiTradesWon, color: "#34d399", label: "W" },
-                      { value: accuracy.siggiTradesResolved - accuracy.siggiTradesWon, color: "#f87171", label: "L" },
-                    ]}
-                  />
-                  <div className="min-w-0">
-                    <p className={`text-[1.1rem] font-bold ${accuracy.siggiTradeWinRate !== null ? "text-emerald-300" : "text-slate-500"}`}>
-                      {accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "Building…"}
-                    </p>
-                    <p className="text-[0.70rem] text-slate-400">
-                      {accuracy.siggiTradesWon}W / {accuracy.siggiTradesResolved - accuracy.siggiTradesWon}L
-                      {accuracy.siggiTradeWinRate === null && " — need 5+"}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-[0.68rem] leading-4 text-slate-600">
-                  Only trades Siggi actually executed. Signal quality + entry gates + sizing combined.
-                </p>
-              </div>
-
-              {/* 3. Skip Quality */}
-              <div className="signal-surface-soft rounded-[0.45rem] p-3">
-                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Skip quality (gate filter)</p>
-                <p className={`mt-1 text-[1.3rem] font-bold ${accuracy.skipQuality !== null ? (accuracy.skipQuality >= 60 ? "text-emerald-300" : accuracy.skipQuality >= 40 ? "text-amber-300" : "text-red-300") : "text-slate-500"}`}>
-                  {accuracy.skipQuality !== null ? `${accuracy.skipQuality}%` : "Building…"}
-                </p>
-                <p className="mt-0.5 text-[0.72rem] text-slate-400">
-                  {accuracy.skippedWouldBeLoss} of {accuracy.skippedResolved} skipped would have lost
-                  {accuracy.skipQuality === null && " — need 5+"}
-                </p>
-                {accuracy.skipQuality !== null && (
-                  <div className="mt-2">
-                    <StatBar
-                      label=""
-                      value={accuracy.skipQuality}
-                      color={accuracy.skipQuality >= 60 ? "#34d399" : accuracy.skipQuality >= 40 ? "#f59e0b" : "#f87171"}
-                    />
-                  </div>
+          {/* Compact visual scorecard strip */}
+          <div className="grid gap-[5px] sm:grid-cols-3">
+            {/* 1. Signal Direction */}
+            <Panel className="p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Signal direction</p>
+                {rollingAccuracy.length >= 3 && (
+                  <Sparkline data={rollingAccuracy} className="h-7 w-16 shrink-0" />
                 )}
-                <p className="mt-1.5 text-[0.68rem] leading-4 text-slate-600">
-                  Higher = gates saved you from losses. Lower = Siggi over-filtering and missing wins.
-                </p>
               </div>
-            </div>
-          </Panel>
+              <p className={`mt-2 text-[1.6rem] font-bold leading-none ${accuracy.signalDirectionAccuracy >= 60 ? "text-emerald-300" : "text-amber-300"}`}>
+                {accuracy.signalDirectionAccuracy}%
+              </p>
+              <div className="mt-2">
+                <StatBar label="" value={accuracy.signalDirectionAccuracy} color={accuracy.signalDirectionAccuracy >= 60 ? "#34d399" : "#f59e0b"} />
+              </div>
+              <p className="mt-1.5 text-[0.69rem] text-slate-500">
+                {accuracy.signalDirectionWins}W · {accuracy.signalDirectionResolved - accuracy.signalDirectionWins}L · {accuracy.signalDirectionResolved} resolved
+              </p>
+            </Panel>
+
+            {/* 2. Siggi Trade Win Rate */}
+            <Panel className="p-3">
+              <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Siggi's trade win rate</p>
+              <div className="mt-2 flex items-center gap-3">
+                <DonutChart
+                  size={56}
+                  thickness={9}
+                  centerLabel={accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "—"}
+                  segments={[
+                    { value: accuracy.siggiTradesWon, color: "#34d399", label: "W" },
+                    { value: accuracy.siggiTradesResolved - accuracy.siggiTradesWon, color: "#f87171", label: "L" },
+                  ]}
+                />
+                <div className="min-w-0">
+                  <p className={`text-[1.4rem] font-bold leading-none ${accuracy.siggiTradeWinRate !== null ? "text-emerald-300" : "text-slate-500"}`}>
+                    {accuracy.siggiTradeWinRate !== null ? `${accuracy.siggiTradeWinRate}%` : "Building…"}
+                  </p>
+                  <p className="mt-1 text-[0.69rem] text-slate-500">
+                    {accuracy.siggiTradesWon}W · {accuracy.siggiTradesResolved - accuracy.siggiTradesWon}L
+                    {accuracy.siggiTradeWinRate === null ? " · need 5+" : ""}
+                  </p>
+                </div>
+              </div>
+            </Panel>
+
+            {/* 3. Skip Quality */}
+            <Panel className="p-3">
+              <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Gate filter quality</p>
+              <p className={`mt-2 text-[1.6rem] font-bold leading-none ${accuracy.skipQuality !== null ? (accuracy.skipQuality >= 60 ? "text-emerald-300" : accuracy.skipQuality >= 40 ? "text-amber-300" : "text-red-300") : "text-slate-500"}`}>
+                {accuracy.skipQuality !== null ? `${accuracy.skipQuality}%` : "Building…"}
+              </p>
+              {accuracy.skipQuality !== null && (
+                <div className="mt-2">
+                  <StatBar label="" value={accuracy.skipQuality} color={accuracy.skipQuality >= 60 ? "#34d399" : accuracy.skipQuality >= 40 ? "#f59e0b" : "#f87171"} />
+                </div>
+              )}
+              <p className="mt-1.5 text-[0.69rem] text-slate-500">
+                {accuracy.skippedWouldBeLoss} of {accuracy.skippedResolved} skipped were correct skips
+                {accuracy.skipQuality === null ? " · need 5+" : ""}
+              </p>
+            </Panel>
+          </div>
 
           <Panel className="p-3 sm:p-3.5">
             <div className="grid gap-[5px] sm:grid-cols-4">
@@ -220,7 +197,7 @@ export default async function HistoryPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
-                          <p className="mt-0.5 text-[0.76rem] font-medium text-cyan-300">{item.actionAtCall} · {item.timeframe} · {item.decisionAtCall}</p>
+                          <p className="mt-0.5 text-[0.76rem] font-medium text-cyan-300">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.decisionAtCall}</p>
                           <p className="mt-0.5 text-[0.72rem] text-slate-400">
                             Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
                           </p>
@@ -250,7 +227,7 @@ export default async function HistoryPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
-                        <p className="mt-0.5 text-[0.76rem] font-medium text-emerald-300">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                        <p className="mt-0.5 text-[0.76rem] font-medium text-emerald-300">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
                         <p className="mt-0.5 text-[0.72rem] text-slate-400">
                           Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
                         </p>
@@ -305,7 +282,7 @@ export default async function HistoryPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
-                        <p className="mt-0.5 text-[0.76rem] font-medium text-red-300">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                        <p className="mt-0.5 text-[0.76rem] font-medium text-red-300">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
                         <p className="mt-0.5 text-[0.72rem] text-slate-400">
                           Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
                         </p>
@@ -356,7 +333,7 @@ export default async function HistoryPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[0.85rem] font-semibold text-slate-300">{item.symbol}</p>
-                    <p className="mt-0.5 text-[0.70rem] text-slate-500">{item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
+                    <p className="mt-0.5 text-[0.70rem] text-slate-500">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.strategyAtCall}</p>
                     <p className="mt-0.5 text-[0.68rem] text-slate-600">
                       Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
                     </p>

@@ -196,7 +196,7 @@ function NotificationManager({
       if (!prevTradeIds.has(trade.id)) {
         notify(
           `trade_open:${trade.id}`,
-          `🤖 Siggi opened ${trade.side} ${trade.symbol}`,
+          `🤖 Siggi opened ${trade.side === "BUY" ? "LONG ▲" : "SHORT ▼"} ${trade.symbol}`,
           "Siggi just entered a live position. View the Trades page for entry, stop, and target.",
           "trade",
         );
@@ -214,7 +214,7 @@ function NotificationManager({
       notify(
         `trade_close:${closed.id}`,
         `🤖 Siggi closed ${closed.symbol} — ${outcome}`,
-        `${closed.side} position resolved. Check history for full details.`,
+        `${closed.side === "BUY" ? "LONG" : "SHORT"} position resolved. Check history for full details.`,
         "trade",
       );
     }

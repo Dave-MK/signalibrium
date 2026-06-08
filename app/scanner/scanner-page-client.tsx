@@ -752,7 +752,7 @@ export default function ScannerPageClient({
                 <div className="signal-surface rounded-[0.46rem] p-3">
                   <p className="micro-label">Siggi call</p>
                   <p className="mt-1.5 text-[1.02rem] font-semibold text-white">
-                    {selectedEventsItem.view.decision.label} / {selectedEventsItem.view.opportunityAction}
+                    {selectedEventsItem.view.decision.label} / {selectedEventsItem.view.opportunityAction === "BUY" ? "LONG" : selectedEventsItem.view.opportunityAction === "SELL" ? "SHORT" : selectedEventsItem.view.opportunityAction}
                   </p>
                   <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">
                     {selectedEventsItem.view.priorityReason}

@@ -78,7 +78,7 @@ export type TradeTicket = {
   strategy: string;
   side: "Long" | "Short";
   orderType: "Limit" | "Market" | "Stop Entry";
-  executionMode: "Paper" | "IBKR Demo" | "IBKR Live" | "IG Demo" | "IG Live";
+  executionMode: "Paper" | "IBKR Demo" | "IBKR Live" | "IG Demo" | "IG Live" | "Alpaca Demo" | "Alpaca Live" | "OANDA Demo" | "OANDA Live" | "Binance Spot" | "Binance Futures" | "Kraken Spot";
   timeInForce: "DAY" | "GTC" | "IOC";
   entry: number;
   stopLoss: number;

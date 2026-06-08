@@ -172,7 +172,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className="text-[0.88rem] font-semibold text-white">{item.symbol}</p>
-                        <StatusChip label={item.actionAtCall} />
+                        <StatusChip label={item.actionAtCall === "BUY" ? "LONG" : item.actionAtCall === "SELL" ? "SHORT" : item.actionAtCall} />
                         {item.tradedStatus === "skipped" && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-amber-900/40 text-amber-300">SIGGI SKIPPED</span>}
                         {item.tradedStatus === "traded"  && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-cyan-900/40 text-cyan-300">SIGGI TRADED</span>}
                         {isSeed && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-amber-900/50 text-amber-300">SEED</span>}
@@ -216,7 +216,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                   </div>
                   <div className="min-w-0">
                     <StatusChip label={item.decisionAtCall} />
-                    <p className="mt-1 text-[0.74rem] text-slate-400">{item.actionAtCall}</p>
+                    <p className="mt-1 text-[0.74rem] text-slate-400">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall}</p>
                   </div>
                   <div className="text-[0.82rem] font-semibold text-white">{item.trendAtCall}</div>
                   <div className="text-[0.82rem] font-semibold text-white">{fmtPrice(item.priceAtCall, item.assetClass)}</div>

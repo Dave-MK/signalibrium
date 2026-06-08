@@ -195,19 +195,19 @@ export function TradePlanChart({
       )}
 
       {/* Side badge */}
-      <rect x={LEFT_PAD + 4} y={TOP_PAD + 4} width={30} height={14} rx="3"
+      <rect x={LEFT_PAD + 4} y={TOP_PAD + 4} width={34} height={14} rx="3"
         fill={side === "BUY" ? "rgba(52,211,153,0.18)" : "rgba(248,113,113,0.18)"} />
-      <text x={LEFT_PAD + 4 + 15} y={TOP_PAD + 14} fontSize="8"
+      <text x={LEFT_PAD + 4 + 17} y={TOP_PAD + 14} fontSize="8"
         fill={side === "BUY" ? "#34d399" : "#f87171"} textAnchor="middle" fontWeight="bold">
-        {side}
+        {side === "BUY" ? "LONG" : "SHORT"}
       </text>
 
       {/* Stop-moved indicator badge */}
       {stopMoved && (
         <>
-          <rect x={LEFT_PAD + 38} y={TOP_PAD + 4} width={stopMode === "Trailing" ? 40 : 32} height={14} rx="3"
+          <rect x={LEFT_PAD + 42} y={TOP_PAD + 4} width={stopMode === "Trailing" ? 40 : 32} height={14} rx="3"
             fill={`${sColor}22`} />
-          <text x={LEFT_PAD + 38 + (stopMode === "Trailing" ? 20 : 16)} y={TOP_PAD + 14} fontSize="8"
+          <text x={LEFT_PAD + 42 + (stopMode === "Trailing" ? 20 : 16)} y={TOP_PAD + 14} fontSize="8"
             fill={sColor} textAnchor="middle" fontWeight="bold">
             {stopMode === "Trailing" ? "TRAILING" : "B/E"}
           </text>

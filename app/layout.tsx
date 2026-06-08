@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { summarizePredictionAccuracy } from "./_lib/bot-engine";
 import { getDisplayCurrencyState } from "./_lib/server/currency-preference";
+import { listBrokerConnections } from "./_lib/server/repositories/broker-connections";
 import { getMarketSnapshot } from "./_lib/server/repositories/market-snapshot";
 import { listPredictionHistory } from "./_lib/server/repositories/prediction-history";
 import { AppShell } from "./_components/app-shell";
@@ -20,11 +21,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [displayCurrencyState, marketSnapshot, predictionHistory] =
+  const [displayCurrencyState, marketSnapshot, predictionHistory, brokerConnections] =
     await Promise.all([
       getDisplayCurrencyState(),
       getMarketSnapshot(),
       listPredictionHistory(),
+      listBrokerConnections(),
     ]);
   const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
 
@@ -40,6 +42,7 @@ export default async function RootLayout({
             <AppShell
               marketSnapshot={marketSnapshot}
               predictionAccuracy={predictionAccuracy}
+              brokerConnections={brokerConnections}
             >
               {children}
             </AppShell>
