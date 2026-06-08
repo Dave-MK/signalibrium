@@ -5,6 +5,7 @@ import {
 import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
 import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
+import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { PageHeader, Panel, StatusChip, SummaryCard } from "../_components/ui";
 import { TradePlanChart } from "../_components/trade-plan-chart";
 import { EquityCurveChart } from "../_components/equity-curve-chart";
@@ -62,11 +63,15 @@ function tradeStatusToNoteOutcome(status: string): TradeNoteOutcome | undefined 
 }
 
 export default async function SiggiDoesTradingPage() {
-  const [siggiAccount, displayCurrencyState, journalEntries] = await Promise.all([
+  const [siggiAccount, displayCurrencyState, journalEntries, predictionHistory] = await Promise.all([
     getSiggiAccount(),
     getDisplayCurrencyState(),
     listJournalEntries(),
+    listPredictionHistory(),
   ]);
+
+  // O(1) lookup: predictionId → prediction record
+  const predictionById = new Map(predictionHistory.map((p) => [p.id, p]));
 
   // Map tradeId → journal entry for O(1) lookup per row
   const noteByTradeId = new Map(
@@ -492,6 +497,112 @@ export default async function SiggiDoesTradingPage() {
                       </div>
 
                       <p className="mt-2.5 text-[0.78rem] leading-5 text-slate-400">{trade.narrative}</p>
+
+                      {/* ── Richer reasoning from linked prediction ── */}
+                      {(() => {
+                        const pred = trade.predictionId ? predictionById.get(trade.predictionId) : null;
+                        if (!pred) return null;
+                        return (
+                          <div className="mt-3 space-y-2 border-t border-white/6 pt-3">
+                            {/* Signal metadata */}
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[0.70rem] text-slate-500">
+                              <span>Strategy <span className="text-slate-300">{pred.strategyAtCall}</span></span>
+                              <span>Timeframe <span className="text-slate-300">{pred.timeframe}</span></span>
+                              <span>Horizon <span className="text-slate-300">{pred.horizon}</span></span>
+                              <span>Trend <span className={`font-medium ${pred.trendAtCall === "Bullish" ? "text-emerald-300" : pred.trendAtCall === "Bearish" ? "text-red-300" : "text-slate-300"}`}>{pred.trendAtCall}</span></span>
+                              <span>Conf at call <span className="text-cyan-200">{pred.confidenceAtCall}%</span></span>
+                            </div>
+
+                            {/* Indicator snapshot */}
+                            {pred.indicatorSnapshotAtCall.length > 0 && (
+                              <div>
+                                <p className="mb-1 text-[0.60rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                                  Indicators at call
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {pred.indicatorSnapshotAtCall.map((item, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-block rounded-[0.22rem] bg-white/[0.04] px-1.5 py-0.5 text-[0.65rem] text-slate-400 ring-1 ring-white/[0.06]"
+                                    >
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Strategy checks */}
+                            {pred.strategySnapshotAtCall.length > 0 && (
+                              <div>
+                                <p className="mb-1 text-[0.60rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                                  Strategy checks
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {pred.strategySnapshotAtCall.map((item, i) => {
+                                    const isPass = item.startsWith("✓") || item.startsWith("✅");
+                                    const isFail = item.startsWith("✗") || item.startsWith("❌") || item.startsWith("⚠");
+                                    return (
+                                      <span
+                                        key={i}
+                                        className={`inline-block rounded-[0.22rem] px-1.5 py-0.5 text-[0.65rem] ring-1 ${
+                                          isPass
+                                            ? "bg-emerald-400/5 text-emerald-300/80 ring-emerald-400/15"
+                                            : isFail
+                                              ? "bg-red-400/5 text-red-300/80 ring-red-400/15"
+                                              : "bg-white/[0.04] text-slate-400 ring-white/[0.06]"
+                                        }`}
+                                      >
+                                        {item}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Validation summary */}
+                            {pred.validationSnapshotAtCall.length > 0 && (
+                              <div>
+                                <p className="mb-1 text-[0.60rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                                  Validation
+                                </p>
+                                <ul className="space-y-0.5">
+                                  {pred.validationSnapshotAtCall.map((item, i) => (
+                                    <li key={i} className="text-[0.70rem] leading-4 text-slate-500">
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Event context */}
+                            {pred.eventContextAtCall && (
+                              <div>
+                                <p className="mb-1 text-[0.60rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                                  Event context
+                                </p>
+                                <p className="text-[0.70rem] leading-[1.45] text-slate-500">
+                                  {pred.eventContextAtCall}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Pattern snapshot */}
+                            {pred.patternSnapshotAtCall && (
+                              <div>
+                                <p className="mb-1 text-[0.60rem] font-semibold uppercase tracking-[0.13em] text-slate-600">
+                                  Pattern
+                                </p>
+                                <p className="text-[0.70rem] leading-[1.45] text-slate-500">
+                                  {pred.patternSnapshotAtCall}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* ── Right: trade plan chart (overflow-hidden here, not on outer card, so tooltip isn't clipped) ── */}

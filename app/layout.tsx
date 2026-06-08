@@ -6,6 +6,7 @@ import { getMarketSnapshot } from "./_lib/server/repositories/market-snapshot";
 import { listPredictionHistory } from "./_lib/server/repositories/prediction-history";
 import { AppShell } from "./_components/app-shell";
 import { DisplayCurrencyProvider } from "./_components/display-currency-provider";
+import { ServiceWorkerRegistrar } from "./_components/service-worker-registrar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default async function RootLayout({
     <ClerkProvider>
       <html lang="en" className="h-full antialiased">
         <body className="min-h-full">
+          <ServiceWorkerRegistrar />
           <DisplayCurrencyProvider
             currency={displayCurrencyState.currency}
             rates={displayCurrencyState.rates}

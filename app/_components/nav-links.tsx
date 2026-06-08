@@ -97,6 +97,22 @@ const links = [
       </svg>
     ),
   },
+  {
+    href: "/backtesting-lab",
+    label: "Backtest Lab",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M3 16h14" />
+        <path d="M5 16V9" />
+        <path d="M9.5 16V5" />
+        <path d="M14 16V11" />
+        <circle cx="5" cy="7" r="1.5" />
+        <circle cx="9.5" cy="3.5" r="1.5" />
+        <circle cx="14" cy="9" r="1.5" />
+        <path d="M5 7 9.5 3.5 14 9" />
+      </svg>
+    ),
+  },
 ];
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {

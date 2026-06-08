@@ -1,6 +1,7 @@
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
 import { fetchLiveCandlesForSymbol } from "./market-data/market-data";
 import { generateOpportunityAnalysis } from "./opportunity-analysis";
+import { sendTelegramMessage, formatEnterNowMessage } from "./telegram";
 import type {
   PersistedAssetRecord,
   PersistedMarketEvent,
@@ -9,6 +10,30 @@ import type {
   PersistedWorkspaceData,
 } from "./workspace-types";
 import type { LiveCandle, SupportedChartInterval } from "./market-data/provider-types";
+
+/**
+ * Fire a Telegram ENTER NOW notification for a newly created prediction.
+ * Takes the fully-formed prediction record so all fields are already resolved.
+ * Never throws — wrapped in try/catch so it can't break the sync pipeline.
+ */
+async function fireEnterNowAlert(record: PersistedPredictionHistoryRecord): Promise<void> {
+  try {
+    const msg = formatEnterNowMessage({
+      symbol: record.symbol,
+      instrumentName: record.instrumentName,
+      action: record.actionAtCall === "SELL" ? "Sell" : "Buy",
+      entryZone: record.entryAtCall,
+      stopLoss: record.stopAtCall,
+      takeProfit: record.targetAtCall,
+      strategy: record.strategyAtCall,
+      timeframe: record.timeframe,
+      score: record.confidenceAtCall,
+    });
+    await sendTelegramMessage(msg);
+  } catch {
+    // Non-fatal — notification failure must never break the sync
+  }
+}
 
 function computeSignedMovePercent(
   action: PersistedPredictionHistoryRecord["actionAtCall"],
@@ -966,6 +991,9 @@ export async function refreshPredictionMemory(
 
       data.predictionHistory.unshift(record);
       activeBySetupId.add(scannerResult.id);
+
+      // Fire Telegram ENTER NOW alert — non-blocking, never throws
+      fireEnterNowAlert(record).catch(() => undefined);
     }
   }
 
