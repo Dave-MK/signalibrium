@@ -44,6 +44,18 @@ const coreLinks: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/my-trades",
+    label: "My Trades",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="3" y="5" width="14" height="11" rx="1.3" />
+        <path d="M7 5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V5" />
+        <path d="M7 10h6" />
+        <path d="M7 13h4" />
+      </svg>
+    ),
+  },
 ];
 
 const analyseLinks: NavItem[] = [

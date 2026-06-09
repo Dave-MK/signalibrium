@@ -620,6 +620,50 @@ function normalizePredictionHistoryRecord(
           ? null
           : null;
 
+  // ── Repair inverted stop/target levels ──────────────────────────────────────
+  // The prediction AI occasionally stores stop/target on the wrong sides of entry
+  // for SHORT signals (stop below entry, target above entry — mirroring a LONG).
+  // When both levels are clearly inverted, swap them.  Records that were already
+  // "resolved" with those bad levels are re-opened so they score correctly.
+  const rawStopPrice   = typeof record.stopPriceAtCall   === "number" ? record.stopPriceAtCall   : 0;
+  const rawTargetPrice = typeof record.targetPriceAtCall === "number" ? record.targetPriceAtCall : 0;
+  const recordAction   = record.actionAtCall ?? "WAIT";
+  const entryMidPrice  = ((record.entryLowAtCall ?? 0) + (record.entryHighAtCall ?? 0)) / 2;
+  const levelsAreBothInverted =
+    rawStopPrice > 0 && rawTargetPrice > 0 && entryMidPrice > 0 &&
+    (recordAction === "SELL"
+      ? rawStopPrice < entryMidPrice && rawTargetPrice > entryMidPrice
+      : rawStopPrice > entryMidPrice && rawTargetPrice < entryMidPrice);
+  const repairedStop      = levelsAreBothInverted ? rawTargetPrice : rawStopPrice;
+  const repairedTarget    = levelsAreBothInverted ? rawStopPrice   : rawTargetPrice;
+  const repairedStopStr   = levelsAreBothInverted
+    ? (record.targetAtCall ?? record.stopAtCall ?? "N/A")
+    : (record.stopAtCall ?? "N/A");
+  const repairedTargetStr = levelsAreBothInverted
+    ? (record.stopAtCall ?? record.targetAtCall ?? "N/A")
+    : (record.targetAtCall ?? "N/A");
+  // Re-open already-resolved records whose outcome was based on the bad levels
+  const reopenForReresolution =
+    levelsAreBothInverted &&
+    (normalizedOutcome === "Hit Target" || normalizedOutcome === "Stopped") &&
+    record.monitoringStatus === "Resolved";
+  const effectiveOutcome      = reopenForReresolution ? "Monitoring"  as const : normalizedOutcome;
+  const effectiveMonitoring   = reopenForReresolution ? "Active"      as const
+    : normalizedOutcome === "Ambiguous" ? "Resolved" as const
+    : (record.monitoringStatus ?? "Resolved") as PersistedPredictionHistoryRecord["monitoringStatus"];
+  const effectiveAccuracy     = reopenForReresolution ? "Neutral" as const
+    : legacyAmbiguousStop ? "Neutral" as const
+    : record.outcomeAccuracy === "Accurate" || record.outcomeAccuracy === "Inaccurate" || record.outcomeAccuracy === "Neutral"
+      ? record.outcomeAccuracy
+      : "Neutral" as const;
+  const effectiveAccuracyScore = reopenForReresolution ? 50
+    : legacyAmbiguousStop ? 50
+    : typeof record.accuracyScore === "number" ? record.accuracyScore : 50;
+  const effectiveResolvedAt    = reopenForReresolution ? null
+    : typeof record.resolvedAt === "string" ? record.resolvedAt : null;
+  const effectiveEvidence      = reopenForReresolution ? null : normalizedResolutionEvidence;
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return {
     id:
       typeof record.id === "string" && record.id.trim().length > 0
@@ -637,20 +681,16 @@ function normalizePredictionHistoryRecord(
     decisionAtCall: record.decisionAtCall ?? "WAIT",
     confidenceAtCall:
       typeof record.confidenceAtCall === "number" ? record.confidenceAtCall : 50,
-    monitoringStatus:
-      normalizedOutcome === "Ambiguous"
-        ? "Resolved"
-        : record.monitoringStatus ?? "Resolved",
+    monitoringStatus: effectiveMonitoring,
     priceAtCall: typeof record.priceAtCall === "number" ? record.priceAtCall : 0,
     entryLowAtCall: typeof record.entryLowAtCall === "number" ? record.entryLowAtCall : 0,
     entryHighAtCall: typeof record.entryHighAtCall === "number" ? record.entryHighAtCall : 0,
-    stopPriceAtCall: typeof record.stopPriceAtCall === "number" ? record.stopPriceAtCall : 0,
-    targetPriceAtCall:
-      typeof record.targetPriceAtCall === "number" ? record.targetPriceAtCall : 0,
+    stopPriceAtCall:   repairedStop,
+    targetPriceAtCall: repairedTarget,
     entryAtCall: record.entryAtCall ?? "N/A",
     discountedEntryAtCall: record.discountedEntryAtCall ?? record.entryAtCall ?? "N/A",
-    stopAtCall: record.stopAtCall ?? "N/A",
-    targetAtCall: record.targetAtCall ?? "N/A",
+    stopAtCall:    repairedStopStr,
+    targetAtCall:  repairedTargetStr,
     eventMoveAtCall: record.eventMoveAtCall ?? "Whipsaw",
     eventLikelihoodAtCall:
       typeof record.eventLikelihoodAtCall === "number" ? record.eventLikelihoodAtCall : 50,
@@ -676,7 +716,7 @@ function normalizePredictionHistoryRecord(
     calledAt: typeof record.calledAt === "string" ? record.calledAt : now,
     lastCandleCheckAt:
       typeof record.lastCandleCheckAt === "string" ? record.lastCandleCheckAt : null,
-    resolvedAt: typeof record.resolvedAt === "string" ? record.resolvedAt : null,
+    resolvedAt: effectiveResolvedAt,
     resolutionMethod:
       record.resolutionMethod === "candle-range" ||
       record.resolutionMethod === "lower-timeframe-drilldown" ||
@@ -686,15 +726,8 @@ function normalizePredictionHistoryRecord(
         : "snapshot",
     ambiguousResolution:
       normalizedOutcome === "Ambiguous" ? true : record.ambiguousResolution ?? false,
-    outcome: normalizedOutcome,
-    outcomeAccuracy:
-      legacyAmbiguousStop
-        ? "Neutral"
-        : record.outcomeAccuracy === "Accurate" ||
-            record.outcomeAccuracy === "Inaccurate" ||
-            record.outcomeAccuracy === "Neutral"
-          ? record.outcomeAccuracy
-          : "Neutral",
+    outcome: effectiveOutcome,
+    outcomeAccuracy: effectiveAccuracy,
     moveFromCallPct:
       typeof record.moveFromCallPct === "number" ? record.moveFromCallPct : 0,
     maxFavorableExcursionPct:
@@ -705,9 +738,8 @@ function normalizePredictionHistoryRecord(
       typeof record.maxAdverseExcursionPct === "number"
         ? record.maxAdverseExcursionPct
         : 0,
-    accuracyScore:
-      legacyAmbiguousStop ? 50 : typeof record.accuracyScore === "number" ? record.accuracyScore : 50,
-    resolutionEvidence: normalizedResolutionEvidence,
+    accuracyScore: effectiveAccuracyScore,
+    resolutionEvidence: effectiveEvidence,
     resolvedSource:
       record.resolvedSource === "live_trade" ||
       record.resolvedSource === "seed_replay" ||

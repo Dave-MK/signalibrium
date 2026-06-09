@@ -3,6 +3,55 @@
 import { useState, useTransition } from "react";
 import { Panel, StatusChip } from "@/app/_components/ui";
 
+// ─── Data maintenance panel ───────────────────────────────────────────────────
+
+function ResyncPredictionsPanel() {
+  const [result,  setResult]  = useState<{ repaired: number; unchanged: number; total: number; message: string } | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
+  const [pending, startT]     = useTransition();
+
+  function run() {
+    setResult(null);
+    setError(null);
+    startT(async () => {
+      try {
+        const res = await fetch("/api/admin/resync-predictions", { method: "POST" });
+        const data = await res.json() as typeof result & { error?: string };
+        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+        setResult(data as NonNullable<typeof result>);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Resync failed.");
+      }
+    });
+  }
+
+  return (
+    <Panel className="px-4 py-3">
+      <p className="micro-label mb-1">Data maintenance</p>
+      <p className="mb-3 text-[0.72rem] leading-[1.5] text-slate-500">
+        Run a one-time sweep to repair any prediction records that were stored with inverted stop/target
+        levels. Affected records are re-opened so the next market sync can resolve them correctly.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={run}
+          disabled={pending}
+          className="rounded-[0.38rem] border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[0.75rem] font-semibold text-slate-300 transition hover:border-cyan-500/20 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? "Running…" : "Resync prediction records"}
+        </button>
+        {result && (
+          <p className={`text-[0.72rem] ${result.repaired > 0 ? "text-amber-300" : "text-emerald-300"}`}>
+            {result.message}
+          </p>
+        )}
+        {error && <p className="text-[0.72rem] text-red-400">{error}</p>}
+      </div>
+    </Panel>
+  );
+}
+
 type Props = {
   initialApiKey: string | null;
   isAlgo: boolean;
@@ -324,6 +373,9 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
           </button>
         </div>
       </Panel>
+
+      {/* ── Data maintenance ─────────────────────────────────────────────────── */}
+      <ResyncPredictionsPanel />
 
       {/* ── Security notes ───────────────────────────────────────────────────── */}
       <Panel className="px-4 py-3">

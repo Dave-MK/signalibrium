@@ -12,6 +12,9 @@ import type {
   PersistedBrokerConnection,
 } from "@/app/_lib/server/workspace-types";
 import type { BrokerAccountPayload } from "@/app/_lib/workspace-api";
+import { useBrokerPositions } from "@/app/_lib/use-broker-positions";
+import { useBrokerPrices } from "@/app/_lib/use-broker-prices";
+import { PositionsPanel } from "./positions-panel";
 import { BrokerSelectModal } from "./broker-select-modal";
 
 type Props = {
@@ -40,12 +43,12 @@ function pnlClass(pnl: number) {
 
 function providerColors(provider: BrokerProvider) {
   switch (provider) {
-    case "Alpaca":  return { chip: "border-cyan-500/30 bg-cyan-500/8 text-cyan-300",     dot: "bg-cyan-400",   accent: "text-cyan-300" };
-    case "OANDA":   return { chip: "border-amber-500/30 bg-amber-500/8 text-amber-300",  dot: "bg-amber-400",  accent: "text-amber-300" };
+    case "Alpaca":  return { chip: "border-cyan-500/30 bg-cyan-500/8 text-cyan-300",      dot: "bg-cyan-400",    accent: "text-cyan-300" };
+    case "OANDA":   return { chip: "border-amber-500/30 bg-amber-500/8 text-amber-300",   dot: "bg-amber-400",   accent: "text-amber-300" };
     case "Binance": return { chip: "border-yellow-500/30 bg-yellow-500/8 text-yellow-300", dot: "bg-yellow-400", accent: "text-yellow-300" };
     case "Kraken":  return { chip: "border-indigo-500/30 bg-indigo-500/8 text-indigo-300", dot: "bg-indigo-400", accent: "text-indigo-300" };
     case "IBKR":    return { chip: "border-purple-500/30 bg-purple-500/8 text-purple-300", dot: "bg-purple-400", accent: "text-purple-300" };
-    default:        return { chip: "border-white/10 bg-white/5 text-slate-300",           dot: "bg-slate-500",  accent: "text-slate-300" };
+    default:        return { chip: "border-white/10 bg-white/5 text-slate-300",            dot: "bg-slate-500",   accent: "text-slate-300" };
   }
 }
 
@@ -66,22 +69,19 @@ export function BrokerStatusChip({ initialConnections }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
 
-  // accountData per connection ID
   const [accountData, setAccountData] = useState<Record<string, BrokerAccountPayload>>({});
   const [accountErrors, setAccountErrors] = useState<Record<string, string>>({});
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  // Which connection is expanded in the dropdown
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [positionsOpen, setPositionsOpen] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Keep connections in sync with server-rendered prop
   useEffect(() => {
     setConnections(initialConnections);
   }, [initialConnections]);
 
-  // When connections change, default active to first connected one
   useEffect(() => {
     const firstConnected = connections.find((c) => c.status === "connected");
     setActiveId((prev) => {
@@ -90,7 +90,6 @@ export function BrokerStatusChip({ initialConnections }: Props) {
     });
   }, [connections]);
 
-  // Fetch account data for a single connection
   const refreshAccount = useCallback(async (conn: PersistedBrokerConnection) => {
     try {
       const result = await fetchBrokerAccountApi(conn.id);
@@ -103,12 +102,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to fetch account.";
       setAccountErrors((prev) => ({ ...prev, [conn.id]: msg }));
-
-      const isReconnectRequired =
-        msg.toLowerCase().includes("reconnect") ||
-        msg.toLowerCase().includes("credentials not found");
-
-      if (isReconnectRequired) {
+      if (msg.toLowerCase().includes("reconnect") || msg.toLowerCase().includes("credentials not found")) {
         setConnections((prev) =>
           prev.map((c) =>
             c.id === conn.id
@@ -120,72 +114,75 @@ export function BrokerStatusChip({ initialConnections }: Props) {
     }
   }, []);
 
-  // Poll every 30s for all connected connections
   useEffect(() => {
     const connected = connections.filter((c) => c.status === "connected");
     if (connected.length === 0) {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       return;
     }
-
     connected.forEach((c) => void refreshAccount(c));
-
     pollIntervalRef.current = setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      connections
-        .filter((c) => c.status === "connected")
-        .forEach((c) => void refreshAccount(c));
+      connections.filter((c) => c.status === "connected").forEach((c) => void refreshAccount(c));
     }, 30_000);
-
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connections.map((c) => c.id + c.status).join(",")]);
 
-  async function handleDisconnect(connectionId: string) {
-    setDisconnecting(connectionId);
-    try {
-      await deleteBrokerConnectionApi(connectionId);
-      setConnections((prev) => prev.filter((c) => c.id !== connectionId));
-      setAccountData((prev) => {
-        const next = { ...prev };
-        delete next[connectionId];
-        return next;
-      });
-      router.refresh();
-    } catch {
-      // noop — user can retry
-    } finally {
-      setDisconnecting(null);
-    }
-  }
-
-  function openDropdown() {
-    if (!chipRef.current) return;
-    const rect = chipRef.current.getBoundingClientRect();
-    setDropdownPos({
-      top: rect.bottom + 8,
-      right: window.innerWidth - rect.right,
-    });
-    setDropdownOpen(true);
-  }
-
-  function closeDropdown() {
-    setDropdownOpen(false);
-  }
-
-  function openModal() {
-    closeDropdown();
-    setModalOpen(true);
-  }
-
-  // The "primary" connection shown in the chip
+  // ── Derived: active connection (may be null) ────────────────────────────────
   const primaryConnection =
     connections.find((c) => c.status === "connected") ??
     connections.find((c) => c.status === "error") ??
     connections[0] ??
     null;
+
+  const activeConn = primaryConnection
+    ? (connections.find((c) => c.id === activeId) ?? primaryConnection)
+    : null;
+
+  // ── Hooks — always called, enabled only when relevant ─────────────────────
+  // (Must be before any conditional returns to satisfy React Rules of Hooks)
+  const {
+    positions,
+    fetchedAt: positionsFetchedAt,
+    loading:   positionsLoading,
+    error:     positionsError,
+  } = useBrokerPositions(
+    activeConn?.id ?? "",
+    { enabled: dropdownOpen && (activeConn?.status === "connected") },
+  );
+
+  const positionSymbols = positions.map((p) => p.symbol);
+  const livePrices = useBrokerPrices({
+    provider: activeConn?.provider ?? null,
+    symbols:  positionSymbols,
+    enabled:  positionSymbols.length > 0,
+  });
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  async function handleDisconnect(connectionId: string) {
+    setDisconnecting(connectionId);
+    try {
+      await deleteBrokerConnectionApi(connectionId);
+      setConnections((prev) => prev.filter((c) => c.id !== connectionId));
+      setAccountData((prev) => { const next = { ...prev }; delete next[connectionId]; return next; });
+      router.refresh();
+    } catch { /* noop */ }
+    finally { setDisconnecting(null); }
+  }
+
+  function openDropdown() {
+    if (!chipRef.current) return;
+    const rect = chipRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    setDropdownOpen(true);
+  }
+
+  function closeDropdown() { setDropdownOpen(false); }
+  function openModal()     { closeDropdown(); setModalOpen(true); }
 
   // ── Paper (no broker) chip ─────────────────────────────────────────────────
 
@@ -202,7 +199,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
           <span className="h-1.5 w-1.5 rounded-full bg-slate-600" aria-hidden="true" />
           <span>Paper</span>
           <span className="text-slate-600" aria-hidden="true">·</span>
-          <span className="text-slate-500">Connect</span>
+          <span className="text-slate-500">Connect broker</span>
         </button>
 
         {mounted && modalOpen && (
@@ -221,7 +218,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
 
   // ── Connected chip ─────────────────────────────────────────────────────────
 
-  const colors = providerColors(primaryConnection.provider);
+  const colors   = providerColors(primaryConnection.provider);
   const hasError = primaryConnection.status === "error";
   const chipData = accountData[primaryConnection.id] ?? null;
 
@@ -231,43 +228,31 @@ export function BrokerStatusChip({ initialConnections }: Props) {
 
   if (chipData && !("error" in chipData)) {
     if ("equity" in chipData) {
-      // Alpaca
       balanceText = formatBalance(chipData.equity, chipData.currency);
-      pnlText = `${chipData.dailyPnl >= 0 ? "+" : ""}${formatBalance(chipData.dailyPnl, chipData.currency)}`;
-      pnlCls = pnlClass(chipData.dailyPnl);
+      pnlText     = `${chipData.dailyPnl >= 0 ? "+" : ""}${formatBalance(chipData.dailyPnl, chipData.currency)}`;
+      pnlCls      = pnlClass(chipData.dailyPnl);
     } else if ("nav" in chipData) {
-      // OANDA
       balanceText = formatBalance(chipData.nav, chipData.currency);
-      pnlText = `${chipData.unrealizedPnl >= 0 ? "+" : ""}${formatBalance(chipData.unrealizedPnl, chipData.currency)}`;
-      pnlCls = pnlClass(chipData.unrealizedPnl);
+      pnlText     = `${chipData.unrealizedPnl >= 0 ? "+" : ""}${formatBalance(chipData.unrealizedPnl, chipData.currency)}`;
+      pnlCls      = pnlClass(chipData.unrealizedPnl);
     } else if ("usdtBalance" in chipData) {
-      // Binance — show stablecoin balance (no P&L available for spot)
       balanceText = chipData.usdtBalance > 0
         ? formatBalance(chipData.usdtBalance, "USDT")
         : `${chipData.assetCount} asset${chipData.assetCount !== 1 ? "s" : ""}`;
     } else if ("fiatBalance" in chipData) {
-      // Kraken — show fiat balance (no P&L available for spot)
       balanceText = chipData.fiatBalance > 0
         ? formatBalance(chipData.fiatBalance, chipData.currency)
         : `${chipData.balances.length} asset${chipData.balances.length !== 1 ? "s" : ""}`;
     }
   }
 
-  // ── Dropdown content ───────────────────────────────────────────────────────
+  const activeData = activeConn ? (accountData[activeConn.id] ?? null) : null;
 
-  const activeConn = connections.find((c) => c.id === activeId) ?? primaryConnection;
-  const activeData = accountData[activeConn.id] ?? null;
+  // ── Dropdown ───────────────────────────────────────────────────────────────
 
-  const dropdown = dropdownOpen && dropdownPos && (
+  const dropdown = dropdownOpen && dropdownPos && activeConn && (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[9990]"
-        onClick={closeDropdown}
-        aria-hidden="true"
-      />
-
-      {/* Dropdown panel */}
+      <div className="fixed inset-0 z-[9990]" onClick={closeDropdown} aria-hidden="true" />
       <div
         role="dialog"
         aria-label="Broker account"
@@ -283,9 +268,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
                 type="button"
                 onClick={() => setActiveId(conn.id)}
                 className={`rounded-t-[0.3rem] px-3 py-1.5 text-[0.7rem] font-medium transition ${
-                  conn.id === activeConn.id
-                    ? "border-b-2 border-blue-400 text-white"
-                    : "text-slate-500 hover:text-slate-300"
+                  conn.id === activeConn.id ? "border-b-2 border-blue-400 text-white" : "text-slate-500 hover:text-slate-300"
                 }`}
               >
                 {conn.provider}
@@ -297,10 +280,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
         {/* Active connection header */}
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-2">
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(activeConn.status)}`}
-              aria-hidden="true"
-            />
+            <span className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(activeConn.status)}`} aria-hidden="true" />
             <div>
               <p className={`text-[0.82rem] font-semibold ${providerColors(activeConn.provider).accent}`}>
                 {activeConn.label}
@@ -310,12 +290,8 @@ export function BrokerStatusChip({ initialConnections }: Props) {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={closeDropdown}
-            aria-label="Close"
-            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition hover:bg-white/6 hover:text-slate-300"
-          >
+          <button type="button" onClick={closeDropdown} aria-label="Close"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition hover:bg-white/6 hover:text-slate-300">
             ✕
           </button>
         </div>
@@ -331,16 +307,14 @@ export function BrokerStatusChip({ initialConnections }: Props) {
         {activeData && !("error" in activeData) && activeConn.status === "connected" && (
           <div className="border-t border-white/6 px-4 py-3">
             {"equity" in activeData && (
-              // Alpaca
               <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                <Stat label="Equity"        value={formatBalance(activeData.equity, activeData.currency)} />
-                <Stat label="Today's P&L"   value={`${activeData.dailyPnl >= 0 ? "+" : ""}${formatBalance(activeData.dailyPnl, activeData.currency)}`} valueClass={pnlClass(activeData.dailyPnl)} />
-                <Stat label="Cash"          value={formatBalance(activeData.cash, activeData.currency)} />
-                <Stat label="Buying Power"  value={formatBalance(activeData.buyingPower, activeData.currency)} />
+                <Stat label="Equity"       value={formatBalance(activeData.equity, activeData.currency)} />
+                <Stat label="Today's P&L"  value={`${activeData.dailyPnl >= 0 ? "+" : ""}${formatBalance(activeData.dailyPnl, activeData.currency)}`} valueClass={pnlClass(activeData.dailyPnl)} />
+                <Stat label="Cash"         value={formatBalance(activeData.cash, activeData.currency)} />
+                <Stat label="Buying Power" value={formatBalance(activeData.buyingPower, activeData.currency)} />
               </div>
             )}
             {"nav" in activeData && (
-              // OANDA
               <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                 <Stat label="NAV"         value={formatBalance(activeData.nav, activeData.currency)} />
                 <Stat label="Open P&L"    value={`${activeData.unrealizedPnl >= 0 ? "+" : ""}${formatBalance(activeData.unrealizedPnl, activeData.currency)}`} valueClass={pnlClass(activeData.unrealizedPnl)} />
@@ -349,7 +323,6 @@ export function BrokerStatusChip({ initialConnections }: Props) {
               </div>
             )}
             {"usdtBalance" in activeData && (
-              // Binance — show top holdings
               <div className="space-y-1.5">
                 <p className="text-[0.63rem] text-slate-600">Top holdings</p>
                 {activeData.balances.slice(0, 4).map((b) => (
@@ -366,7 +339,6 @@ export function BrokerStatusChip({ initialConnections }: Props) {
               </div>
             )}
             {"fiatBalance" in activeData && (
-              // Kraken — show top holdings
               <div className="space-y-1.5">
                 <p className="text-[0.63rem] text-slate-600">Top holdings</p>
                 {activeData.balances.slice(0, 4).map((b) => (
@@ -388,13 +360,43 @@ export function BrokerStatusChip({ initialConnections }: Props) {
           </div>
         )}
 
+        {/* Open positions */}
+        {activeConn.status === "connected" && (
+          <div className="border-t border-white/6">
+            <button
+              type="button"
+              onClick={() => setPositionsOpen((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-[0.72rem] text-slate-400 transition hover:text-slate-200"
+            >
+              <span className="font-medium">
+                Open positions
+                {positions.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-slate-700 px-1.5 py-0.5 text-[0.62rem] text-slate-300">
+                    {positions.length}
+                  </span>
+                )}
+              </span>
+              <span className={`transition ${positionsOpen ? "rotate-180" : ""}`} aria-hidden="true">▾</span>
+            </button>
+            {positionsOpen && (
+              <div className="px-4 pb-3">
+                <PositionsPanel
+                  positions={positions}
+                  livePrices={livePrices}
+                  loading={positionsLoading}
+                  error={positionsError}
+                  fetchedAt={positionsFetchedAt}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="border-t border-white/6 p-3 space-y-1.5">
-          <button
-            type="button"
-            onClick={openModal}
-            className="w-full rounded-[0.36rem] border border-white/8 py-2 text-[0.76rem] text-slate-400 transition hover:border-white/16 hover:text-slate-200"
-          >
+          <button type="button" onClick={openModal}
+            className="w-full rounded-[0.36rem] border border-white/8 py-2 text-[0.76rem] text-slate-400 transition hover:border-white/16 hover:text-slate-200">
             + Connect another broker
           </button>
           <button
@@ -421,13 +423,9 @@ export function BrokerStatusChip({ initialConnections }: Props) {
         }`}
         title={hasError ? "Credentials missing — click to manage" : `${primaryConnection.label} — click to manage`}
       >
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${hasError ? "bg-red-400" : "bg-emerald-400"}`}
-          aria-hidden="true"
-        />
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${hasError ? "bg-red-400" : "bg-emerald-400"}`} aria-hidden="true" />
         <span className="hidden sm:inline">{primaryConnection.label}</span>
         <span className="sm:hidden">{primaryConnection.provider}</span>
-
         {hasError ? (
           <span className="text-red-400/80">⚠</span>
         ) : (
@@ -438,9 +436,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
                 <span className="tabular-nums">{balanceText}</span>
               </>
             )}
-            {pnlText && (
-              <span className={`tabular-nums ${pnlCls}`}>{pnlText}</span>
-            )}
+            {pnlText && <span className={`tabular-nums ${pnlCls}`}>{pnlText}</span>}
           </>
         )}
       </button>
@@ -463,15 +459,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
 
 // ── Stat cell ──────────────────────────────────────────────────────────────────
 
-function Stat({
-  label,
-  value,
-  valueClass = "text-white",
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
+function Stat({ label, value, valueClass = "text-white" }: { label: string; value: string; valueClass?: string }) {
   return (
     <div>
       <p className="text-[0.63rem] text-slate-600">{label}</p>

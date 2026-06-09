@@ -32,7 +32,11 @@ export async function createBrokerConnection(
       ? input.environment === "live" ? "Alpaca Live" : "Alpaca Demo"
       : input.provider === "OANDA"
         ? input.environment === "live" ? "OANDA Live" : "OANDA Demo"
-        : input.environment === "live" ? "IBKR Live" : "IBKR Demo";
+        : input.provider === "Binance"
+          ? "Binance Spot"
+          : input.provider === "Kraken"
+            ? "Kraken Spot"
+            : input.environment === "live" ? "IBKR Live" : "IBKR Demo";
 
   const connection: PersistedBrokerConnection = {
     id: crypto.randomUUID(),

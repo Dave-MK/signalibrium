@@ -6,165 +6,92 @@ import { startBrokerOAuthApi, createBrokerConnectionApi } from "@/app/_lib/works
 import type { BrokerEnvironment, PersistedBrokerConnection } from "@/app/_lib/server/workspace-types";
 
 type Props = {
-  onClose: () => void;
+  onClose:     () => void;
   onConnected: (connection: PersistedBrokerConnection) => void;
 };
 
-// ── Broker catalogue ───────────────────────────────────────────────────────────
+// ─── Broker catalogue ─────────────────────────────────────────────────────────
 
-type ConnMethod = "oauth" | "apikey" | "soon";
-
-type BrokerDef = {
-  key: string;
-  name: string;
-  tagline: string;
-  method: ConnMethod;
-  accent: string;
-  border: string;
-  bg: string;
-  // OAuth brokers
-  hasEnvChoice?: boolean;
+type BrokerEntry = {
+  key:        string;
+  name:       string;
+  tagline:    string;
+  method:     "oauth" | "apikey" | "soon";
+  accent:     string;
+  border:     string;
+  bg:         string;
+  signupUrl?: string;
+  // oauth
   demoLabel?: string;
   liveLabel?: string;
-  // API-key brokers
-  keyLabel?: string;
+  // apikey
+  keyLabel?:    string;
   secretLabel?: string;
-  keyHelp?: string;
-  keyHelpUrl?: string;
+  keyHelp?:     string;
+  keyHelpUrl?:  string;
   needsSecret?: boolean;
 };
 
-const BROKERS_BY_CATEGORY: Array<{ label: string; brokers: BrokerDef[] }> = [
+const BROKERS: BrokerEntry[] = [
+  // ── OAuth ────────────────────────────────────────────────────────────────
   {
-    label: "Stocks & Derivatives",
-    brokers: [
-      {
-        key: "Alpaca", name: "Alpaca", tagline: "US Stocks & Crypto",
-        method: "oauth", hasEnvChoice: true, demoLabel: "Paper", liveLabel: "Live",
-        accent: "text-cyan-300", border: "border-cyan-500/40", bg: "bg-cyan-500/8",
-      },
-      {
-        key: "IBKR", name: "Interactive Brokers", tagline: "Stocks · Options · Futures",
-        method: "soon",
-        accent: "text-purple-300", border: "border-purple-500/20", bg: "bg-purple-500/5",
-      },
-      {
-        key: "Schwab", name: "Schwab", tagline: "thinkorswim · US Markets",
-        method: "soon",
-        accent: "text-blue-300", border: "border-blue-500/20", bg: "bg-blue-500/5",
-      },
-      {
-        key: "TradeStation", name: "TradeStation", tagline: "Stocks · Futures · Options",
-        method: "soon",
-        accent: "text-green-300", border: "border-green-500/20", bg: "bg-green-500/5",
-      },
-      {
-        key: "tastytrade", name: "tastytrade", tagline: "Options · Futures · Crypto",
-        method: "soon",
-        accent: "text-pink-300", border: "border-pink-500/20", bg: "bg-pink-500/5",
-      },
-      {
-        key: "Tradier", name: "Tradier", tagline: "US Stocks & Options",
-        method: "soon",
-        accent: "text-emerald-300", border: "border-emerald-500/20", bg: "bg-emerald-500/5",
-      },
-      {
-        key: "Robinhood", name: "Robinhood", tagline: "Stocks · Options · Crypto",
-        method: "soon",
-        accent: "text-lime-300", border: "border-lime-500/20", bg: "bg-lime-500/5",
-      },
-    ],
+    key: "Alpaca", name: "Alpaca", tagline: "US Stocks, ETFs & Crypto",
+    method: "oauth", demoLabel: "Paper", liveLabel: "Live",
+    signupUrl: "https://app.alpaca.markets/signup",
+    accent: "text-cyan-300", border: "border-cyan-500/40", bg: "bg-cyan-500/8",
   },
   {
-    label: "Forex & CFDs",
-    brokers: [
-      {
-        key: "OANDA", name: "OANDA", tagline: "Forex & CFDs",
-        method: "oauth", hasEnvChoice: true, demoLabel: "Demo", liveLabel: "Live",
-        accent: "text-amber-300", border: "border-amber-500/40", bg: "bg-amber-500/8",
-      },
-      {
-        key: "IG", name: "IG Group", tagline: "Forex · Indices · CFDs",
-        method: "soon",
-        accent: "text-sky-300", border: "border-sky-500/20", bg: "bg-sky-500/5",
-      },
-      {
-        key: "Saxo", name: "Saxo Bank", tagline: "Forex · Equities · Bonds",
-        method: "soon",
-        accent: "text-teal-300", border: "border-teal-500/20", bg: "bg-teal-500/5",
-      },
-      {
-        key: "CMC", name: "CMC Markets", tagline: "CFDs · Spread Betting",
-        method: "soon",
-        accent: "text-violet-300", border: "border-violet-500/20", bg: "bg-violet-500/5",
-      },
-    ],
+    key: "OANDA", name: "OANDA", tagline: "Forex & CFDs",
+    method: "oauth", demoLabel: "Demo", liveLabel: "Live",
+    signupUrl: "https://www.oanda.com/register/",
+    accent: "text-amber-300", border: "border-amber-500/40", bg: "bg-amber-500/8",
+  },
+  // ── API key ──────────────────────────────────────────────────────────────
+  {
+    key: "Binance", name: "Binance", tagline: "Spot · Futures · Margin",
+    method: "apikey", needsSecret: true,
+    keyLabel: "API Key", secretLabel: "Secret Key",
+    keyHelp: "Profile → API Management", keyHelpUrl: "https://www.binance.com/en/my/settings/api-management",
+    signupUrl: "https://www.binance.com/en/register",
+    accent: "text-yellow-300", border: "border-yellow-500/40", bg: "bg-yellow-500/8",
   },
   {
-    label: "Crypto",
-    brokers: [
-      {
-        key: "Binance", name: "Binance", tagline: "Spot · Futures · Margin",
-        method: "apikey", needsSecret: true,
-        keyLabel: "API Key", secretLabel: "Secret Key",
-        keyHelp: "Binance → Profile → API Management",
-        keyHelpUrl: "https://www.binance.com/en/my/settings/api-management",
-        accent: "text-yellow-300", border: "border-yellow-500/40", bg: "bg-yellow-500/8",
-      },
-      {
-        key: "Kraken", name: "Kraken", tagline: "Spot · Futures · Margin",
-        method: "apikey", needsSecret: true,
-        keyLabel: "API Key", secretLabel: "Private Key",
-        keyHelp: "Kraken → Settings → API",
-        keyHelpUrl: "https://www.kraken.com/u/security/api",
-        accent: "text-indigo-300", border: "border-indigo-500/40", bg: "bg-indigo-500/8",
-      },
-      {
-        key: "Coinbase", name: "Coinbase", tagline: "Spot · Advanced Trade",
-        method: "soon",
-        accent: "text-blue-300", border: "border-blue-500/20", bg: "bg-blue-500/5",
-      },
-      {
-        key: "Bybit", name: "Bybit", tagline: "Spot · Derivatives",
-        method: "soon",
-        accent: "text-orange-300", border: "border-orange-500/20", bg: "bg-orange-500/5",
-      },
-      {
-        key: "OKX", name: "OKX", tagline: "Spot · Futures · Options",
-        method: "soon",
-        accent: "text-slate-300", border: "border-slate-500/20", bg: "bg-slate-500/5",
-      },
-      {
-        key: "Gemini", name: "Gemini", tagline: "Regulated Crypto Exchange",
-        method: "soon",
-        accent: "text-blue-300", border: "border-blue-500/20", bg: "bg-blue-500/5",
-      },
-    ],
+    key: "Kraken", name: "Kraken", tagline: "Spot · Futures · Margin",
+    method: "apikey", needsSecret: true,
+    keyLabel: "API Key", secretLabel: "Private Key",
+    keyHelp: "Settings → API", keyHelpUrl: "https://www.kraken.com/u/security/api",
+    signupUrl: "https://www.kraken.com/sign-up",
+    accent: "text-indigo-300", border: "border-indigo-500/40", bg: "bg-indigo-500/8",
   },
+  // ── Coming soon ──────────────────────────────────────────────────────────
+  { key: "IBKR",         name: "Interactive Brokers", tagline: "Stocks · Options · Futures", method: "soon", accent: "text-purple-300", border: "border-purple-500/20", bg: "bg-purple-500/5" },
+  { key: "Schwab",       name: "Schwab",              tagline: "thinkorswim · US Markets",   method: "soon", accent: "text-blue-300",   border: "border-blue-500/20",   bg: "bg-blue-500/5" },
+  { key: "Coinbase",     name: "Coinbase",            tagline: "Spot · Advanced Trade",       method: "soon", accent: "text-blue-300",   border: "border-blue-500/20",   bg: "bg-blue-500/5" },
+  { key: "tastytrade",   name: "tastytrade",          tagline: "Options · Futures · Crypto",  method: "soon", accent: "text-pink-300",   border: "border-pink-500/20",   bg: "bg-pink-500/5" },
 ];
 
-// ── Modal steps ────────────────────────────────────────────────────────────────
-
-type Step = "pick" | "oauth-env" | "apikey-form" | "authorising" | "error";
+const LIVE_BROKERS = BROKERS.filter((b) => b.method !== "soon");
+const SOON_BROKERS = BROKERS.filter((b) => b.method === "soon");
 
 type OAuthMessage =
   | { type: "broker-oauth-success"; connection: PersistedBrokerConnection }
-  | { type: "broker-oauth-error"; error: string };
+  | { type: "broker-oauth-error";   error: string };
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function BrokerSelectModal({ onClose, onConnected }: Props) {
-  const [selected, setSelected] = useState<BrokerDef | null>(null);
-  const [step, setStep] = useState<Step>("pick");
-  const [environment, setEnvironment] = useState<BrokerEnvironment>("demo");
-  const [apiKey, setApiKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const [expanded, setExpanded]     = useState<string | null>(null);
+  const [env, setEnv]               = useState<Record<string, BrokerEnvironment>>({});
+  const [apiKey, setApiKey]         = useState("");
+  const [apiSecret, setApiSecret]   = useState("");
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
+  const [mounted, setMounted]       = useState(false);
 
   const popupRef    = useRef<Window | null>(null);
   const listenerRef = useRef<((e: MessageEvent) => void) | null>(null);
 
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
     return () => {
       if (listenerRef.current) window.removeEventListener("message", listenerRef.current);
@@ -172,41 +99,34 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
     };
   }, []);
 
-  function reset() {
-    if (listenerRef.current) window.removeEventListener("message", listenerRef.current);
-    popupRef.current?.close();
-    setSelected(null);
-    setStep("pick");
-    setError(null);
-    setApiKey("");
-    setApiSecret("");
-    setConnecting(false);
+  function getEnv(key: string): BrokerEnvironment {
+    return env[key] ?? "demo";
   }
 
-  function pickBroker(broker: BrokerDef) {
-    if (broker.method === "soon") return;
-    setSelected(broker);
-    setError(null);
-    if (broker.method === "oauth") {
-      setStep("oauth-env");
+  function toggleExpand(key: string) {
+    if (expanded === key) {
+      setExpanded(null);
     } else {
-      setStep("apikey-form");
+      setExpanded(key);
+      setApiKey("");
+      setApiSecret("");
+      setError(null);
     }
   }
 
-  // ── OAuth flow ─────────────────────────────────────────────────────────────
+  // ── OAuth ──────────────────────────────────────────────────────────────────
 
-  async function handleOAuth() {
-    if (!selected) return;
-    setStep("authorising");
+  async function handleOAuth(broker: BrokerEntry) {
+    if (connecting || broker.method !== "oauth") return;
+    setConnecting(broker.key);
     setError(null);
 
     let authUrl: string;
     try {
-      const result = await startBrokerOAuthApi(selected.key as "Alpaca" | "OANDA", environment);
+      const result = await startBrokerOAuthApi(broker.key as "Alpaca" | "OANDA", getEnv(broker.key));
       authUrl = result.authUrl;
     } catch (err) {
-      setStep("error");
+      setConnecting(null);
       setError(err instanceof Error ? err.message : "Failed to start authorisation.");
       return;
     }
@@ -214,15 +134,11 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
     const w = 600, h = 700;
     const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
     const top  = Math.round(window.screenY + (window.outerHeight - h) / 2);
-    const popup = window.open(
-      authUrl,
-      "broker-oauth",
-      `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes`,
-    );
+    const popup = window.open(authUrl, "broker-oauth", `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
 
     if (!popup) {
-      setStep("error");
-      setError("Popup was blocked. Allow popups for this site and try again.");
+      setConnecting(null);
+      setError("Popup blocked — allow popups for this site and try again.");
       return;
     }
 
@@ -232,16 +148,14 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
       if (event.origin !== window.location.origin) return;
       const data = event.data as OAuthMessage;
       if (!data?.type || (data.type !== "broker-oauth-success" && data.type !== "broker-oauth-error")) return;
-
       window.removeEventListener("message", handleMessage);
       listenerRef.current = null;
       popup.close();
-
+      setConnecting(null);
       if (data.type === "broker-oauth-success") {
         onConnected(data.connection);
         onClose();
       } else {
-        setStep("error");
         setError(data.error ?? "Authorisation failed.");
       }
     };
@@ -249,60 +163,53 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
     listenerRef.current = handleMessage;
     window.addEventListener("message", handleMessage);
 
-    const pollClosed = setInterval(() => {
+    const poll = setInterval(() => {
       if (popup.closed) {
-        clearInterval(pollClosed);
+        clearInterval(poll);
         if (listenerRef.current) {
           window.removeEventListener("message", handleMessage);
           listenerRef.current = null;
-          setStep("error");
-          setError("Authorisation window was closed. Please try again.");
+          setConnecting(null);
+          setError("Window closed before completing sign-in. Please try again.");
         }
       }
     }, 500);
   }
 
-  // ── API key flow ───────────────────────────────────────────────────────────
+  // ── API key ────────────────────────────────────────────────────────────────
 
-  async function handleApiKeyConnect() {
-    if (!selected || connecting) return;
-    if (!apiKey.trim()) { setError(`${selected.keyLabel ?? "API Key"} is required.`); return; }
-    if (selected.needsSecret && !apiSecret.trim()) { setError(`${selected.secretLabel ?? "Secret"} is required.`); return; }
+  async function handleApiKey(broker: BrokerEntry) {
+    if (connecting || broker.method !== "apikey") return;
+    if (!apiKey.trim())                         { setError(`${broker.keyLabel ?? "API key"} is required.`); return; }
+    if (broker.needsSecret && !apiSecret.trim()){ setError(`${broker.secretLabel ?? "Secret"} is required.`); return; }
 
-    setConnecting(true);
+    setConnecting(broker.key);
     setError(null);
 
     try {
       const result = await createBrokerConnectionApi({
-        provider: selected.key as "Binance" | "Kraken",
-        environment,
-        label: `${selected.name} Spot`,
-        apiKey: apiKey.trim(),
-        ...(selected.needsSecret ? { apiSecret: apiSecret.trim() } : {}),
+        provider:    broker.key as "Binance" | "Kraken",
+        environment: getEnv(broker.key),
+        label:       `${broker.name} ${getEnv(broker.key) === "live" ? "Live" : "Spot"}`,
+        apiKey:      apiKey.trim(),
+        ...(broker.needsSecret ? { apiSecret: apiSecret.trim() } : {}),
       });
       onConnected(result.connection);
       onClose();
     } catch (err) {
-      setConnecting(false);
-      setError(err instanceof Error ? err.message : "Connection failed. Check your credentials.");
+      setConnecting(null);
+      setError(err instanceof Error ? err.message : "Connection failed — check your credentials.");
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  const headerTitle =
-    step === "authorising" ? `Connecting ${selected?.name}…` :
-    step === "oauth-env"   ? `Connect ${selected?.name}` :
-    step === "apikey-form" ? `Connect ${selected?.name}` :
-    step === "error"       ? "Connection failed" :
-    "Connect a Broker";
+  if (!mounted) return null;
 
   const modal = (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-[9998] bg-black/70 backdrop-blur-sm"
-        onClick={step !== "authorising" && !connecting ? onClose : undefined}
+        onClick={connecting ? undefined : onClose}
         aria-hidden="true"
       />
 
@@ -311,297 +218,201 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Connect a broker"
-        className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-[520px] max-h-[88vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.72rem] border border-white/10 bg-[#07111d] shadow-[0_24px_64px_rgba(0,0,0,0.8)]"
+        className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-[440px] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.76rem] border border-white/10 bg-[#07111d] shadow-[0_24px_64px_rgba(0,0,0,0.85)]"
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#07111d] px-5 py-4">
-          <div className="flex items-center gap-2">
-            {step !== "pick" && step !== "authorising" && !connecting && (
-              <button
-                type="button"
-                onClick={reset}
-                aria-label="Back"
-                className="mr-0.5 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/6 hover:text-white"
-              >
-                ←
-              </button>
-            )}
-            <h2 className="text-[0.92rem] font-semibold text-white">{headerTitle}</h2>
-          </div>
-          {step !== "authorising" && !connecting && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/6 hover:text-white"
-            >
+          <h2 className="text-[0.92rem] font-semibold text-white">Connect a broker</h2>
+          {!connecting && (
+            <button type="button" onClick={onClose} aria-label="Close"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/6 hover:text-white">
               ✕
             </button>
           )}
         </div>
 
-        <div className="p-5">
+        <div className="p-4 space-y-2">
+          {/* Global error */}
+          {error && (
+            <div className="rounded-[0.38rem] border border-red-500/20 bg-red-500/8 px-3 py-2.5 text-[0.76rem] text-red-300">
+              {error}
+              <button type="button" onClick={() => setError(null)} className="ml-2 text-red-400/60 hover:text-red-300">✕</button>
+            </div>
+          )}
 
-          {/* ── Pick broker ──────────────────────────────────────────────── */}
-          {step === "pick" && (
-            <div className="space-y-5">
-              <div className="flex items-start gap-2 rounded-[0.4rem] border border-emerald-500/15 bg-emerald-500/5 px-3 py-2.5">
-                <span className="mt-0.5 shrink-0 text-[0.8rem]">🔒</span>
-                <p className="text-[0.73rem] leading-relaxed text-emerald-200/80">
-                  OAuth brokers take you to the broker&apos;s own login page — no keys needed. For exchanges, you generate read-only API keys in your account settings.
-                </p>
-              </div>
+          {/* Live broker cards */}
+          {LIVE_BROKERS.map((broker) => {
+            const isExpanded  = expanded === broker.key;
+            const isBusy      = connecting === broker.key;
+            const currentEnv  = getEnv(broker.key);
 
-              {BROKERS_BY_CATEGORY.map((cat) => (
-                <div key={cat.label}>
-                  <p className="mb-2 text-[0.64rem] font-semibold uppercase tracking-widest text-slate-600">
-                    {cat.label}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {cat.brokers.map((b) => (
-                      <button
-                        key={b.key}
-                        type="button"
-                        disabled={b.method === "soon"}
-                        onClick={() => pickBroker(b)}
-                        className={`relative flex flex-col items-center gap-1.5 rounded-[0.48rem] border px-2.5 py-3 text-center transition ${
-                          b.method === "soon"
-                            ? "cursor-not-allowed border-white/5 bg-white/[0.015] opacity-35"
-                            : `${b.border} ${b.bg} hover:brightness-125`
-                        }`}
-                      >
-                        {/* Logo placeholder */}
-                        <span className={`text-[1.1rem] font-bold leading-none ${b.accent}`}>
-                          {b.name.slice(0, 2).toUpperCase()}
-                        </span>
-                        <div>
-                          <p className={`text-[0.72rem] font-semibold leading-tight ${b.accent}`}>{b.name}</p>
-                          <p className="mt-0.5 text-[0.58rem] text-slate-600 leading-tight">{b.tagline}</p>
+            return (
+              <div key={broker.key} className={`rounded-[0.56rem] border transition ${broker.border} ${broker.bg}`}>
+                {/* Card header row */}
+                <div className="flex items-center gap-3 p-3.5">
+                  {/* Broker initials avatar */}
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.4rem] border ${broker.border} text-[0.8rem] font-bold ${broker.accent}`}>
+                    {broker.key.slice(0, 2).toUpperCase()}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[0.88rem] font-semibold ${broker.accent}`}>{broker.name}</p>
+                    <p className="text-[0.68rem] text-slate-500">{broker.tagline}</p>
+                  </div>
+
+                  {broker.method === "oauth" ? (
+                    /* OAuth — single button to kick off login */
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {broker.demoLabel && (
+                        <div className="flex rounded-[0.26rem] border border-white/8 text-[0.63rem] overflow-hidden">
+                          {(["demo", "live"] as BrokerEnvironment[]).map((e) => (
+                            <button
+                              key={e}
+                              type="button"
+                              onClick={() => setEnv((prev) => ({ ...prev, [broker.key]: e }))}
+                              className={`px-2 py-0.5 transition ${currentEnv === e ? `${broker.bg} ${broker.accent} font-medium` : "text-slate-600 hover:text-slate-400"}`}
+                            >
+                              {e === "demo" ? broker.demoLabel : broker.liveLabel}
+                            </button>
+                          ))}
                         </div>
-                        {/* Method badge */}
-                        {b.method !== "soon" && (
-                          <span className={`rounded-full border px-1.5 py-0.5 text-[0.52rem] font-medium ${
-                            b.method === "oauth"
-                              ? "border-emerald-500/25 text-emerald-500"
-                              : "border-yellow-500/25 text-yellow-600"
-                          }`}>
-                            {b.method === "oauth" ? "OAuth" : "API Key"}
-                          </span>
-                        )}
-                        {b.method === "soon" && (
-                          <span className="absolute right-1 top-1 rounded-full border border-white/8 px-1.5 py-0.5 text-[0.5rem] text-slate-700">
-                            Soon
-                          </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={!!connecting}
+                        onClick={() => void handleOAuth(broker)}
+                        className={`flex items-center gap-1.5 rounded-[0.34rem] border px-3 py-1.5 text-[0.76rem] font-semibold transition disabled:opacity-50 ${broker.border} ${broker.accent} hover:brightness-110`}
+                      >
+                        {isBusy ? (
+                          <>
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Signing in…
+                          </>
+                        ) : (
+                          <>Sign in</>
                         )}
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    /* API key — expand/collapse */
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(broker.key)}
+                      disabled={!!connecting}
+                      className={`shrink-0 rounded-[0.34rem] border px-3 py-1.5 text-[0.76rem] font-semibold transition disabled:opacity-50 ${
+                        isExpanded
+                          ? `${broker.border} ${broker.accent}`
+                          : `border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200`
+                      }`}
+                    >
+                      {isExpanded ? "Cancel" : "Connect"}
+                    </button>
+                  )}
                 </div>
+
+                {/* API key form — inline expand */}
+                {broker.method === "apikey" && isExpanded && (
+                  <div className="border-t border-white/6 px-4 pb-4 pt-3 space-y-3">
+                    {/* Step guide */}
+                    <p className="text-[0.7rem] text-slate-500">
+                      Go to{" "}
+                      <a href={broker.keyHelpUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-slate-300 underline underline-offset-2 hover:text-white">
+                        {broker.keyHelp}
+                      </a>
+                      {" "}and create a key with <strong className="text-slate-400">Read Only</strong> permissions.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* API Key */}
+                      <div className="col-span-2">
+                        <label className="mb-1 block text-[0.63rem] font-semibold uppercase tracking-wider text-slate-600">
+                          {broker.keyLabel}
+                        </label>
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder={`Paste ${broker.keyLabel?.toLowerCase()}…`}
+                          value={apiKey}
+                          onChange={(e) => { setApiKey(e.target.value); setError(null); }}
+                          className="w-full rounded-[0.34rem] border border-white/10 bg-[#0a1826] px-3 py-2 text-[0.82rem] text-slate-100 placeholder-slate-700 outline-none focus:border-white/20"
+                        />
+                      </div>
+
+                      {/* Secret */}
+                      {broker.needsSecret && (
+                        <div className="col-span-2">
+                          <label className="mb-1 block text-[0.63rem] font-semibold uppercase tracking-wider text-slate-600">
+                            {broker.secretLabel}
+                          </label>
+                          <input
+                            type="password"
+                            autoComplete="off"
+                            spellCheck={false}
+                            placeholder="Paste secret key…"
+                            value={apiSecret}
+                            onChange={(e) => { setApiSecret(e.target.value); setError(null); }}
+                            className="w-full rounded-[0.34rem] border border-white/10 bg-[#0a1826] px-3 py-2 text-[0.82rem] text-slate-100 placeholder-slate-700 outline-none focus:border-white/20"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-0.5">
+                      <p className="text-[0.64rem] text-slate-700 flex items-center gap-1">
+                        <span>🔒</span> Stored encrypted, never displayed again.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => void handleApiKey(broker)}
+                        className={`shrink-0 rounded-[0.34rem] border px-4 py-1.5 text-[0.78rem] font-semibold transition disabled:opacity-50 ${broker.border} ${broker.accent} hover:brightness-110`}
+                      >
+                        {isBusy ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Verifying…
+                          </span>
+                        ) : "Connect"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Create account link */}
+                {broker.signupUrl && !isExpanded && broker.method !== "oauth" && (
+                  <div className="border-t border-white/4 px-3.5 py-2">
+                    <a href={broker.signupUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-[0.65rem] text-slate-600 hover:text-slate-400">
+                      No account? Create one at {broker.name} →
+                    </a>
+                  </div>
+                )}
+                {broker.signupUrl && broker.method === "oauth" && (
+                  <div className="border-t border-white/4 px-3.5 py-2">
+                    <a href={broker.signupUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-[0.65rem] text-slate-600 hover:text-slate-400">
+                      No account? Create one at {broker.name} →
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Coming soon — compact row */}
+          <div className="pt-1">
+            <p className="mb-1.5 text-[0.62rem] font-semibold uppercase tracking-widest text-slate-700">Coming soon</p>
+            <div className="flex flex-wrap gap-2">
+              {SOON_BROKERS.map((b) => (
+                <span key={b.key}
+                  className="rounded-[0.3rem] border border-white/5 bg-white/[0.015] px-2.5 py-1 text-[0.68rem] text-slate-700">
+                  {b.name}
+                </span>
               ))}
             </div>
-          )}
-
-          {/* ── OAuth env selection ───────────────────────────────────────── */}
-          {step === "oauth-env" && selected?.method === "oauth" && (
-            <div className="space-y-5">
-              {selected.hasEnvChoice && (
-                <div>
-                  <p className="mb-2 text-[0.68rem] font-medium uppercase tracking-widest text-slate-500">
-                    Account type
-                  </p>
-                  <div className="flex gap-2">
-                    {(["demo", "live"] as const).map((env) => (
-                      <button
-                        key={env}
-                        type="button"
-                        onClick={() => setEnvironment(env)}
-                        className={`flex-1 rounded-[0.4rem] border py-2.5 text-[0.8rem] font-medium transition ${
-                          environment === env
-                            ? `${selected.border} ${selected.bg} ${selected.accent}`
-                            : "border-white/8 text-slate-500 hover:border-white/16 hover:text-slate-300"
-                        }`}
-                      >
-                        {env === "demo" ? `🧪 ${selected.demoLabel ?? "Demo"}` : `⚡ ${selected.liveLabel ?? "Live"}`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-[0.4rem] border border-white/6 bg-white/[0.02] px-3 py-3 space-y-1.5">
-                <p className="text-[0.72rem] font-medium text-slate-300">What happens next</p>
-                <ol className="space-y-1">
-                  {[
-                    `A secure window opens on ${selected.name}'s website.`,
-                    `Sign in with your ${selected.name} account.`,
-                    "Authorise Signalibrium to read your account.",
-                    "Done — the window closes automatically.",
-                  ].map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-[0.7rem] text-slate-500">
-                      <span className={`mt-0.5 shrink-0 text-[0.6rem] font-bold ${selected.accent}`}>{i + 1}</span>
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void handleOAuth()}
-                className={`w-full rounded-[0.44rem] border py-3 text-[0.88rem] font-semibold transition hover:brightness-110 ${selected.border} ${selected.accent}`}
-              >
-                Log in to {selected.name} →
-              </button>
-
-              <p className="text-center text-[0.66rem] text-slate-700">
-                Your login is entered directly on {selected.name}&apos;s site — Signalibrium never sees it.
-              </p>
-            </div>
-          )}
-
-          {/* ── API key form ──────────────────────────────────────────────── */}
-          {step === "apikey-form" && selected?.method === "apikey" && (
-            <div className="space-y-4">
-              {/* Step guide */}
-              <div className="rounded-[0.4rem] border border-white/6 bg-white/[0.02] px-3 py-3 space-y-1.5">
-                <p className="text-[0.72rem] font-medium text-slate-300">How to get your API keys</p>
-                <ol className="space-y-1">
-                  <li className="flex items-start gap-2 text-[0.7rem] text-slate-500">
-                    <span className={`mt-0.5 shrink-0 text-[0.6rem] font-bold ${selected.accent}`}>1</span>
-                    <span>
-                      Go to{" "}
-                      <a
-                        href={selected.keyHelpUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-300 underline underline-offset-2 hover:text-white"
-                      >
-                        {selected.keyHelp}
-                      </a>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[0.7rem] text-slate-500">
-                    <span className={`mt-0.5 shrink-0 text-[0.6rem] font-bold ${selected.accent}`}>2</span>
-                    <span>Create a new API key with <strong className="text-slate-400">Read Only</strong> permissions.</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[0.7rem] text-slate-500">
-                    <span className={`mt-0.5 shrink-0 text-[0.6rem] font-bold ${selected.accent}`}>3</span>
-                    <span>Paste both values below and click Connect.</span>
-                  </li>
-                </ol>
-              </div>
-
-              {/* API Key input */}
-              <div>
-                <label htmlFor="broker-apiKey" className="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-widest text-slate-500">
-                  {selected.keyLabel ?? "API Key"}
-                </label>
-                <input
-                  id="broker-apiKey"
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder={`Paste your ${selected.keyLabel?.toLowerCase() ?? "API key"}…`}
-                  value={apiKey}
-                  onChange={(e) => { setApiKey(e.target.value); setError(null); }}
-                  className="w-full rounded-[0.38rem] border border-white/10 bg-[#0a1826] px-3 py-2.5 text-[0.84rem] text-slate-100 placeholder-slate-700 outline-none focus:border-white/20 focus:ring-1 focus:ring-white/10"
-                />
-              </div>
-
-              {selected.needsSecret && (
-                <div>
-                  <label htmlFor="broker-apiSecret" className="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-widest text-slate-500">
-                    {selected.secretLabel ?? "Secret Key"}
-                  </label>
-                  <input
-                    id="broker-apiSecret"
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    placeholder="Paste your secret key…"
-                    value={apiSecret}
-                    onChange={(e) => { setApiSecret(e.target.value); setError(null); }}
-                    className="w-full rounded-[0.38rem] border border-white/10 bg-[#0a1826] px-3 py-2.5 text-[0.84rem] text-slate-100 placeholder-slate-700 outline-none focus:border-white/20 focus:ring-1 focus:ring-white/10"
-                  />
-                </div>
-              )}
-
-              <div className="flex items-start gap-2 rounded-[0.36rem] border border-emerald-500/12 bg-emerald-500/5 px-3 py-2">
-                <span className="mt-0.5 shrink-0 text-[0.72rem]">🔒</span>
-                <p className="text-[0.68rem] text-emerald-200/70">
-                  Keys are stored encrypted and never displayed again. Use read-only keys for security.
-                </p>
-              </div>
-
-              {error && (
-                <div className="rounded-[0.36rem] border border-red-500/20 bg-red-500/8 px-3 py-2.5 text-[0.76rem] text-red-300">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="button"
-                disabled={connecting}
-                onClick={() => void handleApiKeyConnect()}
-                className={`w-full rounded-[0.44rem] border py-2.5 text-[0.84rem] font-semibold transition ${
-                  connecting
-                    ? "cursor-not-allowed border-white/6 text-slate-600"
-                    : `${selected.border} ${selected.accent} hover:brightness-110`
-                }`}
-              >
-                {connecting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Verifying…
-                  </span>
-                ) : (
-                  `Connect ${selected.name}`
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* ── Authorising (OAuth popup waiting) ────────────────────────── */}
-          {step === "authorising" && (
-            <div className="flex flex-col items-center gap-4 py-6">
-              <div className={`flex h-14 w-14 items-center justify-center rounded-full border-2 ${selected?.border ?? "border-white/10"}`}>
-                <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent text-slate-400" />
-              </div>
-              <div className="text-center">
-                <p className="text-[0.88rem] font-medium text-slate-200">
-                  Waiting for authorisation…
-                </p>
-                <p className="mt-1 text-[0.74rem] text-slate-500">
-                  Complete the login in the {selected?.name} window.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-2 text-[0.72rem] text-slate-600 underline underline-offset-2 hover:text-slate-400"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* ── Error ─────────────────────────────────────────────────────── */}
-          {step === "error" && (
-            <div className="space-y-4">
-              <div className="rounded-[0.44rem] border border-red-500/20 bg-red-500/8 px-4 py-3.5">
-                <p className="text-[0.8rem] font-medium text-red-300">Connection failed</p>
-                <p className="mt-1 text-[0.74rem] text-red-300/70">{error}</p>
-              </div>
-              <button
-                type="button"
-                onClick={reset}
-                className="w-full rounded-[0.38rem] border border-white/10 py-2.5 text-[0.82rem] text-slate-300 transition hover:border-white/20 hover:text-white"
-              >
-                Try again
-              </button>
-            </div>
-          )}
-
+          </div>
         </div>
       </div>
     </>

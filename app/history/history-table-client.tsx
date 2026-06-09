@@ -6,6 +6,8 @@ import type { PricedAssetClass } from "@/app/_lib/market-prices";
 import { formatDateTimeLabel, formatPercent } from "@/app/_lib/format";
 import { StatusChip } from "@/app/_components/ui";
 import { InlineNoteButton } from "@/app/_components/trade-note-form";
+import { TradeThisButton } from "@/app/_components/trade-ticket-modal";
+import { QuickAlertButton } from "@/app/_components/quick-alert-button";
 import type {
   PersistedJournalEntry,
   PersistedPredictionHistoryRecord,
@@ -195,8 +197,41 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                       <span className="font-semibold text-amber-300">Siggi skipped:</span> {item.siggiSkipReason}
                     </p>
                   )}
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <InlineNoteButton predictionId={item.id} symbol={item.symbol} defaultOutcome={defaultOutcome} existingEntry={existingNote} />
+                    {item.outcome === "Monitoring" && item.entryLowAtCall > 0 && item.stopPriceAtCall > 0 && item.targetPriceAtCall > 0 && (
+                      <>
+                        <TradeThisButton
+                          prefill={{
+                            symbol:      item.symbol,
+                            side:        item.actionAtCall === "SELL" ? "Short" : "Long",
+                            entry:       (item.entryLowAtCall + item.entryHighAtCall) / 2,
+                            stopLoss:    item.stopPriceAtCall,
+                            takeProfit:  item.targetPriceAtCall,
+                            strategy:    item.strategyAtCall,
+                            predictionId: item.id,
+                          }}
+                        />
+                        <QuickAlertButton
+                          prefill={{
+                            symbol:    item.symbol,
+                            condition: item.actionAtCall === "SELL" ? "above" : "below",
+                            price:     item.stopPriceAtCall,
+                            label:     `${item.symbol} stop hit — ${item.actionAtCall === "SELL" ? "above" : "below"} ${item.stopPriceAtCall}`,
+                          }}
+                          buttonLabel="Stop alert"
+                        />
+                        <QuickAlertButton
+                          prefill={{
+                            symbol:    item.symbol,
+                            condition: item.actionAtCall === "SELL" ? "below" : "above",
+                            price:     item.targetPriceAtCall,
+                            label:     `${item.symbol} target — ${item.actionAtCall === "SELL" ? "below" : "above"} ${item.targetPriceAtCall}`,
+                          }}
+                          buttonLabel="Target alert"
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -230,8 +265,41 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                   </div>
                   <div className="text-[0.82rem] font-semibold text-white">{formatPercent(item.moveFromCallPct, true)}</div>
                   <div className="min-w-0"><p className="text-[0.82rem] font-semibold text-white">{item.accuracyScore}%</p></div>
-                  <div className="pt-0.5">
+                  <div className="space-y-1.5 pt-0.5">
                     <InlineNoteButton predictionId={item.id} symbol={item.symbol} defaultOutcome={defaultOutcome} existingEntry={existingNote} />
+                    {item.outcome === "Monitoring" && item.entryLowAtCall > 0 && item.stopPriceAtCall > 0 && item.targetPriceAtCall > 0 && (
+                      <>
+                        <TradeThisButton
+                          prefill={{
+                            symbol:      item.symbol,
+                            side:        item.actionAtCall === "SELL" ? "Short" : "Long",
+                            entry:       (item.entryLowAtCall + item.entryHighAtCall) / 2,
+                            stopLoss:    item.stopPriceAtCall,
+                            takeProfit:  item.targetPriceAtCall,
+                            strategy:    item.strategyAtCall,
+                            predictionId: item.id,
+                          }}
+                        />
+                        <QuickAlertButton
+                          prefill={{
+                            symbol:    item.symbol,
+                            condition: item.actionAtCall === "SELL" ? "above" : "below",
+                            price:     item.stopPriceAtCall,
+                            label:     `${item.symbol} stop — ${item.stopPriceAtCall}`,
+                          }}
+                          buttonLabel="Stop ▲"
+                        />
+                        <QuickAlertButton
+                          prefill={{
+                            symbol:    item.symbol,
+                            condition: item.actionAtCall === "SELL" ? "below" : "above",
+                            price:     item.targetPriceAtCall,
+                            label:     `${item.symbol} target — ${item.targetPriceAtCall}`,
+                          }}
+                          buttonLabel="Target ▼"
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

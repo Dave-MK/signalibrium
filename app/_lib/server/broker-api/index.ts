@@ -20,6 +20,24 @@ import {
 } from "./oanda";
 import { verifyBinanceCredentials, fetchBinanceAccount, type BinanceAccountData } from "./binance";
 import { verifyKrakenCredentials, fetchKrakenAccount, type KrakenAccountData } from "./kraken";
+import {
+  submitAlpacaOrder,
+  submitOandaOrder,
+  submitBinanceOrder,
+  submitKrakenOrder,
+  type BrokerOrderRequest,
+  type BrokerOrderResult,
+} from "./orders";
+import {
+  fetchAlpacaPositions,
+  fetchOandaPositions,
+  fetchBinancePositions,
+  fetchKrakenPositions,
+  type BrokerPosition,
+  type BrokerPositionsResult,
+} from "./positions";
+
+export type { BrokerOrderRequest, BrokerOrderResult, BrokerPosition, BrokerPositionsResult };
 
 export type { AlpacaAccountData, OandaAccountData, BinanceAccountData, KrakenAccountData };
 
@@ -96,4 +114,30 @@ export async function fetchBrokerAccount(
   }
 
   return { provider: "IBKR", error: "not_implemented" };
+}
+
+export async function submitBrokerOrder(
+  provider: BrokerProvider,
+  environment: BrokerEnvironment,
+  credential: StoredBrokerCredential,
+  request: BrokerOrderRequest,
+): Promise<BrokerOrderResult> {
+  if (provider === "Alpaca") return submitAlpacaOrder(request, credential, environment);
+  if (provider === "OANDA")  return submitOandaOrder(request, credential, environment);
+  if (provider === "Binance") return submitBinanceOrder(request, credential);
+  if (provider === "Kraken")  return submitKrakenOrder(request, credential);
+  throw new Error("Order submission is not yet available for IBKR.");
+}
+
+export async function fetchBrokerPositions(
+  provider: BrokerProvider,
+  environment: BrokerEnvironment,
+  credential: StoredBrokerCredential,
+  accountRef: string | null,
+): Promise<BrokerPositionsResult> {
+  if (provider === "Alpaca")  return fetchAlpacaPositions(credential, environment);
+  if (provider === "OANDA")   return fetchOandaPositions(credential, environment, accountRef ?? "");
+  if (provider === "Binance") return fetchBinancePositions(credential);
+  if (provider === "Kraken")  return fetchKrakenPositions(credential);
+  return { provider: "IBKR" as never, positions: [], fetchedAt: new Date().toISOString() };
 }

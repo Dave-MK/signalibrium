@@ -18,7 +18,15 @@ import type {
   OandaAccountData,
   BinanceAccountData,
   KrakenAccountData,
+  BrokerOrderRequest,
+  BrokerOrderResult,
+  BrokerPosition,
 } from "./server/broker-api";
+import type { PersistedTradeTicket } from "./server/workspace-types";
+import type { CreateTradeTicketInput, UpdateTradeTicketInput } from "./server/repositories/trade-tickets";
+
+export type { BrokerOrderRequest, BrokerOrderResult, BrokerPosition };
+export type { PersistedTradeTicket, CreateTradeTicketInput, UpdateTradeTicketInput };
 import type { SupportedChartInterval } from "./server/market-data/provider-types";
 
 async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit) {
@@ -283,5 +291,83 @@ export async function startBrokerOAuthApi(
 ): Promise<{ authUrl: string }> {
   return requestJson<{ authUrl: string }>(
     `/api/broker-connections/oauth/start?provider=${encodeURIComponent(provider)}&environment=${encodeURIComponent(environment)}`,
+  );
+}
+
+// ── Broker positions ───────────────────────────────────────────────────────────
+
+export async function fetchBrokerPositionsApi(
+  connectionId: string,
+): Promise<{ positions: BrokerPosition[]; fetchedAt: string }> {
+  return requestJson<{ positions: BrokerPosition[]; fetchedAt: string }>(
+    `/api/broker-connections/${connectionId}/positions`,
+  );
+}
+
+// ── Broker orders ─────────────────────────────────────────────────────────────
+
+export async function submitBrokerOrderApi(
+  connectionId: string,
+  order: BrokerOrderRequest,
+): Promise<{ order: BrokerOrderResult }> {
+  return requestJson<{ order: BrokerOrderResult }>(
+    `/api/broker-connections/${connectionId}/orders`,
+    { method: "POST", body: JSON.stringify(order) },
+  );
+}
+
+// ── Trade tickets ─────────────────────────────────────────────────────────────
+
+export async function listTradeTicketsApi(): Promise<{ tickets: PersistedTradeTicket[] }> {
+  return requestJson<{ tickets: PersistedTradeTicket[] }>("/api/trade-tickets");
+}
+
+export async function createTradeTicketApi(
+  input: CreateTradeTicketInput,
+): Promise<{ ticket: PersistedTradeTicket }> {
+  return requestJson<{ ticket: PersistedTradeTicket }>("/api/trade-tickets", {
+    method: "POST",
+    body:   JSON.stringify(input),
+  });
+}
+
+export async function getTradeTicketApi(
+  ticketId: string,
+): Promise<{ ticket: PersistedTradeTicket }> {
+  return requestJson<{ ticket: PersistedTradeTicket }>(`/api/trade-tickets/${ticketId}`);
+}
+
+export async function updateTradeTicketApi(
+  ticketId: string,
+  patch: UpdateTradeTicketInput,
+): Promise<{ ticket: PersistedTradeTicket }> {
+  return requestJson<{ ticket: PersistedTradeTicket }>(`/api/trade-tickets/${ticketId}`, {
+    method: "PATCH",
+    body:   JSON.stringify(patch),
+  });
+}
+
+export async function deleteTradeTicketApi(ticketId: string): Promise<{ success: true }> {
+  return requestJson<{ success: true }>(`/api/trade-tickets/${ticketId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function submitTradeTicketApi(
+  ticketId: string,
+  options?: { connectionId?: string },
+): Promise<{ ticket: PersistedTradeTicket; order: BrokerOrderResult }> {
+  return requestJson<{ ticket: PersistedTradeTicket; order: BrokerOrderResult }>(
+    `/api/trade-tickets/${ticketId}/submit`,
+    { method: "POST", body: JSON.stringify(options ?? {}) },
+  );
+}
+
+export async function cancelTradeTicketApi(
+  ticketId: string,
+): Promise<{ ticket: PersistedTradeTicket }> {
+  return requestJson<{ ticket: PersistedTradeTicket }>(
+    `/api/trade-tickets/${ticketId}/cancel`,
+    { method: "POST", body: JSON.stringify({}) },
   );
 }

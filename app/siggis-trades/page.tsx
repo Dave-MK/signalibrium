@@ -111,8 +111,8 @@ export default async function SiggiTradesPage() {
   const formatUsd = (value: number, digits = 2) =>
     formatCurrencyForDisplay(value, displayCurrencyState.currency, displayCurrencyState.rates, digits);
 
-  // Use up to 40 equity snapshots for the chart — newest last
-  const equityCurve = [...siggiAccount.equityCurve].reverse().slice(-40);
+  // Full equity curve, oldest-first — the chart component filters by period client-side
+  const equityCurve = [...siggiAccount.equityCurve].reverse();
 
   // Portfolio heat: sum of current-stop-distance × quantity × usdToGbp for all open trades
   const usdToGbpRate = displayCurrencyState.rates.GBP ?? 0.79;
@@ -683,7 +683,7 @@ export default async function SiggiTradesPage() {
           <div className="mb-3 flex items-center justify-between">
             <p className="micro-label">Equity curve</p>
             <p className="text-[0.72rem] text-slate-500">
-              {equityCurve.length} snapshots · hover for detail
+              {equityCurve.length} total snapshots
             </p>
           </div>
           <EquityCurveChart

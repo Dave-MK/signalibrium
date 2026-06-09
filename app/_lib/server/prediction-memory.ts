@@ -76,32 +76,37 @@ function buildResolutionEvidence(input: {
   outcome: PersistedPredictionHistoryRecord["outcome"];
   resolutionMethod?: PersistedPredictionHistoryRecord["resolutionMethod"];
   sequenceEvidenceNote?: string | null;
+  record?: Pick<
+    PersistedPredictionHistoryRecord,
+    "actionAtCall" | "stopPriceAtCall" | "targetPriceAtCall" | "priceAtCall"
+  >;
 }) {
-  if (input.outcome === "Monitoring") {
-    return null;
+  if (input.outcome === "Monitoring") return null;
+
+  const r = input.record;
+  const dp = r
+    ? (r.stopPriceAtCall < 10 ? 4 : r.stopPriceAtCall < 1000 ? 2 : 0)
+    : 2;
+  const stopFmt   = r ? r.stopPriceAtCall.toFixed(dp)   : "stop";
+  const targetFmt = r ? r.targetPriceAtCall.toFixed(dp) : "target";
+  const direction = r ? (r.actionAtCall === "SELL" ? "short" : "long") : "";
+
+  if (input.outcome === "Hit Target") {
+    const base = `Hit ${direction} target at ${targetFmt}`;
+    if (input.sequenceEvidenceNote) return `${base}. ${input.sequenceEvidenceNote}`;
+    if (input.ambiguousResolution)  return `${base} — both levels were inside the same candle; resolved by candle direction.`;
+    return base + ".";
+  }
+
+  if (input.outcome === "Stopped") {
+    const base = `Stopped out on ${direction} at ${stopFmt}`;
+    if (input.sequenceEvidenceNote) return `${base}. ${input.sequenceEvidenceNote}`;
+    if (input.ambiguousResolution)  return `${base} — both levels were inside the same candle; resolved by candle direction.`;
+    return base + ".";
   }
 
   if (input.outcome === "Ambiguous") {
-    return "Stop and target both printed in the same candle, so order could not be confirmed.";
-  }
-
-  if (input.resolutionMethod === "pulse-tape") {
-    return (
-      input.sequenceEvidenceNote ??
-      "Resolved from Siggi's pulse tape after the higher bars overlapped both levels."
-    );
-  }
-
-  if (input.resolutionMethod === "lower-timeframe-drilldown") {
-    return "Resolved from lower-timeframe drilldown before any fallback inference was needed.";
-  }
-
-  if (input.resolutionMethod === "sequence-inference") {
-    return "Inferred from the final bar path because deeper drilldown still overlapped both levels.";
-  }
-
-  if (input.resolutionMethod === "candle-range") {
-    return "Resolved from live candle highs and lows.";
+    return `Stop (${stopFmt}) and target (${targetFmt}) both printed in the same candle — sequence could not be confirmed.`;
   }
 
   return "Resolved from the latest synced price snapshot.";
@@ -114,42 +119,54 @@ function buildPredictionNarrative(input: {
   resolutionMethod?: PersistedPredictionHistoryRecord["resolutionMethod"];
   sequenceEvidenceNote?: string | null;
   symbol: string;
+  record?: Pick<
+    PersistedPredictionHistoryRecord,
+    "actionAtCall" | "stopPriceAtCall" | "targetPriceAtCall" | "priceAtCall"
+  >;
 }) {
-  const resolutionNote =
-    input.resolutionMethod === "pulse-tape"
-      ? " The outcome was resolved from Siggi's pulse tape after the higher and lower candles still overlapped both stop and target."
-      : input.resolutionMethod === "sequence-inference"
-      ? " The outcome was inferred from the candle path after deeper drilldown data still touched both stop and target inside the same final bar."
-      : input.resolutionMethod === "lower-timeframe-drilldown"
-      ? " The outcome was resolved from a lower-timeframe drilldown after the higher bar touched both stop and target."
-      : input.resolutionMethod === "candle-range"
-      ? input.ambiguousResolution
-        ? " A single candle touched both stop and target, and the candle data could not confirm which level printed first."
-        : " The outcome was resolved from live candle highs and lows."
-      : " The outcome was resolved from the latest synced price snapshot.";
+  const r = input.record;
+  const dp = r
+    ? (r.stopPriceAtCall < 10 ? 4 : r.stopPriceAtCall < 1000 ? 2 : 0)
+    : 2;
+  const direction   = r ? (r.actionAtCall === "SELL" ? "short" : "long") : "";
+  const stopFmt     = r ? r.stopPriceAtCall.toFixed(dp)   : "the stop";
+  const targetFmt   = r ? r.targetPriceAtCall.toFixed(dp) : "the target";
+  const entryFmt    = r ? r.priceAtCall.toFixed(dp)       : "entry";
 
-  const ambiguityTail =
-    input.resolutionMethod === "lower-timeframe-drilldown" ||
-    input.resolutionMethod === "pulse-tape"
-      ? ""
-      : input.resolutionMethod === "sequence-inference"
-        ? " Siggi used a best-effort sequence inference rather than assuming the stop was hit first."
-        : "";
-  const evidenceTail = input.sequenceEvidenceNote ? ` ${input.sequenceEvidenceNote}` : "";
+  // Concise note appended when both levels were inside the same candle
+  const sameBarNote = input.ambiguousResolution
+    ? " Both stop and target were inside the same candle; resolved by candle close direction."
+    : "";
+  // Sequence evidence from pulse tape (already human-readable timestamps)
+  const seqNote = input.sequenceEvidenceNote ? ` ${input.sequenceEvidenceNote}` : "";
+  // Trim eventContext to a short clause — take first sentence or first 120 chars
+  const evtSummary = input.eventContext
+    ? ` ${input.eventContext.split(".")[0].slice(0, 120)}.`
+    : "";
 
   if (input.outcome === "Hit Target") {
-    return `${input.symbol} reached the planned target after Siggi locked the entry.${resolutionNote}${ambiguityTail}${evidenceTail} ${input.eventContext}`.trim();
+    const moveDesc = r
+      ? r.actionAtCall === "SELL"
+        ? `fell from ${entryFmt} to hit the ${targetFmt} target`
+        : `rose from ${entryFmt} to hit the ${targetFmt} target`
+      : "hit the target";
+    return `${input.symbol} (${direction}) ${moveDesc}.${sameBarNote}${seqNote}${evtSummary}`.trim();
   }
 
   if (input.outcome === "Stopped") {
-    return `${input.symbol} invalidated the setup and hit the tracked stop after entry was locked.${resolutionNote}${ambiguityTail}${evidenceTail} ${input.eventContext}`.trim();
+    const moveDesc = r
+      ? r.actionAtCall === "SELL"
+        ? `rose from ${entryFmt} and hit the ${stopFmt} stop`
+        : `fell from ${entryFmt} and hit the ${stopFmt} stop`
+      : "hit the stop";
+    return `${input.symbol} (${direction}) ${moveDesc}.${sameBarNote}${seqNote}${evtSummary}`.trim();
   }
 
   if (input.outcome === "Ambiguous") {
-    return `${input.symbol} traded through both the tracked stop and target after entry was locked.${resolutionNote} Siggi logged this outcome as ambiguous rather than assuming the stop was hit first. ${input.eventContext}`.trim();
+    return `${input.symbol} (${direction}) traded through both stop (${stopFmt}) and target (${targetFmt}) — sequence could not be confirmed.${evtSummary}`.trim();
   }
 
-  return `${input.symbol} is still being monitored live against the locked stop and target. ${input.eventContext}`.trim();
+  return `${input.symbol} is being monitored against stop ${stopFmt} and target ${targetFmt}.${evtSummary}`.trim();
 }
 
 function resolveMonitoringInterval(
@@ -310,56 +327,41 @@ function resolveOutcomeFromCandles(
 ) {
   for (const candle of candles) {
     if (record.actionAtCall === "SELL") {
-      const targetHit = candle.low <= record.targetPriceAtCall;
-      const stopHit = candle.high >= record.stopPriceAtCall;
+      // For a SHORT: target is below entry (price falls = profit), stop is above entry (price rises = loss)
+      const targetHit = candle.low  <= record.targetPriceAtCall;
+      const stopHit   = candle.high >= record.stopPriceAtCall;
 
       if (targetHit && stopHit) {
+        // Both levels inside the same candle — use the candle's close direction as tiebreaker:
+        // a bearish close (close < open) means price mostly fell → target hit first.
+        // a bullish close means price mostly rose → stop hit first.
         return {
           ambiguousResolution: true,
-          outcome: "Ambiguous" as const,
+          outcome: inferOutcomeFromCandleSequence(record, candle),
         };
       }
 
-      if (targetHit) {
-        return {
-          ambiguousResolution: false,
-          outcome: "Hit Target" as const,
-        };
-      }
-
-      if (stopHit) {
-        return {
-          ambiguousResolution: false,
-          outcome: "Stopped" as const,
-        };
-      }
+      if (targetHit) return { ambiguousResolution: false, outcome: "Hit Target" as const };
+      if (stopHit)   return { ambiguousResolution: false, outcome: "Stopped"    as const };
 
       continue;
     }
 
+    // BUY: target is above entry (price rises = profit), stop is below entry (price falls = loss)
     const targetHit = candle.high >= record.targetPriceAtCall;
-    const stopHit = candle.low <= record.stopPriceAtCall;
+    const stopHit   = candle.low  <= record.stopPriceAtCall;
 
     if (targetHit && stopHit) {
+      // Bullish close = price mostly rose → target hit first.
+      // Bearish close = price mostly fell → stop hit first.
       return {
         ambiguousResolution: true,
-        outcome: "Ambiguous" as const,
+        outcome: inferOutcomeFromCandleSequence(record, candle),
       };
     }
 
-    if (targetHit) {
-      return {
-        ambiguousResolution: false,
-        outcome: "Hit Target" as const,
-      };
-    }
-
-    if (stopHit) {
-      return {
-        ambiguousResolution: false,
-        outcome: "Stopped" as const,
-      };
-    }
+    if (targetHit) return { ambiguousResolution: false, outcome: "Hit Target" as const };
+    if (stopHit)   return { ambiguousResolution: false, outcome: "Stopped"    as const };
   }
 
   return null;
@@ -475,11 +477,9 @@ function resolveOutcomeFromPulseTape(input: {
       }
 
       if (!firstOutcome) {
-        if (targetHit) {
-          firstOutcome = "Hit Target";
-        } else if (stopHit) {
-          firstOutcome = "Stopped";
-        }
+        // Pessimistic tiebreaker: when both fire on the same price point, stop wins.
+        if (stopHit)   firstOutcome = "Stopped";
+        else if (targetHit) firstOutcome = "Hit Target";
       }
 
       if (firstOutcome && targetTouchedAt && stopTouchedAt) {
@@ -501,11 +501,9 @@ function resolveOutcomeFromPulseTape(input: {
     }
 
     if (!firstOutcome) {
-      if (targetHit) {
-        firstOutcome = "Hit Target";
-      } else if (stopHit) {
-        firstOutcome = "Stopped";
-      }
+      // Pessimistic tiebreaker: stop wins when both fire simultaneously.
+      if (stopHit)   firstOutcome = "Stopped";
+      else if (targetHit) firstOutcome = "Hit Target";
     }
 
     if (firstOutcome && targetTouchedAt && stopTouchedAt) {
@@ -542,59 +540,49 @@ async function resolveAmbiguousOutcomeWithDrilldown(input: {
   pulseTape: Array<{ at: string; price: number }>;
   record: PersistedPredictionHistoryRecord;
 }) {
-  let parentCandles = input.candles;
-  let parentInterval = input.interval;
-  let parentAmbiguousCandle = getAmbiguousCandle(input.record, input.candles);
-  let drilldownInterval = resolveDrilldownInterval(parentInterval);
+  // The ambiguous candle is the one where both stop and target were inside the same bar.
+  // We make one attempt to clarify using a lower-timeframe series.
+  // If that still can't differentiate, we fall back to the pulse tape or candle direction.
+  const ambiguousCandle = getAmbiguousCandle(input.record, input.candles);
+  if (!ambiguousCandle) return null;
 
-  while (drilldownInterval && parentAmbiguousCandle) {
+  const drilldownInterval = resolveDrilldownInterval(input.interval);
+
+  if (drilldownInterval) {
     const drilldownSeries = await fetchLiveCandlesForSymbol(
       input.record.symbol,
       drilldownInterval,
       resolveMonitoringOutputSize(drilldownInterval, input.record),
     ).catch(() => null);
 
-    if (!drilldownSeries) {
-      return null;
+    if (drilldownSeries) {
+      const monitoringCandles = getMonitoringCandles(
+        drilldownSeries.candles,
+        input.record.calledAt,
+        input.record.lastCandleCheckAt,
+        drilldownInterval,
+      );
+      const drilldownCandles = filterCandlesToParentWindow(
+        monitoringCandles,
+        ambiguousCandle,
+        input.interval,
+      );
+
+      if (drilldownCandles.length > 0) {
+        const drilldownOutcome = resolveOutcomeFromCandles(input.record, drilldownCandles);
+        if (drilldownOutcome && !drilldownOutcome.ambiguousResolution) {
+          return {
+            candles: drilldownCandles,
+            interval: drilldownInterval,
+            outcome: drilldownOutcome.outcome,
+            resolutionMethod: "lower-timeframe-drilldown" as const,
+          };
+        }
+      }
     }
-
-    const monitoringCandles = getMonitoringCandles(
-      drilldownSeries.candles,
-      input.record.calledAt,
-      input.record.lastCandleCheckAt,
-      drilldownInterval,
-    );
-    const drilldownCandles = filterCandlesToParentWindow(
-      monitoringCandles,
-      parentAmbiguousCandle,
-      parentInterval,
-    );
-
-    if (drilldownCandles.length === 0) {
-      return null;
-    }
-
-    const drilldownOutcome = resolveOutcomeFromCandles(input.record, drilldownCandles);
-
-    if (drilldownOutcome && !drilldownOutcome.ambiguousResolution) {
-      return {
-        candles: drilldownCandles,
-        interval: drilldownInterval,
-        outcome: drilldownOutcome.outcome,
-        resolutionMethod: "lower-timeframe-drilldown" as const,
-      };
-    }
-
-    parentCandles = drilldownCandles;
-    parentInterval = drilldownInterval;
-    parentAmbiguousCandle = getAmbiguousCandle(input.record, drilldownCandles);
-    drilldownInterval = resolveDrilldownInterval(drilldownInterval);
   }
 
-  if (!parentAmbiguousCandle) {
-    return null;
-  }
-
+  // One-level drilldown failed or was unavailable — try the pulse tape next.
   const pulseTapeOutcome = resolveOutcomeFromPulseTape({
     pulseTape: input.pulseTape,
     record: input.record,
@@ -602,20 +590,18 @@ async function resolveAmbiguousOutcomeWithDrilldown(input: {
 
   if (pulseTapeOutcome) {
     return {
-      candles: parentCandles,
-      interval: parentInterval,
+      candles: input.candles,
+      interval: input.interval,
       outcome: pulseTapeOutcome.outcome,
       resolutionMethod: "pulse-tape" as const,
       sequenceEvidenceNote: pulseTapeOutcome.sequenceEvidenceNote,
     };
   }
 
-  return {
-    candles: parentCandles,
-    interval: parentInterval,
-    outcome: inferOutcomeFromCandleSequence(input.record, parentAmbiguousCandle),
-    resolutionMethod: "sequence-inference" as const,
-  };
+  // Final fallback: use the candle close direction as tiebreaker (already computed in
+  // resolveOutcomeFromCandles — return null here so the caller uses the ambiguousResolution
+  // outcome it already has rather than running inferOutcomeFromCandleSequence twice).
+  return null;
 }
 
 function assertPriceScaleConsistency(
@@ -643,20 +629,33 @@ function createPredictionRecord(input: {
 }): PersistedPredictionHistoryRecord {
   const entryLow = input.setup.analysis?.chartAnnotations.entryZone.low ?? input.asset.price;
   const entryHigh = input.setup.analysis?.chartAnnotations.entryZone.high ?? input.asset.price;
-  const stopPrice =
+  const rawStopPrice =
     input.setup.analysis?.chartAnnotations.stopLevel ??
     (Number.isFinite(Number.parseFloat(input.view.stop))
       ? Number.parseFloat(input.view.stop)
       : input.asset.price);
-  const targetPrice =
+  const rawTargetPrice =
     input.setup.analysis?.chartAnnotations.targetLevel ??
     (Number.isFinite(Number.parseFloat(input.view.target))
       ? Number.parseFloat(input.view.target)
       : input.asset.price);
 
-  assertPriceScaleConsistency("entryZone", (entryLow + entryHigh) / 2, input.asset.price, input.setup.symbol);
-  assertPriceScaleConsistency("stop", stopPrice, input.asset.price, input.setup.symbol);
-  assertPriceScaleConsistency("target", targetPrice, input.asset.price, input.setup.symbol);
+  // Guard: if the AI returned stop/target in the wrong order for this direction, swap them.
+  // For SELL: stop must be above entry (loss if price rises), target below (profit if price falls).
+  // For BUY: stop must be below entry (loss if price falls), target above (profit if price rises).
+  // When both are on the wrong sides we can safely swap; if only one is wrong we leave as-is
+  // and the level-validity guard in resolvePredictionOutcome will skip resolution.
+  const entryMidForValidation = (entryLow + entryHigh) / 2;
+  const isSell = input.view.opportunityAction === "SELL";
+  const bothInverted = isSell
+    ? rawStopPrice < entryMidForValidation && rawTargetPrice > entryMidForValidation
+    : rawStopPrice > entryMidForValidation && rawTargetPrice < entryMidForValidation;
+  const stopPrice  = bothInverted ? rawTargetPrice : rawStopPrice;
+  const targetPrice = bothInverted ? rawStopPrice   : rawTargetPrice;
+
+  assertPriceScaleConsistency("entryZone", entryMidForValidation, input.asset.price, input.setup.symbol);
+  assertPriceScaleConsistency("stop",      stopPrice,             input.asset.price, input.setup.symbol);
+  assertPriceScaleConsistency("target",    targetPrice,           input.asset.price, input.setup.symbol);
   const indicatorSnapshotAtCall =
     input.setup.analysis?.indicatorSweep?.map(
       (item) => `${item.label}: ${item.status} / ${item.detail}`,
@@ -728,6 +727,12 @@ function createPredictionRecord(input: {
       eventContext,
       outcome: "Monitoring",
       symbol: input.setup.symbol,
+      record: {
+        actionAtCall:    input.view.opportunityAction,
+        stopPriceAtCall:  stopPrice,
+        targetPriceAtCall: targetPrice,
+        priceAtCall:      input.asset.price,
+      },
     }),
     createdAt: input.syncedAt,
     updatedAt: input.syncedAt,
@@ -744,6 +749,22 @@ async function resolvePredictionOutcome(
   },
   pulseTape: Array<{ at: string; price: number }> = [],
 ) {
+  // ── Level validity guard ──────────────────────────────────────────────────
+  // If stop/target are on the wrong sides of entry for the declared direction,
+  // the candle/pulse checks below would trigger instantly (entry price already
+  // satisfies both conditions), producing a meaningless instant "win".
+  // Skip resolution and let the next sync re-check once real data is available.
+  const isSell = record.actionAtCall === "SELL";
+  const levelsValid = isSell
+    ? record.stopPriceAtCall > record.targetPriceAtCall   // stop above target for short
+    : record.stopPriceAtCall < record.targetPriceAtCall;  // stop below target for long
+  if (!levelsValid) {
+    return {
+      ...record,
+      updatedAt: syncedAt,
+    };
+  }
+
   const candleExcursions = candleRangeInput
     ? computeCandleRangeExcursions(
         record.actionAtCall,
@@ -824,14 +845,15 @@ async function resolvePredictionOutcome(
   const priceResolvedSource = candleRangeInput ? "candle_range" : "price_snapshot";
 
   if (ambiguousHit) {
+    const seqNote = effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
+      ? effectiveOutcome.sequenceEvidenceNote
+      : null;
     const resolutionEvidence = buildResolutionEvidence({
       ambiguousResolution: true,
       outcome: "Ambiguous",
       resolutionMethod,
-      sequenceEvidenceNote:
-        effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
-          ? effectiveOutcome.sequenceEvidenceNote
-          : null,
+      sequenceEvidenceNote: seqNote,
+      record,
     });
 
     return {
@@ -849,30 +871,30 @@ async function resolvePredictionOutcome(
         eventContext: record.eventContextAtCall,
         outcome: "Ambiguous",
         resolutionMethod,
-        sequenceEvidenceNote:
-          effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
-            ? effectiveOutcome.sequenceEvidenceNote
-            : null,
+        sequenceEvidenceNote: seqNote,
         symbol: record.symbol,
+        record,
       }),
     } satisfies PersistedPredictionHistoryRecord;
   }
 
   if (targetHit || stopHit) {
     const outcome = targetHit ? "Hit Target" : "Stopped";
+    const seqNote = effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
+      ? effectiveOutcome.sequenceEvidenceNote
+      : null;
+    const wasAmbiguous = effectiveOutcome?.ambiguousResolution ?? false;
     const resolutionEvidence = buildResolutionEvidence({
-      ambiguousResolution: effectiveOutcome?.ambiguousResolution ?? false,
+      ambiguousResolution: wasAmbiguous,
       outcome,
       resolutionMethod,
-      sequenceEvidenceNote:
-        effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
-          ? effectiveOutcome.sequenceEvidenceNote
-          : null,
+      sequenceEvidenceNote: seqNote,
+      record,
     });
 
     return {
       ...nextResolvedRecord,
-      ambiguousResolution: effectiveOutcome?.ambiguousResolution ?? false,
+      ambiguousResolution: wasAmbiguous,
       monitoringStatus: "Resolved",
       resolvedAt: syncedAt,
       outcome,
@@ -881,15 +903,13 @@ async function resolvePredictionOutcome(
       resolutionEvidence,
       resolvedSource: priceResolvedSource,
       narrative: buildPredictionNarrative({
-        ambiguousResolution: effectiveOutcome?.ambiguousResolution ?? false,
+        ambiguousResolution: wasAmbiguous,
         eventContext: record.eventContextAtCall,
         outcome,
         resolutionMethod,
-        sequenceEvidenceNote:
-          effectiveOutcome && "sequenceEvidenceNote" in effectiveOutcome
-            ? effectiveOutcome.sequenceEvidenceNote
-            : null,
+        sequenceEvidenceNote: seqNote,
         symbol: record.symbol,
+        record,
       }),
     } satisfies PersistedPredictionHistoryRecord;
   }
