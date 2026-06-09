@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type NavItem = {
   href: string;
@@ -228,9 +228,25 @@ function SectionLabel({ label, collapsed }: { label: string; collapsed: boolean 
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
+  // Prevent hydration mismatches from stale server-rendered nav HTML:
+  // render an empty nav on the server and during the initial client pass,
+  // then fill in the real links after mount (sub-frame, no visible flash).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   function isActive(href: string) {
     return pathname === href || (href !== "/" && pathname.startsWith(href));
+  }
+
+  if (!mounted) {
+    return (
+      <nav
+        aria-label="Main navigation"
+        className={`grid grid-cols-2 gap-1.25 sm:flex sm:overflow-x-auto sm:gap-1.25 sm:pb-1 lg:block lg:overflow-visible lg:pb-0 ${
+          collapsed ? "lg:-mx-2 lg:space-y-0" : "lg:-mx-3 lg:space-y-0"
+        }`}
+      />
+    );
   }
 
   return (

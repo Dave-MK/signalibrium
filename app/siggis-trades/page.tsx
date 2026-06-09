@@ -8,14 +8,7 @@ import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entri
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { PageHeader, Panel, StatusChip, SummaryCard } from "../_components/ui";
 import { TradePlanChart } from "../_components/trade-plan-chart";
-import dynamic from "next/dynamic";
-
-// Rendered client-only: the period filter uses new Date() which differs
-// between server and client, causing hydration mismatches if SSR'd.
-const EquityCurveChart = dynamic(
-  () => import("../_components/equity-curve-chart").then((m) => ({ default: m.EquityCurveChart })),
-  { ssr: false },
-);
+import { EquityCurveChart } from "../_components/equity-curve-chart";
 import { TradesCsvExportButton } from "../_components/csv-export-button";
 import { DonutWithLegend, DonutChart, StatBar } from "../_components/donut-chart";
 import { Sparkline } from "../_components/sparkline";

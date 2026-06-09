@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type EquityPoint = {
   at: string;
@@ -197,11 +197,14 @@ export function EquityCurveChart({ curve, startingBalanceGbp }: Props) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [period,   setPeriod]   = useState<Period>("all");
 
-  // Stable "now" reference — recomputed when the period tab changes
-  // (which is fine; the tiny time difference doesn't matter)
-  const now = useMemo(() => new Date(), [period]); // eslint-disable-line react-hooks/exhaustive-deps
+  // `now` is null on the server and during the first client render so that
+  // server HTML and the initial client render are identical (no hydration
+  // mismatch).  useEffect only runs on the client, after the first paint.
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => { setNow(new Date()); }, [period]);
 
   const plotCurve = useMemo(() => {
+    if (!now) return [];
     const { start, end } = getPeriodBounds(period, now);
     return buildPlotCurve(curve, start, end, startingBalanceGbp, period === "all");
   }, [curve, period, now, startingBalanceGbp]);
