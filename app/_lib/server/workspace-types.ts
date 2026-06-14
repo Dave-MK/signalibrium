@@ -51,6 +51,8 @@ export type PersistedBrokerConnection = {
   executionModes: BrokerExecutionMode[];
   lastError: string | null;
   lastSyncedAt: string | null;
+  /** When true, Siggi's trades are automatically forwarded as live orders to this broker. */
+  autoExecuteSiggi?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -59,6 +61,8 @@ export type PersistedTradeTicket = TradeTicket & {
   sourceAssetSymbol: string | null;
   sourceSetupId: string | null;
   notes: string;
+  /** Which broker connection submitted this ticket — null for paper trades. */
+  brokerConnectionId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -292,6 +296,12 @@ export type PersistedSiggiTrade = {
   stakeGbp: number;
   stakeUsd: number;
   quantity: number;
+  /** Broker connection used for live execution (null = paper trade only). */
+  brokerConnectionId?: string | null;
+  /** Entry order ID returned by the broker. */
+  brokerOrderId?: string | null;
+  /** Close order ID returned by the broker (set when Siggi closes the position). */
+  brokerCloseOrderId?: string | null;
   currentPriceUsd: number | null;
   unrealizedPnlGbp: number | null;
   unrealizedPnlUsd: number | null;
@@ -418,8 +428,30 @@ export type PersistedPriceAlert = {
   updatedAt: string;
 };
 
+/** Siggi risk guard-rails — persisted per-workspace so they survive deploys. */
+export type PersistedRiskControls = {
+  /** Max risk per trade as a fraction of equity (default 0.02 = 2%). */
+  maxRiskPerTrade: number;
+  /** Minimum cash buffer as a fraction of equity (default 0.05 = 5%). */
+  minCashReserveRatio: number;
+  /** Maximum number of concurrent open trades (default 20). */
+  maxConcurrentTrades: number;
+  /** Daily loss limit as a fraction of equity — null means no limit (default null). */
+  dailyLossLimitRatio: number | null;
+  /** Hard absolute position cap per trade in GBP — null means no cap (default null). */
+  maxPositionSizeGbp: number | null;
+};
+
+export const DEFAULT_RISK_CONTROLS: PersistedRiskControls = {
+  maxRiskPerTrade:      0.02,
+  minCashReserveRatio:  0.05,
+  maxConcurrentTrades:  20,
+  dailyLossLimitRatio:  null,
+  maxPositionSizeGbp:   null,
+};
+
 export type PersistedWorkspaceData = {
-  schemaVersion: 15;
+  schemaVersion: 16;
   updatedAt: string;
   workspace: {
     id: string;
@@ -447,4 +479,5 @@ export type PersistedWorkspaceData = {
   predictionHistory: PersistedPredictionHistoryRecord[];
   siggiAccount: PersistedSiggiAccount;
   priceAlerts: PersistedPriceAlert[];
+  riskControls: PersistedRiskControls;
 };

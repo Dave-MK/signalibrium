@@ -36,8 +36,15 @@ import {
   type BrokerPosition,
   type BrokerPositionsResult,
 } from "./positions";
+import {
+  fetchAlpacaOrderStatus,
+  fetchOandaOrderStatus,
+  fetchBinanceOrderStatus,
+  fetchKrakenOrderStatus,
+  type OrderStatusResult,
+} from "./order-status";
 
-export type { BrokerOrderRequest, BrokerOrderResult, BrokerPosition, BrokerPositionsResult };
+export type { BrokerOrderRequest, BrokerOrderResult, BrokerPosition, BrokerPositionsResult, OrderStatusResult };
 
 export type { AlpacaAccountData, OandaAccountData, BinanceAccountData, KrakenAccountData };
 
@@ -127,6 +134,21 @@ export async function submitBrokerOrder(
   if (provider === "Binance") return submitBinanceOrder(request, credential);
   if (provider === "Kraken")  return submitKrakenOrder(request, credential);
   throw new Error("Order submission is not yet available for IBKR.");
+}
+
+export async function fetchBrokerOrderStatus(
+  provider: BrokerProvider,
+  environment: BrokerEnvironment,
+  credential: StoredBrokerCredential,
+  orderId: string,
+  symbol: string,
+  accountRef: string | null,
+): Promise<OrderStatusResult> {
+  if (provider === "Alpaca")  return fetchAlpacaOrderStatus(orderId, credential, environment);
+  if (provider === "OANDA")   return fetchOandaOrderStatus(orderId, credential, environment, accountRef);
+  if (provider === "Binance") return fetchBinanceOrderStatus(orderId, symbol, credential);
+  if (provider === "Kraken")  return fetchKrakenOrderStatus(orderId, credential);
+  throw new Error("Order status polling is not yet available for IBKR.");
 }
 
 export async function fetchBrokerPositions(

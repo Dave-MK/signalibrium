@@ -10,6 +10,9 @@ import {
   getStrategyTriggerTimeframe,
   selectStrategyProfile,
 } from "@/app/_lib/strategy-profiles";
+import {
+  DEFAULT_RISK_CONTROLS,
+} from "./workspace-types";
 import type {
   PersistedPredictionHistoryRecord,
   PersistedWorkspaceData,
@@ -587,7 +590,7 @@ const seededPredictionHistory: PersistedPredictionHistoryRecord[] = instrumentUn
   });
 
 export const defaultWorkspaceData: PersistedWorkspaceData = {
-  schemaVersion: 15,
+  schemaVersion: 16,
   updatedAt: seededAt,
   workspace: {
     id: "workspace-signalibrium-mvp",
@@ -675,4 +678,5 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     updatedAt: seededAt,
   },
   priceAlerts: [],
+  riskControls: DEFAULT_RISK_CONTROLS,
 };

@@ -10,8 +10,10 @@ import { getMarketSnapshot } from "@/app/_lib/server/repositories/market-snapsho
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
+import { listBrokerConnections } from "@/app/_lib/server/repositories/broker-connections";
 import { ActionLink, PageHeader, Panel, StatusChip, SummaryCard } from "./_components/ui";
 import { DonutWithLegend, StatBar } from "./_components/donut-chart";
+import { DashboardPositionsWidget } from "./_components/dashboard-positions-widget";
 
 function MarketStatusBadge({ state, venue }: { state: MarketSessionState; venue: string }) {
   if (state === "Open" || state === "24/7") {
@@ -150,6 +152,7 @@ export default async function DashboardPage() {
     predictionHistory,
     scannerResults,
     siggiAccount,
+    brokerConnections,
   ] = await Promise.all([
     listAssets(),
     listBacktests(),
@@ -159,7 +162,10 @@ export default async function DashboardPage() {
     listPredictionHistory(),
     listScannerResults(),
     getSiggiAccount(),
+    listBrokerConnections(),
   ]);
+
+  const primaryConnection = brokerConnections.find((c) => c.status === "connected") ?? null;
 
   const siggiOpenSymbols = new Set(siggiAccount.openTrades.map((t) => t.symbol));
   const assetsBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
@@ -428,6 +434,11 @@ export default async function DashboardPage() {
           </div>
         ) : null}
       </Panel>
+
+      {/* Live broker positions */}
+      {primaryConnection && (
+        <DashboardPositionsWidget connectionId={primaryConnection.id} />
+      )}
 
       {/* CTA to scanner */}
       <div className="flex flex-col items-center gap-3 rounded-lg bg-linear-to-r from-cyan-500/8 via-violet-500/4 to-transparent p-4 ring-1 ring-white/8 sm:flex-row sm:justify-between">

@@ -4,6 +4,9 @@ import {
   selectStrategyProfile,
 } from "@/app/_lib/strategy-profiles";
 import { defaultWorkspaceData } from "@/app/_lib/server/workspace-seed";
+import {
+  DEFAULT_RISK_CONTROLS,
+} from "./workspace-types";
 import type {
   PersistedAssetRecord,
   PersistedAiOpportunity,
@@ -11,6 +14,7 @@ import type {
   OpportunityAnalysisSnapshot,
   PersistedPredictionHistoryRecord,
   PersistedPriceAlert,
+  PersistedRiskControls,
   PersistedScannerResult,
   PersistedSiggiAccount,
   PersistedSiggiActivity,
@@ -317,6 +321,7 @@ async function writeKvNamespacedSlices(data: PersistedWorkspaceData) {
       journalEntries: data.journalEntries,
       marketSnapshot: data.marketSnapshot,
       priceAlerts: data.priceAlerts,
+      riskControls: data.riskControls,
     })],
     ["SET", kvAssetsKey, JSON.stringify({ assets: data.assets })],
     ["SET", kvIntelligenceKey, JSON.stringify({
@@ -1222,6 +1227,47 @@ async function ensureStoreFile() {
   return storePath;
 }
 
+function normalizeRiskControls(
+  raw: Partial<PersistedRiskControls> | null | undefined,
+): PersistedRiskControls {
+  if (!raw || typeof raw !== "object") return DEFAULT_RISK_CONTROLS;
+  return {
+    maxRiskPerTrade:
+      typeof raw.maxRiskPerTrade === "number" && raw.maxRiskPerTrade > 0 && raw.maxRiskPerTrade < 1
+        ? raw.maxRiskPerTrade
+        : DEFAULT_RISK_CONTROLS.maxRiskPerTrade,
+    minCashReserveRatio:
+      typeof raw.minCashReserveRatio === "number" &&
+      raw.minCashReserveRatio >= 0 &&
+      raw.minCashReserveRatio < 1
+        ? raw.minCashReserveRatio
+        : DEFAULT_RISK_CONTROLS.minCashReserveRatio,
+    maxConcurrentTrades:
+      typeof raw.maxConcurrentTrades === "number" &&
+      Number.isInteger(raw.maxConcurrentTrades) &&
+      raw.maxConcurrentTrades >= 1 &&
+      raw.maxConcurrentTrades <= 100
+        ? raw.maxConcurrentTrades
+        : DEFAULT_RISK_CONTROLS.maxConcurrentTrades,
+    dailyLossLimitRatio:
+      raw.dailyLossLimitRatio === null ||
+      raw.dailyLossLimitRatio === undefined
+        ? null
+        : typeof raw.dailyLossLimitRatio === "number" &&
+          raw.dailyLossLimitRatio > 0 &&
+          raw.dailyLossLimitRatio < 1
+          ? raw.dailyLossLimitRatio
+          : DEFAULT_RISK_CONTROLS.dailyLossLimitRatio,
+    maxPositionSizeGbp:
+      raw.maxPositionSizeGbp === null ||
+      raw.maxPositionSizeGbp === undefined
+        ? null
+        : typeof raw.maxPositionSizeGbp === "number" && raw.maxPositionSizeGbp > 0
+          ? raw.maxPositionSizeGbp
+          : DEFAULT_RISK_CONTROLS.maxPositionSizeGbp,
+  };
+}
+
 function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   const candidate = (raw ?? {}) as Partial<PersistedWorkspaceData>;
   const normalizedAssets = mergeByKey(
@@ -1331,7 +1377,7 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
   );
 
   const normalized: PersistedWorkspaceData = {
-    schemaVersion: 15,
+    schemaVersion: 16,
     updatedAt:
       typeof candidate.updatedAt === "string"
         ? candidate.updatedAt
@@ -1426,6 +1472,9 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
             typeof a.targetPrice === "number",
         )
       : [],
+    riskControls: normalizeRiskControls(
+      (candidate as Partial<PersistedWorkspaceData>).riskControls,
+    ),
   };
 
   // Reconcile prediction accuracy against actual trade outcomes (idempotent backfill)

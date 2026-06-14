@@ -6,6 +6,7 @@ import { getDisplayCurrencyState } from "@/app/_lib/server/currency-preference";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
 import { listJournalEntries } from "@/app/_lib/server/repositories/journal-entries";
 import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction-history";
+import { getRiskControls } from "@/app/_lib/server/repositories/risk-controls";
 import { PageHeader, Panel, StatusChip, SummaryCard } from "../_components/ui";
 import { TradePlanChart } from "../_components/trade-plan-chart";
 import { EquityCurveChart } from "../_components/equity-curve-chart";
@@ -15,6 +16,7 @@ import { Sparkline } from "../_components/sparkline";
 import { SiggiResetButton } from "./siggi-reset-button";
 import { TradesTabs } from "./trades-tabs";
 import { InlineNoteButton } from "@/app/_components/trade-note-form";
+import { RiskControlsPanel } from "@/app/_components/risk-controls-panel";
 import type { TradeNoteOutcome } from "@/app/_lib/server/workspace-types";
 
 // Correlation groups — mirrors siggi-simulation.ts CORRELATION_GROUPS
@@ -72,11 +74,12 @@ function priceDp(symbol: string, price: number): number {
 }
 
 export default async function SiggiTradesPage() {
-  const [siggiAccount, displayCurrencyState, journalEntries, predictionHistory] = await Promise.all([
+  const [siggiAccount, displayCurrencyState, journalEntries, predictionHistory, riskControls] = await Promise.all([
     getSiggiAccount(),
     getDisplayCurrencyState(),
     listJournalEntries(),
     listPredictionHistory(),
+    getRiskControls(),
   ]);
 
   // O(1) lookup: predictionId → prediction record
@@ -881,6 +884,9 @@ export default async function SiggiTradesPage() {
           </div>
         }
       />
+
+      {/* ── Risk guard-rails ── */}
+      <RiskControlsPanel initial={riskControls} />
     </div>
   );
 }

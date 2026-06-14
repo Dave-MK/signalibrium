@@ -25,6 +25,7 @@ import {
   formatTradeOpenedMessage,
   formatTradeClosedMessage,
 } from "../telegram";
+import { executeSiggiBrokerOrders } from "../siggi-broker-execution";
 
 const minimumSyncIntervalMs = 65_000;
 const minimumPulseIntervalMs = 12_000;
@@ -525,6 +526,9 @@ export async function syncExternalMarketData(): Promise<MarketDataSyncSummary> {
 
   syncSiggiAccount(data, syncedAt);
 
+  // Mirror Siggi's new opens/closes to the linked live broker (if any)
+  await executeSiggiBrokerOrders(data, openTradeIdsBefore, closedTradeIdsBefore);
+
   // Fire Telegram notifications for any new opens or closes
   await fireSiggiTradeNotifications(
     data,
@@ -653,9 +657,13 @@ export async function pulseExternalMarketData(): Promise<MarketDataPulseSummary>
     createNewCalls: false,
     refreshAnalyses: false,
   });
+  const pulseOpenIdsBefore   = new Set(data.siggiAccount.openTrades.map((t) => t.id));
+  const pulseClosedIdsBefore = new Set(data.siggiAccount.closedTrades.map((t) => t.id));
   syncSiggiAccountWithOptions(data, pulsedAt, {
     allowNewTrades: false,
   });
+  // Execute any closes that Siggi decided on during this pulse
+  await executeSiggiBrokerOrders(data, pulseOpenIdsBefore, pulseClosedIdsBefore);
   const persisted = await writeWorkspaceData(data);
 
   return {

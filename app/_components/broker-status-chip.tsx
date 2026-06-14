@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   deleteBrokerConnectionApi,
   fetchBrokerAccountApi,
+  updateBrokerConnectionApi,
 } from "@/app/_lib/workspace-api";
 import type {
   BrokerProvider,
@@ -172,6 +173,22 @@ export function BrokerStatusChip({ initialConnections }: Props) {
       router.refresh();
     } catch { /* noop */ }
     finally { setDisconnecting(null); }
+  }
+
+  async function handleAutoExecuteToggle(connectionId: string, enabled: boolean) {
+    // Optimistic update
+    setConnections((prev) =>
+      prev.map((c) => c.id === connectionId ? { ...c, autoExecuteSiggi: enabled } : c),
+    );
+    try {
+      await updateBrokerConnectionApi(connectionId, { autoExecuteSiggi: enabled });
+      router.refresh();
+    } catch {
+      // Revert on failure
+      setConnections((prev) =>
+        prev.map((c) => c.id === connectionId ? { ...c, autoExecuteSiggi: !enabled } : c),
+      );
+    }
   }
 
   function openDropdown() {
@@ -389,6 +406,41 @@ export function BrokerStatusChip({ initialConnections }: Props) {
                   compact
                 />
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Siggi auto-execute toggle */}
+        {activeConn.status === "connected" && (
+          <div className="border-t border-white/6 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[0.76rem] font-medium text-slate-200">Siggi auto-trading</p>
+                <p className="text-[0.68rem] text-slate-500 leading-snug">
+                  {activeConn.autoExecuteSiggi
+                    ? "Siggi's trades execute live on this account"
+                    : "Enable to forward Siggi's trades as live orders"}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label={activeConn.autoExecuteSiggi ? "Disable Siggi auto-trading" : "Enable Siggi auto-trading"}
+                onClick={() => void handleAutoExecuteToggle(activeConn.id, !activeConn.autoExecuteSiggi)}
+                className={`relative shrink-0 h-5 w-9 rounded-full transition-colors duration-200 ${
+                  activeConn.autoExecuteSiggi ? "bg-cyan-500" : "bg-white/10"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                    activeConn.autoExecuteSiggi ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+            {activeConn.autoExecuteSiggi && activeConn.environment === "live" && (
+              <p className="mt-1.5 rounded-[0.28rem] bg-amber-500/8 px-2 py-1 text-[0.64rem] text-amber-300 ring-1 ring-amber-500/20">
+                ⚠ Live account — real money will be traded
+              </p>
             )}
           </div>
         )}

@@ -63,7 +63,7 @@ export async function updateBrokerConnection(
   patch: Partial<
     Pick<
       PersistedBrokerConnection,
-      "label" | "status" | "accountRef" | "lastError" | "lastSyncedAt" | "executionModes"
+      "label" | "status" | "accountRef" | "lastError" | "lastSyncedAt" | "executionModes" | "autoExecuteSiggi"
     >
   >,
 ): Promise<PersistedBrokerConnection | null> {

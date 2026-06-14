@@ -1,14 +1,19 @@
 import { buildCurrencyRates } from "@/app/_lib/currency";
 import { buildBotOpportunityView } from "@/app/_lib/bot-engine";
 import { getMarketSession, isApproachingMarketClose } from "@/app/_lib/market-hours";
+import { DEFAULT_RISK_CONTROLS } from "./workspace-types";
 import type {
   PersistedAssetRecord,
   PersistedPredictionHistoryRecord,
+  PersistedRiskControls,
   PersistedSiggiAccount,
   PersistedSiggiActivity,
   PersistedSiggiTrade,
   PersistedWorkspaceData,
 } from "./workspace-types";
+
+/** Runtime risk context — merged from workspace `riskControls` + module defaults. */
+type RiskCtx = PersistedRiskControls;
 
 // Siggi operates with full capital — no artificial limits on concurrent trades.
 // Risk discipline is preserved (2% per trade, 5% reserve) but the old penny-ante
@@ -283,7 +288,9 @@ function shouldOpenTrade(input: {
   record: PersistedPredictionHistoryRecord;
   usdToGbpRate: number;
   view: ReturnType<typeof buildBotOpportunityView>;
+  riskCtx?: RiskCtx;
 }) {
+  const riskCtx = input.riskCtx ?? DEFAULT_RISK_CONTROLS;
   if (input.view.decision.label !== "ENTER NOW" || input.view.opportunityAction === "WAIT") {
     return {
       allow: false,
@@ -454,18 +461,18 @@ function shouldOpenTrade(input: {
   }
 
   const totalEquityGbp = computeTotalEquityGbp(input.account);
-  const deployable = input.account.cashBalanceGbp - totalEquityGbp * minCashReserveRatio;
+  const deployable = input.account.cashBalanceGbp - totalEquityGbp * riskCtx.minCashReserveRatio;
 
   if (deployable <= 0) {
     return {
       allow: false,
-      reason: `Cash reserve (${(minCashReserveRatio * 100).toFixed(0)}% of equity) is fully committed — Siggi is protecting the floor before opening more.`,
+      reason: `Cash reserve (${(riskCtx.minCashReserveRatio * 100).toFixed(0)}% of equity) is fully committed — Siggi is protecting the floor before opening more.`,
     };
   }
 
   // Tier 1 — portfolio heat cap
   const currentOpenRiskGbp = computeTotalOpenRiskGbp(input.account, input.usdToGbpRate);
-  const projectedNewRiskGbp = totalEquityGbp * maxRiskPerTrade;
+  const projectedNewRiskGbp = totalEquityGbp * riskCtx.maxRiskPerTrade;
   const projectedHeatRatio = (currentOpenRiskGbp + projectedNewRiskGbp) / Math.max(totalEquityGbp, 1);
 
   if (projectedHeatRatio > maxPortfolioHeatRatio) {
@@ -485,7 +492,9 @@ function openSiggiTrade(input: {
   syncedAt: string;
   usdToGbpRate: number;
   view: ReturnType<typeof buildBotOpportunityView>;
+  riskCtx?: RiskCtx;
 }) {
+  const riskCtx = input.riskCtx ?? DEFAULT_RISK_CONTROLS;
   const direction = input.record.actionAtCall === "SELL" ? "SELL" : "BUY";
   const entryPrice =
     direction === "SELL" ? input.record.entryHighAtCall : input.record.entryLowAtCall;
@@ -497,7 +506,7 @@ function openSiggiTrade(input: {
 
   const totalEquityGbp = computeTotalEquityGbp(input.account);
   const freeCash = input.account.cashBalanceGbp;
-  const cashReserve = totalEquityGbp * minCashReserveRatio;
+  const cashReserve = totalEquityGbp * riskCtx.minCashReserveRatio;
   const minimumFreeCashToTradeGbp = Math.max(10, totalEquityGbp * 0.005);
   const deployable = freeCash - cashReserve;
 
@@ -519,12 +528,15 @@ function openSiggiTrade(input: {
   // Anti-tilt: halve risk after 3 consecutive losses, cap at 40% after 5+
   const consecutiveLosses = computeConsecutiveLosses(input.account);
   const antiTiltMultiplier = consecutiveLosses >= 5 ? 0.4 : consecutiveLosses >= 3 ? 0.6 : 1.0;
-  const effectiveMaxRisk = maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier * confidenceMultiplier * antiTiltMultiplier;
+  const effectiveMaxRisk = riskCtx.maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier * confidenceMultiplier * antiTiltMultiplier;
 
   // Risk-based sizing: stake = riskAmount / stopDistance
   const riskAmount = totalEquityGbp * effectiveMaxRisk;
   const stopDistanceRatio = riskDistanceUsd / Math.max(entryPrice, 0.000001);
-  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), Math.max(10, totalEquityGbp * 0.005), deployable);
+  const stakeGbpCap = riskCtx.maxPositionSizeGbp != null
+    ? Math.min(deployable, riskCtx.maxPositionSizeGbp)
+    : deployable;
+  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), Math.max(10, totalEquityGbp * 0.005), stakeGbpCap);
   const riskBudgetGbp = stakeGbp * stopDistanceRatio;
   const stakeUsd = convertGbpToUsd(stakeGbp, input.usdToGbpRate);
   const riskBudgetUsd = convertGbpToUsd(riskBudgetGbp, input.usdToGbpRate);
@@ -974,6 +986,8 @@ export function syncSiggiAccountWithOptions(
   },
 ) {
   const allowNewTrades = options?.allowNewTrades ?? true;
+  // Merge workspace risk controls with module-level defaults
+  const riskCtx: RiskCtx = { ...DEFAULT_RISK_CONTROLS, ...(data.riskControls ?? {}) };
   const nowMs = Date.parse(syncedAt);
   const rates = buildCurrencyRates(data.assets);
   const usdToGbpRate = rates.GBP;
@@ -1104,7 +1118,22 @@ export function syncSiggiAccountWithOptions(
     }
   }
 
-  if (allowNewTrades) {
+  // ── Daily loss limit — halt new trades if equity dropped too far today ──────
+  const allowNewTradesAfterDailyLimit = (() => {
+    if (!allowNewTrades) return false;
+    if (riskCtx.dailyLossLimitRatio == null) return true;
+    // Compare current equity to the most recent snapshot from > 20h ago (approximate day-start)
+    const dayStartMs = Date.parse(syncedAt) - 20 * 60 * 60 * 1000;
+    const dayStartSnap = [...account.equityCurve]
+      .reverse()
+      .find((s) => Date.parse(s.at) <= dayStartMs);
+    if (!dayStartSnap) return true;
+    const currentEquity = computeTotalEquityGbp(account);
+    const dropRatio = (dayStartSnap.equityGbp - currentEquity) / Math.max(dayStartSnap.equityGbp, 1);
+    return dropRatio < riskCtx.dailyLossLimitRatio;
+  })();
+
+  if (allowNewTradesAfterDailyLimit) {
     const existingPredictionIds = new Set(
       [...account.openTrades, ...account.closedTrades].map((trade) => trade.predictionId),
     );
@@ -1140,7 +1169,7 @@ export function syncSiggiAccountWithOptions(
     let skipLogsAdded = 0;
 
     for (const candidate of rankedCandidates) {
-      if (account.openTrades.length >= maximumConcurrentTrades) {
+      if (account.openTrades.length >= riskCtx.maxConcurrentTrades) {
         const alreadyLoggedCapacity = account.activityLog.some(
           (activity) =>
             activity.type === "Skipped" &&
@@ -1154,7 +1183,7 @@ export function syncSiggiAccountWithOptions(
             account,
             buildActivity({
               at: syncedAt,
-              detail: `Siggi reached the maximum active trade slots (${maximumConcurrentTrades}), so further enter-now calls will queue until a position closes or free capacity returns.`,
+              detail: `Siggi reached the maximum active trade slots (${riskCtx.maxConcurrentTrades}), so further enter-now calls will queue until a position closes or free capacity returns.`,
               symbol: null,
               type: "Skipped",
             }),
@@ -1218,6 +1247,7 @@ export function syncSiggiAccountWithOptions(
         record,
         usdToGbpRate,
         view: candidate.view,
+        riskCtx,
       });
 
       if (!tradeDecision.allow) {
@@ -1259,6 +1289,7 @@ export function syncSiggiAccountWithOptions(
         syncedAt,
         usdToGbpRate,
         view: candidate.view,
+        riskCtx,
       });
       existingPredictionIds.add(record.id);
       existingSymbols.add(candidate.setup.symbol);
@@ -1275,7 +1306,7 @@ export function syncSiggiAccountWithOptions(
         item.id === record.id ? { ...item, tradedStatus: "traded", updatedAt: syncedAt } : item,
       );
     }
-  }
+  } // end allowNewTradesAfterDailyLimit
 
   const equityAccount = recordEquitySnapshot(account, syncedAt);
   const totalEquityGbp = computeTotalEquityGbp(equityAccount);

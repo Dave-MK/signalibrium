@@ -9,6 +9,7 @@ import type {
   BrokerProvider,
   PersistedBrokerConnection,
   PersistedJournalEntry,
+  PersistedRiskControls,
   PersistedScannerResult,
   SupportedDisplayCurrency,
   PersistedWatchlist,
@@ -266,6 +267,16 @@ export async function deleteBrokerConnectionApi(connectionId: string) {
   });
 }
 
+export async function updateBrokerConnectionApi(
+  connectionId: string,
+  patch: { autoExecuteSiggi?: boolean; label?: string },
+) {
+  return requestJson<{ connection: PersistedBrokerConnection }>(
+    `/api/broker-connections/${connectionId}`,
+    { method: "PATCH", body: JSON.stringify(patch) },
+  );
+}
+
 export async function verifyBrokerConnectionApi(connectionId: string) {
   return requestJson<{ connection: PersistedBrokerConnection; verified: boolean }>(
     `/api/broker-connections/${connectionId}/verify`,
@@ -370,4 +381,19 @@ export async function cancelTradeTicketApi(
     `/api/trade-tickets/${ticketId}/cancel`,
     { method: "POST", body: JSON.stringify({}) },
   );
+}
+
+// ── Risk controls ─────────────────────────────────────────────────────────────
+
+export async function fetchRiskControlsApi(): Promise<{ controls: PersistedRiskControls }> {
+  return requestJson<{ controls: PersistedRiskControls }>("/api/risk-controls");
+}
+
+export async function updateRiskControlsApi(
+  patch: Partial<PersistedRiskControls>,
+): Promise<{ controls: PersistedRiskControls }> {
+  return requestJson<{ controls: PersistedRiskControls }>("/api/risk-controls", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
 }

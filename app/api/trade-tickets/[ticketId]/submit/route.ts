@@ -137,6 +137,7 @@ export async function POST(request: Request, context: RouteContext) {
       status:           brokerResult.status,
       filledQuantity:   brokerResult.filledQuantity,
       filledPrice:      brokerResult.filledPrice,
+      connectionId:     connection.id,
     });
 
     return NextResponse.json({ ticket: updatedTicket, order: brokerResult });

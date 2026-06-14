@@ -56,6 +56,7 @@ export type UpdateTradeTicketInput = Partial<
     | "brokerStatus"
     | "brokerReference"
     | "brokerDealId"
+    | "brokerConnectionId"
     | "submittedAt"
     | "filledAt"
     | "closedAt"
@@ -118,6 +119,7 @@ export type BrokerSubmitResult = {
   status: "submitted" | "filled" | "working" | "pending";
   filledQuantity?: number;
   filledPrice?: number;
+  connectionId?: string;
 };
 
 export async function applyBrokerResultToTicket(
@@ -132,11 +134,12 @@ export async function applyBrokerResultToTicket(
 
   return updateTradeTicket(ticketId, {
     status,
-    brokerStatus:     status === "Filled" ? "Filled" : "Working",
-    brokerReference:  result.orderId,
-    submittedAt:      now,
-    filledAt:         result.status === "filled" ? now : null,
-    executedEntry:    result.filledPrice ?? null,
-    executedQuantity: result.filledQuantity ?? null,
+    brokerStatus:      status === "Filled" ? "Filled" : "Working",
+    brokerReference:   result.orderId,
+    brokerConnectionId: result.connectionId ?? undefined,
+    submittedAt:       now,
+    filledAt:          result.status === "filled" ? now : null,
+    executedEntry:     result.filledPrice ?? null,
+    executedQuantity:  result.filledQuantity ?? null,
   });
 }
