@@ -15,7 +15,7 @@ export function DashboardPositionsWidget({ connectionId }: { connectionId: strin
 
   if (loading && positions.length === 0) {
     return (
-      <div className="signal-surface-soft rounded-[0.4rem] p-4">
+      <div className="signal-surface-soft rounded-[0.65rem] p-4">
         <p className="micro-label mb-2">Live Positions</p>
         <p className="text-[0.78rem] text-slate-500">Loading positions…</p>
       </div>
@@ -24,7 +24,7 @@ export function DashboardPositionsWidget({ connectionId }: { connectionId: strin
 
   if (error && positions.length === 0) {
     return (
-      <div className="signal-surface-soft rounded-[0.4rem] p-4">
+      <div className="signal-surface-soft rounded-[0.65rem] p-4">
         <p className="micro-label mb-2">Live Positions</p>
         <p className="text-[0.78rem] text-red-400">{error}</p>
       </div>
@@ -34,7 +34,7 @@ export function DashboardPositionsWidget({ connectionId }: { connectionId: strin
   if (positions.length === 0) return null;
 
   return (
-    <div className="signal-surface-soft rounded-[0.4rem] p-3 sm:p-4">
+    <div className="signal-surface-soft rounded-[0.65rem] p-3 sm:p-4">
       <div className="mb-2.5 flex items-center justify-between">
         <p className="micro-label">Live Positions</p>
         {fetchedAt && (

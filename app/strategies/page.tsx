@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import {
   candlePatternGuide,
@@ -25,7 +25,7 @@ function formatHoldWindow(minimum: number, maximum: number) {
 function CandleSketch({ label }: { label: string }) {
   if (label.includes("Engulfing")) {
     return (
-      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-[#00C884]/80" fill="none">
         <path d="M17 8v28" stroke="currentColor" strokeWidth="2" />
         <rect x="11" y="17" width="12" height="12" rx="1.5" fill="rgba(239,68,68,0.28)" stroke="rgba(248,113,113,0.7)" />
         <path d="M42 5v34" stroke="currentColor" strokeWidth="2" />
@@ -36,11 +36,11 @@ function CandleSketch({ label }: { label: string }) {
 
   if (label.includes("Rejection")) {
     return (
-      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-[#00C884]/80" fill="none">
         <path d="M6 31h52" stroke="rgba(217,183,95,0.88)" strokeWidth="2" strokeLinecap="round" />
         <path d="M49 25 57 31 49 37" stroke="rgba(217,183,95,0.82)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M32 7v33" stroke="currentColor" strokeWidth="2" />
-        <rect x="22" y="12" width="20" height="14" rx="1.5" fill="rgba(0,229,255,0.16)" stroke="rgba(125,211,252,0.78)" />
+        <rect x="22" y="12" width="20" height="14" rx="1.5" fill="rgba(0,200,132,0.16)" stroke="rgba(125,211,252,0.78)" />
         <path d="M28 38h8" stroke="rgba(248,113,113,0.8)" strokeWidth="2" strokeLinecap="round" />
         <text x="7" y="27" fill="rgba(217,183,95,0.95)" fontSize="6" fontWeight="700">
           level
@@ -51,7 +51,7 @@ function CandleSketch({ label }: { label: string }) {
 
   if (label.includes("Doji")) {
     return (
-      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-[#00C884]/80" fill="none">
         <path d="M32 4v36" stroke="currentColor" strokeWidth="2" />
         <path d="M20 22h24" stroke="rgba(217,183,95,0.95)" strokeWidth="3" strokeLinecap="round" />
         <path d="M14 14h36M14 30h36" stroke="rgba(148,163,184,0.22)" strokeWidth="1" strokeDasharray="3 3" />
@@ -61,16 +61,16 @@ function CandleSketch({ label }: { label: string }) {
 
   if (label.includes("Displacement")) {
     return (
-      <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+      <svg viewBox="0 0 64 44" className="h-11 w-16 text-[#00C884]/80" fill="none">
         <path d="M32 5v35" stroke="currentColor" strokeWidth="2" />
         <rect x="22" y="7" width="20" height="30" rx="1.5" fill="rgba(34,197,94,0.26)" stroke="rgba(110,231,183,0.85)" />
-        <path d="M48 30 58 20 48 10" stroke="rgba(0,229,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M48 30 58 20 48 10" stroke="rgba(0,200,132,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
 
   return (
-    <svg viewBox="0 0 64 44" className="h-11 w-16 text-cyan-200" fill="none">
+    <svg viewBox="0 0 64 44" className="h-11 w-16 text-[#00C884]/80" fill="none">
       <path d="M18 12v24" stroke="rgba(110,231,183,0.75)" strokeWidth="2" />
       <rect x="12" y="15" width="12" height="16" rx="1.5" fill="rgba(34,197,94,0.2)" stroke="rgba(110,231,183,0.75)" />
       <path d="M39 4v36" stroke="currentColor" strokeWidth="2" />
@@ -112,24 +112,28 @@ export default async function StrategiesPage() {
           <div>
             <p className="micro-label">Strategies</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-              Siggi&apos;s entry playbooks
+              Proven Playbooks. Repeatable Results.
             </h1>
             <p className="mt-1 max-w-3xl text-[0.88rem] leading-6 text-slate-400">
-              The live strategy set Siggi rotates through when ranking opportunities and defining entry timing.
+              The live strategy set Siggi rotates through — each one proven on real market structure, with clear rules for entry, stop, and target sizing.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-1.25 sm:min-w-96">
+          <div className="grid grid-cols-4 gap-1.25 sm:min-w-[26rem]">
             <div className="signal-surface-soft p-2.5">
-              <p className="micro-label">Employed</p>
-              <p className="mt-1 text-xl font-semibold text-white">{employedCount}</p>
-            </div>
-            <div className="signal-surface-soft p-2.5">
-              <p className="micro-label">Profiles</p>
+              <p className="micro-label">Strategies</p>
               <p className="mt-1 text-xl font-semibold text-white">{strategyProfiles.length}</p>
             </div>
             <div className="signal-surface-soft p-2.5">
-              <p className="micro-label">Setups</p>
+              <p className="micro-label">Active</p>
+              <p className="mt-1 text-xl font-semibold text-[#00C884]">{employedCount}</p>
+            </div>
+            <div className="signal-surface-soft p-2.5">
+              <p className="micro-label">Live setups</p>
               <p className="mt-1 text-xl font-semibold text-white">{scannerResults.length}</p>
+            </div>
+            <div className="signal-surface-soft p-2.5">
+              <p className="micro-label">Dormant</p>
+              <p className="mt-1 text-xl font-semibold text-slate-500">{strategyProfiles.length - employedCount}</p>
             </div>
           </div>
         </div>
@@ -145,7 +149,7 @@ export default async function StrategiesPage() {
             {strategyDecisionFramework.map((layer, index) => (
               <div key={layer.label} className="signal-surface-soft p-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-300/10 text-[0.72rem] font-bold text-cyan-200">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00C884]/10 text-[0.72rem] font-bold text-[#00C884]/80">
                     {index + 1}
                   </span>
                   <p className="text-[0.78rem] font-semibold text-white">{layer.label}</p>
@@ -158,7 +162,7 @@ export default async function StrategiesPage() {
 
         <div className="panel p-3.5">
           <p className="micro-label">Confluence Rule</p>
-          <div className="mt-2 rounded-[0.5rem] border border-cyan-300/16 bg-[radial-gradient(circle_at_20%_0%,rgba(0,229,255,0.12),transparent_38%),linear-gradient(180deg,rgba(8,29,40,0.7),rgba(10,17,27,0.72))] p-3">
+          <div className="mt-2 rounded-[0.5rem] border border-[#00C884]/16 bg-[radial-gradient(circle_at_20%_0%,rgba(0,200,132,0.12),transparent_38%),linear-gradient(180deg,rgba(8,29,40,0.7),rgba(10,17,27,0.72))] p-3">
             <p className="text-[0.95rem] font-semibold text-white">
               No single pattern gets to boss the trade.
             </p>
@@ -181,7 +185,7 @@ export default async function StrategiesPage() {
             {candlePatternGuide.map((pattern) => (
               <div key={pattern.label} className="signal-surface-soft p-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-13 w-18 shrink-0 items-center justify-center rounded-[0.45rem] border border-white/8 bg-[#07111d]">
+                  <div className="flex h-13 w-18 shrink-0 items-center justify-center rounded-[0.45rem] border border-white/8 bg-[#111210]">
                     <CandleSketch label={pattern.label} />
                   </div>
                   <p className="text-[0.86rem] font-semibold text-white">{pattern.label}</p>
@@ -200,8 +204,8 @@ export default async function StrategiesPage() {
           <div className="mt-3 grid gap-1.25 sm:grid-cols-2">
             {trendPatternGuide.map((pattern) => (
               <div key={pattern.label} className="signal-surface-soft p-2.5">
-                <div className="mb-2 h-10 rounded-[0.4rem] border border-white/8 bg-[#07111d] px-2 py-1.5">
-                  <svg viewBox="0 0 120 28" className="h-full w-full text-cyan-200" fill="none" stroke="currentColor" strokeWidth="2">
+                <div className="mb-2 h-10 rounded-[0.4rem] border border-white/8 bg-[#111210] px-2 py-1.5">
+                  <svg viewBox="0 0 120 28" className="h-full w-full text-[#00C884]/80" fill="none" stroke="currentColor" strokeWidth="2">
                     {pattern.label.startsWith("M") ? (
                       <path d="M4 22 24 6 46 20 68 7 92 23 116 18" />
                     ) : pattern.label.startsWith("W") ? (
@@ -294,7 +298,7 @@ export default async function StrategiesPage() {
                   <div className="mt-2 space-y-1.25">
                     {profile.visualModel ? (
                       <div className="signal-accent-surface p-2.5">
-                        <p className="text-[0.8rem] font-semibold text-cyan-100">
+                        <p className="text-[0.8rem] font-semibold text-[#00F79A]">
                           {profile.visualModel.pattern}
                         </p>
                         <div className="mt-2 grid gap-1.25 sm:grid-cols-2">
@@ -311,7 +315,7 @@ export default async function StrategiesPage() {
                     ) : null}
                     {profile.rules.map((rule) => (
                       <div key={rule} className="signal-surface-soft flex gap-2 p-2.5">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(0,229,255,0.55)]" />
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#00C884] shadow-[0_0_10px_rgba(0,200,132,0.55)]" />
                         <p className="text-[0.8rem] leading-5 text-slate-300">{rule}</p>
                       </div>
                     ))}
@@ -337,13 +341,13 @@ export default async function StrategiesPage() {
                         <Link
                           key={setup.id}
                           href={`/assets/${setup.symbol}`}
-                          className="signal-accent-surface block p-2.5 transition hover:border-cyan-300/40"
+                          className="signal-accent-surface block p-2.5 transition hover:border-[#00C884]/40"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <p className="truncate text-[0.84rem] font-semibold text-white">
                               {setup.symbol}
                             </p>
-                            <span className="text-[0.76rem] font-semibold text-cyan-200">
+                            <span className="text-[0.76rem] font-semibold text-[#00C884]/80">
                               {setup.score}
                             </span>
                           </div>

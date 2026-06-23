@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import type { PersistedPriceAlert } from "@/app/_lib/server/workspace-types";
@@ -66,7 +66,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-[0.4rem] border border-dashed border-white/10 px-3.5 py-2.5 text-[0.78rem] font-semibold text-slate-500 transition hover:border-cyan-500/30 hover:text-cyan-300"
+        className="flex items-center gap-2 rounded-[0.4rem] border border-dashed border-white/10 px-3.5 py-2.5 text-[0.78rem] font-semibold text-slate-500 transition hover:border-[#00C884]/30 hover:text-[#00C884]"
       >
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M8 3v10M3 8h10" />
@@ -87,7 +87,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
             placeholder="e.g. XAUUSD"
-            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none"
+            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none"
           />
         </div>
         <div>
@@ -96,7 +96,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="e.g. Gold breaks key level"
-            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none"
+            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none"
           />
         </div>
         <div>
@@ -104,7 +104,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
           <select
             value={condition}
             onChange={(e) => setCondition(e.target.value as "above" | "below")}
-            className="w-full rounded-[0.35rem] border border-white/8 bg-[#07111d] px-3 py-1.5 text-[0.78rem] text-slate-200 focus:border-cyan-500/40 focus:outline-none"
+            className="w-full rounded-[0.35rem] border border-white/8 bg-[#111210] px-3 py-1.5 text-[0.78rem] text-slate-200 focus:border-[#00C884]/40 focus:outline-none"
           >
             <option value="above">Price goes above</option>
             <option value="below">Price goes below</option>
@@ -118,7 +118,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="e.g. 2400"
-            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none"
+            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none"
           />
         </div>
       </div>
@@ -129,7 +129,7 @@ function CreateAlertForm({ onCreated }: { onCreated: (a: PersistedPriceAlert) =>
         <button
           type="submit"
           disabled={pending}
-          className="rounded-[0.35rem] bg-cyan-500/15 px-4 py-1.5 text-[0.75rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 transition hover:bg-cyan-500/25 disabled:opacity-50"
+          className="rounded-[0.35rem] bg-[#00C884]/15 px-4 py-1.5 text-[0.75rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 transition hover:bg-[#00C884]/25 disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save alert"}
         </button>
@@ -256,11 +256,11 @@ export function AlertsClient({ initialAlerts }: { initialAlerts: PersistedPriceA
       {/* Stats strip */}
       <div className="grid grid-cols-3 gap-[5px]">
         {[
-          { label: "Watching", value: active.length,  color: "text-cyan-200" },
+          { label: "Watching", value: active.length,  color: "text-[#00C884]/80" },
           { label: "Fired",    value: fired.length,   color: "text-amber-300" },
           { label: "Paused",   value: paused.length,  color: "text-slate-500" },
         ].map((s) => (
-          <div key={s.label} className="signal-surface-soft rounded-[0.45rem] px-3 py-2.5">
+          <div key={s.label} className="signal-surface-soft rounded-[0.65rem] px-3 py-2.5">
             <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{s.label}</p>
             <p className={`mt-0.5 text-[1.1rem] font-bold ${s.color}`}>{s.value}</p>
           </div>
@@ -268,7 +268,7 @@ export function AlertsClient({ initialAlerts }: { initialAlerts: PersistedPriceA
       </div>
 
       {alerts.length === 0 ? (
-        <div className="signal-surface-soft rounded-[0.5rem] px-4 py-8 text-center">
+        <div className="signal-surface-soft rounded-[0.65rem] px-4 py-8 text-center">
           <p className="text-[0.82rem] text-slate-500">
             No price alerts yet. Create one above — Siggi will fire a notification the moment price crosses your level.
           </p>

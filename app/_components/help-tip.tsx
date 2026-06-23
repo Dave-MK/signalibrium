@@ -16,7 +16,7 @@ export function HelpTip({
       <button
         type="button"
         aria-describedby={tooltipId}
-        className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full border border-white/12 bg-white/3 text-[0.62rem] font-semibold text-slate-400 transition hover:border-cyan-300/24 hover:text-cyan-200 focus:border-cyan-300/24 focus:text-cyan-200 focus:outline-none"
+        className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full border border-white/12 bg-white/3 text-[0.62rem] font-semibold text-slate-400 transition hover:border-[#00C884]/24 hover:text-[#00C884]/80 focus:border-[#00C884]/24 focus:text-[#00C884]/80 focus:outline-none"
       >
         ?
       </button>

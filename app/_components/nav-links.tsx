@@ -34,6 +34,16 @@ const coreLinks: NavItem[] = [
     ),
   },
   {
+    href: "/assets",
+    label: "Charts & Asset Detail",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M3 15.5h14" />
+        <path d="M4 12 7.5 7l3 3.5 2.5-4.5 3 4" />
+      </svg>
+    ),
+  },
+  {
     href: "/siggis-trades",
     label: "Siggi's Trades",
     icon: (
@@ -98,21 +108,19 @@ const analyseLinks: NavItem[] = [
       </svg>
     ),
   },
-];
-
-const toolLinks: NavItem[] = [
   {
-    href: "/assets",
-    label: "Charts",
+    href: "/market-events",
+    label: "Market Events",
     icon: (
       <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-        <path d="M3 15.5h14" />
-        <path d="M5.5 13V8.5" />
-        <path d="M10 13V5.5" />
-        <path d="M14.5 13v-3" />
+        <circle cx="10" cy="10" r="7.5" />
+        <path d="M10 6v4.5l3 2" />
       </svg>
     ),
   },
+];
+
+const toolLinks: NavItem[] = [
   {
     href: "/strategies",
     label: "Strategies",
@@ -178,35 +186,34 @@ function NavLink({
       href={item.href}
       aria-label={item.label}
       title={collapsed ? item.label : undefined}
-      className={`group flex min-w-0 items-center gap-2 rounded-none px-2.5 py-2 text-[0.82rem] font-semibold transition sm:min-w-31.5 sm:shrink-0 sm:text-[0.86rem] lg:min-w-0 ${
-        collapsed ? "lg:justify-center lg:px-0 lg:py-2.5" : "lg:px-3 lg:py-2.5"
+      className={`group relative flex min-w-0 items-center gap-2.5 rounded-[0.55rem] px-2.5 py-2 text-[0.82rem] font-medium transition-all sm:min-w-31.5 sm:shrink-0 lg:min-w-0 ${
+        collapsed ? "lg:justify-center lg:px-0 lg:py-2.5" : "lg:px-3 lg:py-2"
       } ${
         isActive
-          ? "bg-[linear-gradient(135deg,rgba(0,229,255,0.14),rgba(37,107,255,0.08),rgba(124,58,237,0.05))] text-white shadow-[inset_0_0_0_1px_rgba(0,229,255,0.05)]"
-          : "bg-transparent text-slate-300 hover:bg-[linear-gradient(135deg,rgba(0,229,255,0.08),rgba(37,107,255,0.04),rgba(124,58,237,0.02))] hover:text-white"
+          ? "bg-[#00C884]/10 text-white"
+          : "text-[#A6B0AC] hover:bg-white/[0.05] hover:text-white"
       }`}
     >
+      {/* Green left-edge bar on active */}
+      {isActive && (
+        <span className="absolute left-0 top-1/2 hidden h-[60%] w-0.5 -translate-y-1/2 rounded-full bg-[#00C884] lg:block" />
+      )}
+
       <span
-        className={`flex shrink-0 items-center justify-center rounded-[0.34rem] transition ${
-          collapsed ? "h-9 w-9" : "h-7.5 w-7.5"
+        className={`flex shrink-0 items-center justify-center rounded-[0.4rem] transition-all ${
+          collapsed ? "h-9 w-9" : "h-7 w-7"
         } ${
           isActive
-            ? "bg-cyan-400/10 text-cyan-200"
-            : "bg-white/2.5 text-slate-400 group-hover:bg-cyan-400/8 group-hover:text-white"
+            ? "bg-[#00C884]/12 text-[#00C884]"
+            : "text-[#4B5A6B] group-hover:bg-white/[0.04] group-hover:text-[#A6B0AC]"
         }`}
       >
         {item.icon as ReactNode}
       </span>
+
       <span className={`min-w-0 flex-1 truncate ${collapsed ? "lg:hidden" : ""}`}>
         {item.label}
       </span>
-      <span
-        className={`h-1.5 w-1.5 rounded-full transition ${collapsed ? "lg:hidden" : ""} ${
-          isActive
-            ? "bg-cyan-300 shadow-[0_0_12px_rgba(0,229,255,0.7)]"
-            : "bg-slate-600 group-hover:bg-slate-400"
-        }`}
-      />
     </Link>
   );
 }
@@ -214,13 +221,13 @@ function NavLink({
 function SectionLabel({ label, collapsed }: { label: string; collapsed: boolean }) {
   if (collapsed) {
     return (
-      <div className="my-1.5 hidden lg:flex lg:justify-center">
-        <div className="h-px w-5 bg-white/[0.08]" />
+      <div className="my-2 hidden lg:flex lg:justify-center">
+        <div className="h-px w-4 bg-white/[0.07]" />
       </div>
     );
   }
   return (
-    <p className="hidden lg:block mt-3 mb-1 px-3 text-[0.58rem] font-semibold uppercase tracking-[0.18em] text-slate-700">
+    <p className="mt-4 mb-1 hidden px-3 text-[0.57rem] font-semibold uppercase tracking-[0.20em] text-[#2D3748] lg:block">
       {label}
     </p>
   );
@@ -228,9 +235,6 @@ function SectionLabel({ label, collapsed }: { label: string; collapsed: boolean 
 
 export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
-  // Prevent hydration mismatches from stale server-rendered nav HTML:
-  // render an empty nav on the server and during the initial client pass,
-  // then fill in the real links after mount (sub-frame, no visible flash).
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
@@ -238,57 +242,47 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
     return pathname === href || (href !== "/" && pathname.startsWith(href));
   }
 
+  const navClass = `grid grid-cols-2 gap-1 sm:flex sm:overflow-x-auto sm:gap-1 sm:pb-1 lg:block lg:overflow-visible lg:pb-0 lg:space-y-0.5 ${
+    collapsed ? "lg:-mx-1" : "lg:-mx-1"
+  }`;
+
   if (!mounted) {
-    return (
-      <nav
-        aria-label="Main navigation"
-        className={`grid grid-cols-2 gap-1.25 sm:flex sm:overflow-x-auto sm:gap-1.25 sm:pb-1 lg:block lg:overflow-visible lg:pb-0 ${
-          collapsed ? "lg:-mx-2 lg:space-y-0" : "lg:-mx-3 lg:space-y-0"
-        }`}
-      />
-    );
+    return <nav aria-label="Main navigation" className={navClass} />;
   }
 
   return (
-    <nav
-      className={`grid grid-cols-2 gap-1.25 sm:flex sm:overflow-x-auto sm:gap-1.25 sm:pb-1 lg:block lg:overflow-visible lg:pb-0 ${
-        collapsed ? "lg:-mx-2 lg:space-y-0" : "lg:-mx-3 lg:space-y-0"
-      }`}
-    >
-      {/* ── Core ── */}
+    <nav aria-label="Main navigation" className={navClass}>
       {coreLinks.map((link) => (
         <NavLink key={link.href} item={link} collapsed={collapsed} isActive={isActive(link.href)} />
       ))}
 
-      {/* ── Analyse ── */}
       <SectionLabel label="Analyse" collapsed={collapsed} />
       {analyseLinks.map((link) => (
         <NavLink key={link.href} item={link} collapsed={collapsed} isActive={isActive(link.href)} />
       ))}
 
-      {/* ── Tools ── */}
       <SectionLabel label="Tools" collapsed={collapsed} />
       {toolLinks.map((link) => (
         <NavLink key={link.href} item={link} collapsed={collapsed} isActive={isActive(link.href)} />
       ))}
 
-      {/* ── Dev — quieter treatment ── */}
-      <div className={`hidden lg:block ${collapsed ? "mt-1" : "mt-3 border-t border-white/[0.05] pt-2"}`}>
+      {/* API Access — shown as regular link on desktop, normal on mobile */}
+      <div className={`hidden lg:block ${collapsed ? "mt-1" : "mt-3 border-t border-white/[0.04] pt-2"}`}>
         {devLinks.map((link) => (
           <Link
             key={link.href}
             href={link.href}
             aria-label={link.label}
             title={collapsed ? link.label : undefined}
-            className={`group flex min-w-0 items-center gap-2 rounded-none py-1.5 text-[0.74rem] font-medium transition ${
+            className={`group flex min-w-0 items-center gap-2.5 rounded-[0.55rem] py-1.5 text-[0.76rem] font-medium transition-all ${
               collapsed ? "justify-center px-0" : "px-3"
             } ${
               isActive(link.href)
-                ? "text-slate-300"
-                : "text-slate-600 hover:text-slate-400"
+                ? "text-[#00C884]"
+                : "text-[#2D3748] hover:text-[#A6B0AC]"
             }`}
           >
-            <span className={`flex shrink-0 items-center justify-center ${collapsed ? "h-9 w-9" : "h-6 w-6"} text-slate-600 group-hover:text-slate-400 transition`}>
+            <span className={`flex shrink-0 items-center justify-center transition-colors ${collapsed ? "h-9 w-9" : "h-6 w-6"} text-[#2D3748] group-hover:text-[#A6B0AC]`}>
               {link.icon as ReactNode}
             </span>
             {!collapsed && <span className="truncate">{link.label}</span>}
@@ -296,7 +290,7 @@ export function NavLinks({ collapsed = false }: { collapsed?: boolean }) {
         ))}
       </div>
 
-      {/* Mobile-only: show API Access as regular nav item */}
+      {/* Mobile: show API Access as a grid item */}
       <div className="sm:flex lg:hidden">
         {devLinks.map((link) => (
           <NavLink key={link.href} item={link} collapsed={false} isActive={isActive(link.href)} />

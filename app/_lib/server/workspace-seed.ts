@@ -603,6 +603,7 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
     intelligenceLastSyncedAt: seededAt,
     pricePulseLastSyncedAt: seededAt,
     pricePulseTape: {},
+    dailyLossLimitNotifiedAt: null,
   },
   brokerConnections: [],
   watchlists: [
@@ -679,4 +680,5 @@ export const defaultWorkspaceData: PersistedWorkspaceData = {
   },
   priceAlerts: [],
   riskControls: DEFAULT_RISK_CONTROLS,
+  tradeLearnings: null,
 };

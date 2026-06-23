@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Space_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { summarizePredictionAccuracy } from "./_lib/bot-engine";
 import { getDisplayCurrencyState } from "./_lib/server/currency-preference";
@@ -9,6 +10,13 @@ import { AppShell } from "./_components/app-shell";
 import { DisplayCurrencyProvider } from "./_components/display-currency-provider";
 import { ServiceWorkerRegistrar } from "./_components/service-worker-registrar";
 import "./globals.css";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Signalibrium | Siggi",
@@ -32,7 +40,7 @@ export default async function RootLayout({
 
   return (
     <ClerkProvider>
-      <html lang="en" className="h-full antialiased">
+      <html lang="en" className={`h-full antialiased ${spaceGrotesk.variable}`}>
         <body className="min-h-full">
           <ServiceWorkerRegistrar />
           <DisplayCurrencyProvider

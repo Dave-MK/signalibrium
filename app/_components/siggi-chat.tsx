@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -23,13 +23,13 @@ function SiggiAvatar({ size = "sm" }: { size?: "sm" | "md" }) {
   const iconDim = size === "md" ? "h-4 w-4" : "h-3 w-3";
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400/20 to-violet-500/20 ring-1 ring-cyan-400/30 ${dim}`}
+      className={`relative flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00C884]/20 to-transparent ring-1 ring-[#00C884]/30 ${dim}`}
     >
-      <svg viewBox="0 0 20 20" className={`${iconDim} text-cyan-300`} fill="currentColor">
+      <svg viewBox="0 0 20 20" className={`${iconDim} text-[#00C884]`} fill="currentColor">
         <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm0 9.5c-2.67 0-4.47-1.33-4.47-2 0-.67 1.8-2 4.47-2s4.47 1.33 4.47 2c0 .67-1.8 2-4.47 2Z" />
       </svg>
       {size === "md" && (
-        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#07111d]" />
+        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#111210]" />
       )}
     </div>
   );
@@ -38,9 +38,9 @@ function SiggiAvatar({ size = "sm" }: { size?: "sm" | "md" }) {
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 py-0.5">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:120ms]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-400 [animation-delay:240ms]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00C884] [animation-delay:0ms]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00C884] [animation-delay:120ms]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#00C884] [animation-delay:240ms]" />
     </div>
   );
 }
@@ -63,7 +63,7 @@ function MessageBubble({
       <div
         className={`max-w-[82%] rounded-[0.5rem] px-3 py-2 text-[0.82rem] leading-[1.55] ${
           isUser
-            ? "bg-cyan-500/20 text-cyan-50 ring-1 ring-cyan-500/25"
+            ? "bg-[#00C884]/20 text-white ring-1 ring-[#00C884]/25"
             : "bg-white/[0.055] text-slate-200 ring-1 ring-white/8"
         }`}
       >
@@ -232,21 +232,21 @@ export function SiggiChat() {
         type="button"
         onClick={open}
         aria-label="Ask Siggi"
-        className={`group fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500/30 to-violet-500/20 shadow-[0_8px_32px_rgba(0,229,255,0.22)] ring-1 ring-cyan-400/35 backdrop-blur-sm transition-all duration-300 ease-out hover:scale-105 hover:shadow-[0_8px_40px_rgba(0,229,255,0.35)] hover:ring-cyan-400/55 ${
+        className={`group fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#00C884]/30 to-transparent shadow-[0_8px_32px_rgba(0,200,132,0.22)] ring-1 ring-[#00C884]/35 backdrop-blur-sm transition-all duration-300 ease-out hover:scale-105 hover:shadow-[0_8px_40px_rgba(0,200,132,0.35)] hover:ring-[#00C884]/55 ${
           isOpen ? "pointer-events-none scale-0 opacity-0" : "scale-100 opacity-100"
         }`}
       >
         {/* Pulsing background ring */}
-        <span className="absolute inset-0 rounded-full bg-cyan-400/10 transition-transform duration-500 group-hover:scale-110" />
+        <span className="absolute inset-0 rounded-full bg-[#00C884]/10 transition-transform duration-500 group-hover:scale-110" />
         <svg
           viewBox="0 0 20 20"
-          className="relative h-6 w-6 text-cyan-200"
+          className="relative h-6 w-6 text-[#00C884]/80"
           fill="currentColor"
         >
           <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm0 9.5c-2.67 0-4.47-1.33-4.47-2 0-.67 1.8-2 4.47-2s4.47 1.33 4.47 2c0 .67-1.8 2-4.47 2Z" />
         </svg>
         {/* Tooltip label */}
-        <span className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-[0.35rem] bg-[#07111d] px-2.5 py-1 text-[0.72rem] font-semibold text-cyan-200 opacity-0 ring-1 ring-white/10 transition-opacity duration-150 group-hover:opacity-100">
+        <span className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-[0.35rem] bg-[#111210] px-2.5 py-1 text-[0.72rem] font-semibold text-[#00C884]/80 opacity-0 ring-1 ring-white/10 transition-opacity duration-150 group-hover:opacity-100">
           Ask Siggi
         </span>
       </button>
@@ -256,7 +256,7 @@ export function SiggiChat() {
        * to look like it expands out of the FAB.
        */}
       <div
-        className={`fixed bottom-5 right-5 z-50 flex origin-bottom-right flex-col overflow-hidden rounded-[0.75rem] border border-white/10 bg-[#07111d] shadow-[0_28px_80px_rgba(0,0,0,0.65),0_0_0_1px_rgba(0,229,255,0.05)] transition-all duration-300 ease-out ${
+        className={`fixed bottom-5 right-5 z-50 flex origin-bottom-right flex-col overflow-hidden rounded-[0.75rem] border border-white/10 bg-[#111210] shadow-[0_28px_80px_rgba(0,0,0,0.65),0_0_0_1px_rgba(0,200,132,0.05)] transition-all duration-300 ease-out ${
           isOpen
             ? "scale-100 opacity-100"
             : "pointer-events-none scale-75 opacity-0"
@@ -355,7 +355,7 @@ export function SiggiChat() {
               placeholder={
                 isStreaming ? "Siggi is thinking…" : "Ask about any market or strategy…"
               }
-              className="min-h-[36px] flex-1 resize-none rounded-[0.4rem] bg-white/[0.05] px-3 py-2 text-[0.82rem] text-white placeholder-slate-500 outline-none ring-1 ring-white/10 transition focus:ring-cyan-500/40 disabled:opacity-50"
+              className="min-h-[36px] flex-1 resize-none rounded-[0.4rem] bg-white/[0.05] px-3 py-2 text-[0.82rem] text-white placeholder-slate-500 outline-none ring-1 ring-white/10 transition focus:ring-[#00C884]/40 disabled:opacity-50"
               style={{ maxHeight: 96, overflowY: "auto" }}
             />
             <button

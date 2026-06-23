@@ -65,11 +65,11 @@ export function TradesTabs({
               onClick={() => setActive(tab.id)}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-[0.38rem] px-3 py-2 text-[0.80rem] font-semibold transition ${
                 active === tab.id
-                  ? "bg-[linear-gradient(135deg,rgba(0,229,255,0.14),rgba(37,107,255,0.08))] text-white shadow-[inset_0_0_0_1px_rgba(0,229,255,0.08)]"
+                  ? "bg-[linear-gradient(135deg,rgba(0,200,132,0.14),rgba(37,107,255,0.08))] text-white shadow-[inset_0_0_0_1px_rgba(0,200,132,0.08)]"
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <span className={active === tab.id ? "text-cyan-300" : "text-slate-500"}>
+              <span className={active === tab.id ? "text-[#00C884]" : "text-slate-500"}>
                 {tab.icon}
               </span>
               {tab.label}
@@ -78,7 +78,7 @@ export function TradesTabs({
                   className={`min-w-[1.25rem] rounded-full px-1 py-0.5 text-center text-[0.60rem] font-bold leading-none ${
                     active === tab.id
                       ? count > 0
-                        ? "bg-cyan-400/20 text-cyan-200"
+                        ? "bg-[#00C884]/20 text-[#00C884]/80"
                         : "bg-white/[0.06] text-slate-500"
                       : "bg-white/[0.04] text-slate-600"
                   }`}

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useTransition } from "react";
 import { Panel, StatusChip } from "@/app/_components/ui";
@@ -37,7 +37,7 @@ function ResyncPredictionsPanel() {
           type="button"
           onClick={run}
           disabled={pending}
-          className="rounded-[0.38rem] border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[0.75rem] font-semibold text-slate-300 transition hover:border-cyan-500/20 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-[0.38rem] border border-white/10 bg-white/[0.03] px-4 py-1.5 text-[0.75rem] font-semibold text-slate-300 transition hover:border-[#00C884]/20 hover:text-[#00C884]/80 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "Running…" : "Resync prediction records"}
         </button>
@@ -237,13 +237,13 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
           <div className="space-y-3">
             {/* Key display */}
             <div className="flex items-center gap-2">
-              <code className="flex-1 overflow-x-auto rounded-[0.4rem] border border-white/8 bg-white/[0.03] px-3 py-2.5 font-mono text-[0.78rem] text-cyan-200">
+              <code className="flex-1 overflow-x-auto rounded-[0.4rem] border border-white/8 bg-white/[0.03] px-3 py-2.5 font-mono text-[0.78rem] text-[#00C884]/80">
                 {revealed ? apiKey : maskedKey}
               </code>
               <button
                 type="button"
                 onClick={() => setRevealed((v) => !v)}
-                className="shrink-0 rounded-[0.35rem] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] font-medium text-slate-400 transition hover:border-cyan-400/30 hover:text-white"
+                className="shrink-0 rounded-[0.35rem] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] font-medium text-slate-400 transition hover:border-[#00C884]/30 hover:text-white"
               >
                 {revealed ? "Hide" : "Reveal"}
               </button>
@@ -251,7 +251,7 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
                 <button
                   type="button"
                   onClick={() => copyToClipboard(apiKey, "key")}
-                  className="shrink-0 rounded-[0.35rem] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] font-medium text-slate-400 transition hover:border-cyan-400/30 hover:text-white"
+                  className="shrink-0 rounded-[0.35rem] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[0.72rem] font-medium text-slate-400 transition hover:border-[#00C884]/30 hover:text-white"
                 >
                   {copied ? "Copied ✓" : "Copy"}
                 </button>
@@ -283,7 +283,7 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
               type="button"
               onClick={enableAndGenerate}
               disabled={isPending}
-              className="rounded-[0.4rem] bg-gradient-to-r from-cyan-500/20 to-violet-500/10 px-4 py-2 text-[0.82rem] font-semibold text-cyan-200 ring-1 ring-cyan-400/20 transition hover:from-cyan-500/30 hover:to-violet-500/20 disabled:opacity-50"
+              className="rounded-[0.4rem] bg-gradient-to-r from-[#00C884]/20 to-transparent px-4 py-2 text-[0.82rem] font-semibold text-[#00C884]/80 ring-1 ring-[#00C884]/20 transition hover:from-[#00C884]/30 hover:to-transparent disabled:opacity-50"
             >
               {isPending ? "Setting up…" : "Enable API access & generate key"}
             </button>
@@ -319,7 +319,7 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
                 ["x-signature", "HMAC-SHA256 of  <timestamp>:GET:/api/signals  signed with your key"],
               ].map(([header, desc]) => (
                 <div key={header} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <code className="shrink-0 font-mono text-[0.72rem] text-cyan-300">{header}</code>
+                  <code className="shrink-0 font-mono text-[0.72rem] text-[#00C884]">{header}</code>
                   <span className="text-[0.68rem] text-slate-500">{desc}</span>
                 </div>
               ))}
@@ -351,7 +351,7 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
                 onClick={() => setActiveTab(tab)}
                 className={`rounded-[0.3rem] px-2.5 py-1 text-[0.70rem] font-semibold transition capitalize ${
                   activeTab === tab
-                    ? "bg-cyan-400/10 text-cyan-200"
+                    ? "bg-[#00C884]/10 text-[#00C884]/80"
                     : "text-slate-500 hover:text-slate-300"
                 }`}
               >
@@ -367,7 +367,7 @@ export function ApiAccessClient({ initialApiKey, isAlgo, appUrl }: Props) {
           <button
             type="button"
             onClick={() => copyToClipboard(snippetWithKey, activeTab)}
-            className="absolute right-3 top-3 rounded-[0.3rem] border border-white/10 bg-[#0a1525] px-2 py-1 text-[0.65rem] font-medium text-slate-500 transition hover:border-cyan-400/25 hover:text-cyan-300"
+            className="absolute right-3 top-3 rounded-[0.3rem] border border-white/10 bg-[#111210] px-2 py-1 text-[0.65rem] font-medium text-slate-500 transition hover:border-[#00C884]/25 hover:text-[#00C884]"
           >
             {copiedSnippet === activeTab ? "Copied ✓" : "Copy"}
           </button>

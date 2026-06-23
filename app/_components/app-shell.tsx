@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -92,21 +92,21 @@ function HeaderMetric({
 }) {
   const inner = (
     <>
-      <p className="text-[0.66rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+      <p className="text-[0.60rem] font-semibold uppercase tracking-[0.16em] text-slate-600">
         {label}
       </p>
-      <p className={`mt-0.5 text-[0.84rem] font-semibold ${tone}`}>{value}</p>
-      <p className="mt-0.5 text-[0.72rem] text-slate-400">{detail}</p>
+      <p className={`mt-0.5 text-[0.88rem] font-bold ${tone}`}>{value}</p>
+      <p className="mt-0.5 text-[0.68rem] text-slate-500">{detail}</p>
     </>
   );
   if (href) {
     return (
-      <Link href={href} className="signal-toolbar-card px-3 py-1.5 transition hover:bg-white/[0.04]">
+      <Link href={href} className="flex flex-col justify-center border-r border-white/[0.05] px-3.5 py-2.5 transition hover:bg-white/[0.025]">
         {inner}
       </Link>
     );
   }
-  return <div className="signal-toolbar-card px-3 py-1.5">{inner}</div>;
+  return <div className="flex flex-col justify-center border-r border-white/[0.05] px-3.5 py-2.5">{inner}</div>;
 }
 
 export function AppShell({
@@ -384,111 +384,113 @@ export function AppShell({
     <NotificationProvider>
     <div className="relative z-10 min-h-screen">
       <div className="flex min-h-screen flex-col lg:flex-row">
+
+        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
         <aside
-          className={`group/sidebar relative shrink-0 border-b border-white/6 bg-[#06101b]/94 px-2.5 py-2.5 backdrop-blur-xl transition-[width,padding] duration-200 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r ${
+          className={`group/sidebar relative shrink-0 border-b border-white/[0.05] bg-[#09090A] px-2.5 py-3 transition-[width,padding] duration-200 lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r lg:border-r-white/[0.05] ${
             isSidebarCollapsed
-              ? "lg:w-19 lg:px-2 lg:py-3"
-              : "lg:w-55 lg:px-3 lg:py-3"
+              ? "lg:w-[4.5rem] lg:px-2 lg:py-3"
+              : "lg:w-[14.5rem] lg:px-3 lg:py-3"
           }`}
         >
-          <div className="pointer-events-none sticky top-13.5 z-20 hidden h-0 lg:block">
+          {/* Collapse toggle — appears on hover */}
+          <div className="pointer-events-none sticky top-14 z-20 hidden h-0 lg:block">
             <button
               type="button"
               aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               onClick={() => {
                 startTransition(() => {
                   const nextValue = !isSidebarCollapsed;
-                  window.localStorage.setItem(
-                    sidebarPreferenceStorageKey,
-                    String(nextValue),
-                  );
+                  window.localStorage.setItem(sidebarPreferenceStorageKey, String(nextValue));
                   window.dispatchEvent(new Event(sidebarPreferenceChangedEvent));
                 });
               }}
-              className="signal-surface-soft pointer-events-auto ml-auto flex h-9 w-9 translate-x-[1.1rem] items-center justify-center border border-white/8 bg-[#091321]/98 text-slate-300 opacity-0 shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition-[transform,color,opacity] duration-200 hover:text-white group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100 after:absolute after:left-0 after:top-1/2 after:h-5 after:w-px after:-translate-x-full after:-translate-y-1/2 after:bg-white/12"
+              className="pointer-events-auto ml-auto flex h-6 w-6 translate-x-[0.9rem] items-center justify-center rounded-full border border-white/10 bg-[#111210] text-[#4B5A6B] opacity-0 shadow-md transition-[opacity,color] hover:text-[#A6B0AC] group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100"
             >
               <svg
                 viewBox="0 0 20 20"
-                className={`h-4 w-4 transition-transform ${isSidebarCollapsed ? "rotate-180" : ""}`}
+                className={`h-3 w-3 transition-transform ${isSidebarCollapsed ? "rotate-180" : ""}`}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2"
               >
                 <path d="m12.5 4.5-5 5 5 5" />
               </svg>
             </button>
           </div>
 
-          <div className="flex min-w-0 items-center justify-between gap-3 lg:block">
-            <div className="min-w-0 lg:flex lg:justify-center">
-              <Link
-                href="/"
-                className={`inline-flex max-w-full items-center gap-0.5 pr-0.5 leading-none transition-[max-width,justify-content,padding] duration-200 lg:w-full ${
+          {/* Logo */}
+          <div className="flex min-w-0 items-center justify-between gap-2 lg:block">
+            <Link
+              href="/"
+              className={`inline-flex max-w-full items-center gap-2 leading-none transition-all duration-200 lg:w-full ${
+                isSidebarCollapsed
+                  ? "lg:justify-center lg:px-0"
+                  : "lg:px-2"
+              }`}
+            >
+              <Image
+                src="/branding/signa-logo.svg"
+                alt="Signalibrium"
+                width={32}
+                height={32}
+                className="h-8 w-8 shrink-0 object-contain"
+                priority
+              />
+              <span
+                className={`min-w-0 text-[1.15rem] font-bold leading-none tracking-tight text-white transition-[opacity,width] duration-200 ${
                   isSidebarCollapsed
-                    ? "lg:max-w-none lg:justify-center lg:px-0"
-                    : "lg:max-w-48 lg:justify-around lg:px-1"
+                    ? "pointer-events-none w-0 overflow-hidden opacity-0"
+                    : "opacity-100"
                 }`}
               >
-                <Image
-                  src="/branding/signa-logo.svg"
-                  alt="Signalibrium"
-                  width={52}
-                  height={52}
-                  className="h-[2.7rem] w-[2.7rem] shrink-0 object-contain"
-                  priority
-                />
-                <span
-                  className={`flex min-w-0 items-center text-[1.38rem] font-semibold leading-none tracking-tight text-white transition-[opacity,width,margin] duration-200 sm:text-[1.56rem] ${
-                    isSidebarCollapsed
-                      ? "pointer-events-none w-0 overflow-hidden opacity-0 lg:ml-0"
-                      : "opacity-100 lg:ml-1"
-                  }`}
-                >
-                  <span className="text-white">Signal</span>
-                  <span className="signal-wordmark-gradient">ibrium</span>
-                </span>
-              </Link>
-            </div>
+                Signal<span className="signal-wordmark-gradient">ibrium</span>
+              </span>
+            </Link>
             <div className="shrink-0 lg:hidden">
               <StatusChip label="BOT LIVE" />
             </div>
           </div>
 
-          <div className="mt-3 lg:mt-5">
+          {/* Nav */}
+          <div className="mt-5 lg:mt-6">
             <NavLinks collapsed={isSidebarCollapsed} />
           </div>
 
+          {/* Affiliate button — only when expanded */}
           {!isSidebarCollapsed && (
-            <div className="mt-4 hidden lg:block">
+            <div className="mt-5 hidden lg:block">
               <AffiliateBrokerButton className="w-full justify-center" />
             </div>
           )}
-
         </aside>
 
+        {/* ── Main content area ────────────────────────────────────────────── */}
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/6 bg-[#07111d]/90 backdrop-blur-xl">
-            {/* ── Mobile header: single compact row ── */}
-            <div className="flex items-center justify-between gap-2 px-3 py-2 sm:hidden">
+
+          {/* Top bar */}
+          <header className="sticky top-0 z-20 border-b border-white/[0.05] bg-[#09090A]/95 backdrop-blur-xl">
+
+            {/* Mobile header */}
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5 sm:hidden">
               <div className="min-w-0">
-                <p className="truncate text-[0.72rem] font-semibold text-cyan-200">{marketSnapshot.state}</p>
-                <p className="text-[0.62rem] text-slate-500">
-                  Signal {predictionAccuracy.signalDirectionAccuracy}%
+                <p className="truncate text-[0.75rem] font-semibold text-[#00C884]">{marketSnapshot.state}</p>
+                <p className="text-[0.62rem] text-[#4B5A6B]">
+                  {predictionAccuracy.signalDirectionAccuracy}% accuracy
                   {predictionAccuracy.siggiTradeWinRate !== null
                     ? ` · Siggi ${predictionAccuracy.siggiTradeWinRate}%`
-                    : " · Siggi building…"}
+                    : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <select
                   aria-label="Display currency"
                   value={activeCurrency}
-                  onChange={(event) => {
-                    void updateDisplayCurrency(
-                      event.target.value as SupportedDisplayCurrency,
-                    ).then(() => startTransition(() => routerRef.current.refresh()));
+                  onChange={(e) => {
+                    void updateDisplayCurrency(e.target.value as SupportedDisplayCurrency)
+                      .then(() => startTransition(() => routerRef.current.refresh()));
                   }}
-                  className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.68rem] font-medium text-slate-200 outline-none"
+                  className="rounded-md border border-white/10 bg-[#111210] px-2 py-1 text-[0.68rem] font-medium text-[#F2F7F2] outline-none"
                 >
                   {(["GBP", "USD", "EUR"] as const).map((c) => (
                     <option key={c} value={c}>{c}</option>
@@ -497,26 +499,23 @@ export function AppShell({
                 <StatusChip label="LIVE" />
                 <BrokerStatusChip initialConnections={brokerConnections} />
                 <NotificationBell />
-                <UserButton
-                  appearance={{ variables: { colorPrimary: "#10b981" } }}
-                  userProfileUrl="/billing"
-                />
+                <UserButton appearance={{ variables: { colorPrimary: "#00C884" } }} userProfileUrl="/billing" />
               </div>
             </div>
 
-            {/* ── Desktop header: four metric cards ── */}
-            <div className="hidden gap-1 px-1.25 py-1 sm:grid sm:grid-cols-[minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,0.75fr)_minmax(0,1fr)]">
+            {/* Desktop header — metric strip */}
+            <div className="hidden sm:flex sm:items-stretch">
               <HeaderMetric
                 label="Live Market"
                 value={marketSnapshot.state}
-                detail={`Live pulse + auto-sync / ${latestSyncLabel}`}
-                tone="text-cyan-200"
+                detail={`Auto-sync · ${latestSyncLabel}`}
+                tone="text-[#00C884]"
               />
               <HeaderMetric
                 label="Signal Accuracy"
                 value={`${predictionAccuracy.signalDirectionAccuracy}%`}
-                detail={`${predictionAccuracy.signalDirectionWins}W / ${predictionAccuracy.signalDirectionResolved - predictionAccuracy.signalDirectionWins}L from ${predictionAccuracy.signalDirectionResolved} resolved`}
-                tone="text-emerald-300"
+                detail={`${predictionAccuracy.signalDirectionWins}W / ${predictionAccuracy.signalDirectionResolved - predictionAccuracy.signalDirectionWins}L · ${predictionAccuracy.signalDirectionResolved} resolved`}
+                tone="text-[#00C884]"
                 href="/history"
               />
               <HeaderMetric
@@ -524,48 +523,40 @@ export function AppShell({
                 value={predictionAccuracy.siggiTradeWinRate !== null ? `${predictionAccuracy.siggiTradeWinRate}%` : "Building…"}
                 detail={
                   predictionAccuracy.siggiTradeWinRate !== null
-                    ? `${predictionAccuracy.siggiTradesWon}W / ${predictionAccuracy.siggiTradesResolved - predictionAccuracy.siggiTradesWon}L from ${predictionAccuracy.siggiTradesResolved} trades`
-                    : `${predictionAccuracy.siggiTradesResolved} trade${predictionAccuracy.siggiTradesResolved === 1 ? "" : "s"} — needs 5+ to show rate`
+                    ? `${predictionAccuracy.siggiTradesWon}W / ${predictionAccuracy.siggiTradesResolved - predictionAccuracy.siggiTradesWon}L · ${predictionAccuracy.siggiTradesResolved} trades`
+                    : `${predictionAccuracy.siggiTradesResolved} trades — needs 5+`
                 }
-                tone={predictionAccuracy.siggiTradeWinRate !== null ? "text-cyan-200" : "text-slate-500"}
+                tone={predictionAccuracy.siggiTradeWinRate !== null ? "text-[#00C884]" : "text-[#4B5A6B]"}
                 href="/siggis-trades"
               />
-              <div className="signal-toolbar-card flex min-w-0 items-center gap-2 px-2.5 py-2">
+              {/* Right side — controls */}
+              <div className="ml-auto flex items-center gap-3 px-4 py-2">
                 <select
                   aria-label="Display currency"
                   value={activeCurrency}
-                  onChange={(event) => {
-                    void updateDisplayCurrency(
-                      event.target.value as SupportedDisplayCurrency,
-                    ).then(() => startTransition(() => routerRef.current.refresh()));
+                  onChange={(e) => {
+                    void updateDisplayCurrency(e.target.value as SupportedDisplayCurrency)
+                      .then(() => startTransition(() => routerRef.current.refresh()));
                   }}
-                  className="rounded-[0.34rem] border border-white/10 bg-[#0a1320] px-2 py-1 text-[0.72rem] font-medium text-slate-200 outline-none"
+                  className="rounded-md border border-white/10 bg-[#111210] px-2.5 py-1.5 text-[0.72rem] font-medium text-[#F2F7F2] outline-none transition hover:border-white/16"
                 >
-                  {(["GBP", "USD", "EUR"] as const).map((currencyOption) => (
-                    <option key={currencyOption} value={currencyOption}>
-                      {currencyOption}
-                    </option>
+                  {(["GBP", "USD", "EUR"] as const).map((c) => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
                 <StatusChip label="LIVE" />
                 <BrokerStatusChip initialConnections={brokerConnections} />
                 <NotificationBell />
-                <UserButton
-                  appearance={{ variables: { colorPrimary: "#10b981" } }}
-                  userProfileUrl="/billing"
-                />
+                <UserButton appearance={{ variables: { colorPrimary: "#00C884" } }} userProfileUrl="/billing" />
               </div>
             </div>
           </header>
 
-          <main className="flex-1 px-1.25 py-1.25">{children}</main>
+          <main className="flex-1 p-[5px]">{children}</main>
         </div>
       </div>
 
-      {/* Siggi — self-contained FAB + chat panel, fixed bottom-right */}
       <SiggiChat />
-
-      {/* Getting-started checklist — slides in from right, follows user on every page */}
       <GettingStartedChecklist />
     </div>
     </NotificationProvider>

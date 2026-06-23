@@ -53,7 +53,7 @@ export default function BillingPage() {
               key={plan.name}
               className={`rounded-[0.5rem] border p-4 ${
                 plan.current
-                  ? "border-cyan-400/25 bg-cyan-400/5"
+                  ? "border-[#00C884]/25 bg-[#00C884]/5"
                   : "border-white/8 bg-white/[0.02]"
               }`}
             >
@@ -62,7 +62,7 @@ export default function BillingPage() {
               </p>
               <p className="mt-1 text-[1.4rem] font-bold text-white">{plan.price}</p>
               {plan.current && (
-                <p className="mt-1 text-[0.70rem] font-semibold text-cyan-300">Current plan</p>
+                <p className="mt-1 text-[0.70rem] font-semibold text-[#00C884]">Current plan</p>
               )}
               <ul className="mt-4 space-y-2">
                 {plan.features.map((f) => (

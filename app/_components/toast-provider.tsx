@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   createContext,
@@ -51,9 +51,9 @@ const ACCENT: Record<ToastType, { bar: string; icon: ReactElement }> = {
     ),
   },
   trade: {
-    bar: "bg-cyan-400",
+    bar: "bg-[#00C884]",
     icon: (
-      <svg viewBox="0 0 20 20" className="h-4 w-4 text-cyan-300" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <svg viewBox="0 0 20 20" className="h-4 w-4 text-[#00C884]" fill="none" stroke="currentColor" strokeWidth="1.7">
         <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm0 9.5c-2.67 0-4.47-1.33-4.47-2 0-.67 1.8-2 4.47-2s4.47 1.33 4.47 2c0 .67-1.8 2-4.47 2Z" fill="currentColor" />
       </svg>
     ),
@@ -98,7 +98,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
   return (
     <div
-      className={`relative flex w-[260px] shrink-0 items-start gap-3 overflow-hidden rounded-[0.55rem] border border-white/10 bg-[#07111d]/98 px-3.5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ${
+      className={`relative flex w-[260px] shrink-0 items-start gap-3 overflow-hidden rounded-[0.55rem] border border-white/10 bg-[#111210]/98 px-3.5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ${
         visible ? "translate-x-0 opacity-100" : "-translate-x-3 opacity-0"
       }`}
     >

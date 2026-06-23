@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * TradeTicketModal
@@ -98,8 +98,8 @@ function Field({ label, children, hint }: { label: string; children: React.React
   );
 }
 
-const INPUT = "w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none";
-const SELECT = "w-full rounded-[0.35rem] border border-white/8 bg-[#07111d] px-3 py-1.5 text-[0.78rem] text-slate-200 focus:border-cyan-500/40 focus:outline-none";
+const INPUT = "w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] px-3 py-1.5 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none";
+const SELECT = "w-full rounded-[0.35rem] border border-white/8 bg-[#111210] px-3 py-1.5 text-[0.78rem] text-slate-200 focus:border-[#00C884]/40 focus:outline-none";
 
 // ─── Modal content ────────────────────────────────────────────────────────────
 
@@ -245,9 +245,9 @@ function ModalContent({ prefill = {}, connections: passedConnections, onClose, o
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-h-[90vh] overflow-y-auto rounded-t-[1rem] sm:rounded-[0.72rem] sm:max-w-lg bg-[#07111d] border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.8)]">
+      <div className="relative z-10 w-full max-h-[90dvh] overflow-y-auto rounded-t-[1rem] sm:rounded-[0.72rem] sm:max-w-lg bg-[#111210] border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.8)]">
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#07111d] px-4 py-3.5">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#111210] px-4 py-3.5">
           <div>
             <p className="text-[0.88rem] font-bold text-white">New trade ticket</p>
             {prefill.symbol && (
@@ -402,7 +402,7 @@ function ModalContent({ prefill = {}, connections: passedConnections, onClose, o
               onClick={handleSubmit}
               disabled={isPending || execMode === "Paper"}
               title={execMode === "Paper" ? "Select a broker to submit" : undefined}
-              className="flex-1 rounded-[0.4rem] bg-cyan-500/15 py-2 text-[0.78rem] font-semibold text-cyan-200 ring-1 ring-cyan-500/25 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex-1 rounded-[0.4rem] bg-[#00C884]/15 py-2 text-[0.78rem] font-semibold text-[#00C884]/80 ring-1 ring-[#00C884]/25 transition hover:bg-[#00C884]/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitPending ? "Submitting…" : "Submit to broker"}
             </button>
@@ -444,7 +444,7 @@ export function TradeThisButton({
         onClick={() => setOpen(true)}
         className={
           className ??
-          "flex items-center gap-1.5 rounded-[0.3rem] bg-cyan-500/10 px-2.5 py-1 text-[0.70rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/20 transition hover:bg-cyan-500/20"
+          "flex items-center gap-1.5 rounded-[0.3rem] bg-[#00C884]/10 px-2.5 py-1 text-[0.70rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/20 transition hover:bg-[#00C884]/20"
         }
       >
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">

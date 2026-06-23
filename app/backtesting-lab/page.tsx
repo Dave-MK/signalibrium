@@ -38,7 +38,7 @@ export default async function BacktestingLabPage() {
     <div className="panel-stack-5">
       <PageHeader
         eyebrow="Lab"
-        title="Backtesting Lab"
+        title="Backtest Lab"
         description="Strategy performance metrics computed against historical data for each instrument in the universe. All figures are estimates derived from strategy-class profiles — live fills will replace these as trades accumulate."
       />
 
@@ -50,7 +50,7 @@ export default async function BacktestingLabPage() {
               label: "Strategies tracked",
               value: String(total),
               sub: "instrument × strategy pairs",
-              tone: "text-cyan-200",
+              tone: "text-[#00C884]/80",
             },
             {
               label: "Avg win rate",
@@ -160,9 +160,9 @@ export default async function BacktestingLabPage() {
                 </div>
 
                 {/* ── Metrics grid ── */}
-                <div className="mb-3 grid grid-cols-3 gap-[5px] sm:grid-cols-5">
+                <div className="mb-3 grid grid-cols-2 gap-[5px] sm:grid-cols-3 lg:grid-cols-5">
                   {/* Win Rate */}
-                  <div className="signal-surface-soft rounded-[0.38rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.60rem] text-slate-500 uppercase tracking-[0.12em]">
                       Win rate
                     </p>
@@ -186,7 +186,7 @@ export default async function BacktestingLabPage() {
                   </div>
 
                   {/* Total Return */}
-                  <div className="signal-surface-soft rounded-[0.38rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.60rem] text-slate-500 uppercase tracking-[0.12em]">
                       Return
                     </p>
@@ -199,7 +199,7 @@ export default async function BacktestingLabPage() {
                   </div>
 
                   {/* Max Drawdown */}
-                  <div className="signal-surface-soft rounded-[0.38rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.60rem] text-slate-500 uppercase tracking-[0.12em]">
                       Max DD
                     </p>
@@ -209,7 +209,7 @@ export default async function BacktestingLabPage() {
                   </div>
 
                   {/* Profit Factor */}
-                  <div className="signal-surface-soft rounded-[0.38rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.60rem] text-slate-500 uppercase tracking-[0.12em]">
                       Prof. factor
                     </p>
@@ -227,7 +227,7 @@ export default async function BacktestingLabPage() {
                   </div>
 
                   {/* Sharpe */}
-                  <div className="signal-surface-soft rounded-[0.38rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.60rem] text-slate-500 uppercase tracking-[0.12em]">
                       Sharpe
                     </p>

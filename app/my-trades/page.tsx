@@ -21,10 +21,10 @@ export default async function MyTradesPage() {
       />
 
       {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-[5px]">
+      <div className="grid grid-cols-3 gap-[5px] sm:grid-cols-3">
         {[
           { label: "Total tickets",  value: tickets.length,  color: "text-slate-200"   },
-          { label: "Active / open",  value: activeCount,     color: "text-cyan-300"    },
+          { label: "Active / open",  value: activeCount,     color: "text-[#00C884]"    },
           { label: "Filled",         value: filledCount,     color: "text-emerald-300" },
         ].map((s) => (
           <Panel key={s.label} className="p-3">

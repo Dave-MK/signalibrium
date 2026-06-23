@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
 import type { PersistedJournalEntry, TradeNoteOutcome } from "@/app/_lib/server/workspace-types";
@@ -50,6 +50,8 @@ function EntryCard({
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing]   = useState(false);
 
+  const isUnreviewed = needsReview(entry);
+
   const summary =
     entry.whatISaw?.trim() ||
     entry.reasoning?.trim() ||
@@ -57,7 +59,7 @@ function EntryCard({
     "No notes written yet.";
 
   return (
-    <div className="signal-surface-soft rounded-[0.5rem] border border-white/[0.05]">
+    <div className="signal-surface-soft rounded-[0.65rem] border border-white/[0.05]">
       {/* Header row */}
       <button
         type="button"
@@ -76,6 +78,11 @@ function EntryCard({
             {entry.taggedOutcome && (
               <span className={`rounded-[0.28rem] px-2 py-0.5 text-[0.63rem] font-semibold uppercase tracking-wider ring-1 ${OUTCOME_STYLE[entry.taggedOutcome]}`}>
                 {entry.taggedOutcome}
+              </span>
+            )}
+            {isUnreviewed && (
+              <span className="rounded-[0.25rem] bg-amber-500/12 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wider text-amber-400 ring-1 ring-amber-500/20">
+                needs review
               </span>
             )}
             {entry.rating && (
@@ -143,7 +150,7 @@ function EntryCard({
             {(entry.tags?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {entry.tags.map((t) => (
-                  <span key={t} className="rounded-[0.28rem] bg-cyan-500/10 px-2 py-0.5 text-[0.67rem] text-cyan-300 ring-1 ring-cyan-500/20">
+                  <span key={t} className="rounded-[0.28rem] bg-[#00C884]/10 px-2 py-0.5 text-[0.67rem] text-[#00C884] ring-1 ring-[#00C884]/20">
                     {t}
                   </span>
                 ))}
@@ -151,19 +158,19 @@ function EntryCard({
             )}
             <div className="flex gap-2 pt-1">
               {entry.predictionId && (
-                <a href={`/history#${entry.predictionId}`} className="text-[0.72rem] text-cyan-400 underline underline-offset-2 hover:text-cyan-200">
+                <a href={`/history#${entry.predictionId}`} className="text-[0.72rem] text-[#00C884] underline underline-offset-2 hover:text-[#00C884]/80">
                   → View signal
                 </a>
               )}
               {entry.tradeId && (
-                <a href="/siggis-trades" className="text-[0.72rem] text-cyan-400 underline underline-offset-2 hover:text-cyan-200">
+                <a href="/siggis-trades" className="text-[0.72rem] text-[#00C884] underline underline-offset-2 hover:text-[#00C884]/80">
                   → View trade
                 </a>
               )}
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="ml-auto text-[0.72rem] text-slate-500 transition hover:text-cyan-300"
+                className="ml-auto text-[0.72rem] text-slate-500 transition hover:text-[#00C884]"
               >
                 Edit note
               </button>
@@ -204,7 +211,7 @@ function CreatePanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-dashed border-white/10 py-3.5 text-[0.8rem] font-semibold text-slate-500 transition hover:border-cyan-500/30 hover:text-cyan-300"
+        className="flex w-full items-center justify-center gap-2 rounded-[0.5rem] border border-dashed border-white/10 py-3.5 text-[0.8rem] font-semibold text-slate-500 transition hover:border-[#00C884]/30 hover:text-[#00C884]"
       >
         <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M8 3v10M3 8h10" />
@@ -228,7 +235,11 @@ function CreatePanel({
 
 // ─── filter bar ──────────────────────────────────────────────────────────────
 
-type Filter = "All" | TradeNoteOutcome | "Trade" | "Signal" | "General";
+type Filter = "All" | TradeNoteOutcome | "Trade" | "Signal" | "General" | "Needs Review";
+
+function needsReview(e: PersistedJournalEntry) {
+  return e.entryType === "trade_review" && e.rating === null && !e.improvement?.trim();
+}
 
 // ─── Bulk review modal ────────────────────────────────────────────────────────
 
@@ -264,7 +275,7 @@ function BulkReviewModal({
   if (!current) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-[0.6rem] border border-white/10 bg-[#07111d] p-6 shadow-2xl text-center">
+        <div className="w-full max-w-md rounded-[0.6rem] border border-white/10 bg-[#111210] p-6 shadow-2xl text-center">
           <p className="text-2xl mb-2">🎉</p>
           <p className="text-[0.94rem] font-semibold text-white">All caught up!</p>
           <p className="mt-1 text-[0.78rem] text-slate-400">
@@ -273,7 +284,7 @@ function BulkReviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="mt-4 rounded-[0.4rem] bg-cyan-500/15 px-5 py-2 text-[0.78rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 hover:bg-cyan-500/25"
+            className="mt-4 rounded-[0.4rem] bg-[#00C884]/15 px-5 py-2 text-[0.78rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 hover:bg-[#00C884]/25"
           >
             Done
           </button>
@@ -297,7 +308,7 @@ function BulkReviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-[0.6rem] border border-white/10 bg-[#07111d] shadow-2xl"
+        className="w-full max-w-lg rounded-[0.6rem] border border-white/10 bg-[#111210] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -308,7 +319,7 @@ function BulkReviewModal({
             </p>
             <div className="mt-0.5 h-1 w-32 overflow-hidden rounded-full bg-white/[0.06]">
               <div
-                className="h-full rounded-full bg-cyan-500/60 transition-all"
+                className="h-full rounded-full bg-[#00C884]/60 transition-all"
                 style={{ width: `${((items.length - remaining.length) / items.length) * 100}%` }}
               />
             </div>
@@ -322,7 +333,7 @@ function BulkReviewModal({
 
         {/* Card */}
         <div className="p-4 space-y-3">
-          <div className="signal-surface-soft rounded-[0.45rem] p-3.5">
+          <div className="signal-surface-soft rounded-[0.65rem] p-3.5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -358,7 +369,7 @@ function BulkReviewModal({
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                className="flex-1 rounded-[0.4rem] bg-cyan-500/15 py-2 text-[0.76rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 hover:bg-cyan-500/25"
+                className="flex-1 rounded-[0.4rem] bg-[#00C884]/15 py-2 text-[0.76rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 hover:bg-[#00C884]/25"
               >
                 ✍️ Add note
               </button>
@@ -437,18 +448,20 @@ export function JournalClient({
   // Outcome/type filter
   const filtered = entries.filter((e) => {
     if (!matchesSearch(e)) return false;
-    if (filter === "All")       return true;
-    if (filter === "Win")       return e.taggedOutcome === "Win";
-    if (filter === "Loss")      return e.taggedOutcome === "Loss";
-    if (filter === "Breakeven") return e.taggedOutcome === "Breakeven";
-    if (filter === "Skipped")   return e.taggedOutcome === "Skipped";
-    if (filter === "Trade")     return e.entryType === "trade_review";
-    if (filter === "Signal")    return e.entryType === "signal_review";
-    if (filter === "General")   return e.entryType === "general";
+    if (filter === "All")          return true;
+    if (filter === "Win")          return e.taggedOutcome === "Win";
+    if (filter === "Loss")         return e.taggedOutcome === "Loss";
+    if (filter === "Breakeven")    return e.taggedOutcome === "Breakeven";
+    if (filter === "Skipped")      return e.taggedOutcome === "Skipped";
+    if (filter === "Trade")        return e.entryType === "trade_review";
+    if (filter === "Signal")       return e.entryType === "signal_review";
+    if (filter === "General")      return e.entryType === "general";
+    if (filter === "Needs Review") return needsReview(e);
     return true;
   });
 
-  const FILTERS: Filter[] = ["All", "Trade", "Signal", "Win", "Loss", "Breakeven", "Skipped", "General"];
+  const needsReviewCount = entries.filter(needsReview).length;
+  const FILTERS: Filter[] = ["All", "Needs Review", "Trade", "Signal", "Win", "Loss", "Breakeven", "Skipped", "General"];
 
   return (
     <div className="grid gap-3">
@@ -466,7 +479,7 @@ export function JournalClient({
 
       {/* Review prompt banner */}
       {pendingReview.length > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-[0.45rem] border border-cyan-500/15 bg-cyan-500/5 px-3.5 py-2.5">
+        <div className="flex items-center justify-between gap-3 rounded-[0.45rem] border border-[#00C884]/15 bg-[#00C884]/5 px-3.5 py-2.5">
           <div className="min-w-0">
             <p className="text-[0.78rem] font-semibold text-white">
               {pendingReview.length} trade{pendingReview.length === 1 ? "" : "s"} waiting for review
@@ -478,7 +491,7 @@ export function JournalClient({
           <button
             type="button"
             onClick={() => setReviewMode(true)}
-            className="shrink-0 rounded-[0.35rem] bg-cyan-500/15 px-3 py-1.5 text-[0.72rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 transition hover:bg-cyan-500/25"
+            className="shrink-0 rounded-[0.35rem] bg-[#00C884]/15 px-3 py-1.5 text-[0.72rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 transition hover:bg-[#00C884]/25"
           >
             Review now →
           </button>
@@ -492,9 +505,9 @@ export function JournalClient({
             { label: "Total entries",  value: entries.length },
             { label: "Wins noted",     value: entries.filter((e) => e.taggedOutcome === "Win").length,  tone: "text-emerald-300" },
             { label: "Losses noted",   value: entries.filter((e) => e.taggedOutcome === "Loss").length, tone: "text-red-300"     },
-            { label: "Would repeat",   value: entries.filter((e) => e.wouldTakeAgain === true).length,  tone: "text-cyan-200"   },
+            { label: "Would repeat",   value: entries.filter((e) => e.wouldTakeAgain === true).length,  tone: "text-[#00C884]/80"   },
           ].map((s) => (
-            <div key={s.label} className="signal-surface-soft rounded-[0.5rem] px-3.5 py-3">
+            <div key={s.label} className="signal-surface-soft rounded-[0.65rem] px-3.5 py-3">
               <p className="text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-slate-500">{s.label}</p>
               <p className={`mt-1 text-[1.15rem] font-bold ${s.tone ?? "text-white"}`}>{s.value}</p>
             </div>
@@ -520,7 +533,7 @@ export function JournalClient({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by symbol, notes, tags…"
-          className="w-full rounded-[0.4rem] border border-white/8 bg-white/[0.03] py-2 pl-8 pr-3 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none focus:ring-1 focus:ring-cyan-500/20"
+          className="w-full rounded-[0.4rem] border border-white/8 bg-white/[0.03] py-2 pl-8 pr-3 text-[0.78rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none focus:ring-1 focus:ring-[#00C884]/20"
         />
         {searchQuery && (
           <button
@@ -538,30 +551,40 @@ export function JournalClient({
 
       {/* Filter bar */}
       <div className="flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-[0.32rem] px-2.5 py-1 text-[0.7rem] font-semibold ring-1 transition ${
-              filter === f
-                ? "bg-cyan-500/15 text-cyan-200 ring-cyan-500/30"
-                : "bg-white/[0.03] text-slate-500 ring-white/8 hover:text-slate-300"
-            }`}
-          >
-            {f}
-            {f !== "All" && (
-              <span className="ml-1.5 text-[0.62rem] opacity-60">
-                {entries.filter((e) => {
-                  if (f === "Trade")   return e.entryType === "trade_review";
-                  if (f === "Signal")  return e.entryType === "signal_review";
-                  if (f === "General") return e.entryType === "general";
-                  return e.taggedOutcome === f;
-                }).length}
-              </span>
-            )}
-          </button>
-        ))}
+        {FILTERS.map((f) => {
+          const isNeedsReview = f === "Needs Review";
+          const count = f === "All" ? null : isNeedsReview ? needsReviewCount : entries.filter((e) => {
+            if (f === "Trade")   return e.entryType === "trade_review";
+            if (f === "Signal")  return e.entryType === "signal_review";
+            if (f === "General") return e.entryType === "general";
+            return e.taggedOutcome === f;
+          }).length;
+
+          const activeClass = isNeedsReview
+            ? "bg-amber-500/15 text-amber-200 ring-amber-500/30"
+            : "bg-[#00C884]/15 text-[#00C884]/80 ring-[#00C884]/30";
+          const inactiveClass = isNeedsReview && needsReviewCount > 0
+            ? "bg-amber-500/8 text-amber-400 ring-amber-500/20 hover:bg-amber-500/15"
+            : "bg-white/[0.03] text-slate-500 ring-white/8 hover:text-slate-300";
+
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-[0.32rem] px-2.5 py-1 text-[0.7rem] font-semibold ring-1 transition ${
+                filter === f ? activeClass : inactiveClass
+              }`}
+            >
+              {f}
+              {count !== null && (
+                <span className={`ml-1.5 text-[0.62rem] ${isNeedsReview && needsReviewCount > 0 ? "font-bold opacity-90" : "opacity-60"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Create panel */}
@@ -569,7 +592,7 @@ export function JournalClient({
 
       {/* Entries */}
       {filtered.length === 0 ? (
-        <div className="signal-surface-soft rounded-[0.5rem] px-4 py-8 text-center">
+        <div className="signal-surface-soft rounded-[0.65rem] px-4 py-8 text-center">
           <p className="text-[0.82rem] text-slate-500">
             {entries.length === 0
               ? "No journal entries yet. Click \"New journal entry\" above to start reviewing your trades and calls."

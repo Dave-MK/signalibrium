@@ -156,7 +156,7 @@ export function TradeNoteForm({
 
   // ── textarea helper ─────────────────────────────────────────────────────────
 
-  const fieldCls = "w-full resize-none rounded-[0.38rem] border border-white/10 bg-white/[0.04] px-2.5 py-2 text-[0.82rem] text-slate-200 placeholder-slate-600 outline-none transition focus:border-cyan-500/40 focus:bg-white/[0.06]";
+  const fieldCls = "w-full resize-none rounded-[0.38rem] border border-white/10 bg-white/[0.04] px-2.5 py-2 text-[0.82rem] text-slate-200 placeholder-slate-600 outline-none transition focus:border-[#00C884]/40 focus:bg-white/[0.06]";
   const labelCls = "mb-1 block text-[0.66rem] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
   // Unique datalist id — avoid collisions if multiple forms are on the page
@@ -200,7 +200,7 @@ export function TradeNoteForm({
       {/* Show pre-filled symbol as read-only badge */}
       {symbol && (
         <div className="flex items-center gap-2">
-          <span className="rounded-[0.3rem] bg-cyan-500/10 px-2.5 py-1 text-[0.76rem] font-semibold text-cyan-200 ring-1 ring-cyan-500/20">
+          <span className="rounded-[0.3rem] bg-[#00C884]/10 px-2.5 py-1 text-[0.76rem] font-semibold text-[#00C884]/80 ring-1 ring-[#00C884]/20">
             {symbol}
           </span>
           <span className="text-[0.72rem] text-slate-500">linked instrument</span>
@@ -331,7 +331,7 @@ export function TradeNoteForm({
               onClick={() => togglePresetTag(t)}
               className={`rounded-[0.3rem] px-2 py-0.5 text-[0.67rem] font-medium ring-1 transition ${
                 tags.includes(t)
-                  ? "bg-cyan-500/15 text-cyan-200 ring-cyan-500/30"
+                  ? "bg-[#00C884]/15 text-[#00C884]/80 ring-[#00C884]/30"
                   : "bg-white/[0.03] text-slate-500 ring-white/8 hover:text-slate-300"
               }`}
             >
@@ -347,7 +347,7 @@ export function TradeNoteForm({
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } }}
-            className="min-w-0 flex-1 rounded-[0.38rem] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[0.78rem] text-slate-200 placeholder-slate-600 outline-none focus:border-cyan-500/40"
+            className="min-w-0 flex-1 rounded-[0.38rem] border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[0.78rem] text-slate-200 placeholder-slate-600 outline-none focus:border-[#00C884]/40"
           />
           <button
             type="button"
@@ -361,13 +361,13 @@ export function TradeNoteForm({
         {tags.filter((t) => !PRESET_TAGS.includes(t)).map((t) => (
           <span
             key={t}
-            className="mr-1.5 mt-1.5 inline-flex items-center gap-1 rounded-[0.3rem] bg-cyan-500/15 px-2 py-0.5 text-[0.67rem] font-medium text-cyan-200 ring-1 ring-cyan-500/30"
+            className="mr-1.5 mt-1.5 inline-flex items-center gap-1 rounded-[0.3rem] bg-[#00C884]/15 px-2 py-0.5 text-[0.67rem] font-medium text-[#00C884]/80 ring-1 ring-[#00C884]/30"
           >
             {t}
             <button
               type="button"
               onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
-              className="text-cyan-400 hover:text-cyan-100"
+              className="text-[#00C884] hover:text-[#00F79A]"
               aria-label={`Remove ${t}`}
             >
               ×
@@ -389,7 +389,7 @@ export function TradeNoteForm({
           type="button"
           onClick={handleSave}
           disabled={saving || pending}
-          className="rounded-[0.4rem] bg-cyan-500/20 px-4 py-1.5 text-[0.78rem] font-semibold text-cyan-200 ring-1 ring-cyan-500/30 transition hover:bg-cyan-500/30 disabled:opacity-50"
+          className="rounded-[0.4rem] bg-[#00C884]/20 px-4 py-1.5 text-[0.78rem] font-semibold text-[#00C884]/80 ring-1 ring-[#00C884]/30 transition hover:bg-[#00C884]/30 disabled:opacity-50"
         >
           {saving ? "Saving…" : entry ? "Update note" : "Save note"}
         </button>
@@ -474,7 +474,7 @@ export function InlineNoteButton({
         title={entry ? "View / edit note" : "Add note"}
         className={`flex items-center gap-1 rounded-[0.3rem] px-2 py-0.5 text-[0.68rem] font-semibold ring-1 transition ${
           entry
-            ? "bg-cyan-500/10 text-cyan-300 ring-cyan-500/25 hover:bg-cyan-500/20"
+            ? "bg-[#00C884]/10 text-[#00C884] ring-[#00C884]/25 hover:bg-[#00C884]/20"
             : "bg-white/[0.03] text-slate-500 ring-white/8 hover:bg-white/[0.07] hover:text-slate-300"
         }`}
       >

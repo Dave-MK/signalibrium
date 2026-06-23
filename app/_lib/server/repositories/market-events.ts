@@ -28,3 +28,29 @@ export async function createMarketEvent(
   return nextEvent;
 }
 
+export async function updateMarketEvent(
+  id: string,
+  patch: Partial<Pick<PersistedMarketEvent, "status" | "impact" | "bias" | "title" | "summary">>,
+) {
+  const data = await readWorkspaceData();
+  const idx = data.marketEvents.findIndex((e) => e.id === id);
+  if (idx === -1) return null;
+  const updated: PersistedMarketEvent = {
+    ...data.marketEvents[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  data.marketEvents[idx] = updated;
+  await writeWorkspaceData(data);
+  return updated;
+}
+
+export async function deleteMarketEvent(id: string) {
+  const data = await readWorkspaceData();
+  const before = data.marketEvents.length;
+  data.marketEvents = data.marketEvents.filter((e) => e.id !== id);
+  if (data.marketEvents.length === before) return false;
+  await writeWorkspaceData(data);
+  return true;
+}
+

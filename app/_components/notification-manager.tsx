@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useCallback, createContext, useContext, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -409,7 +409,7 @@ export function NotificationBell() {
       {/* Panel */}
       <div
         style={{ top: dropPos.top, right: dropPos.right }}
-        className="fixed z-[9999] w-80 rounded-[0.55rem] border border-white/10 bg-[#07111d] shadow-[0_16px_48px_rgba(0,0,0,0.7)]"
+        className="fixed z-[9999] w-[calc(100vw-1.5rem)] max-w-80 rounded-[0.55rem] border border-white/10 bg-[#111210] shadow-[0_16px_48px_rgba(0,0,0,0.7)]"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/6 px-3.5 py-2.5">
@@ -448,7 +448,7 @@ export function NotificationBell() {
               <button
                 type="button"
                 onClick={requestPermission}
-                className="rounded-[0.3rem] bg-cyan-500/15 px-2 py-0.5 text-[0.65rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 transition hover:bg-cyan-500/25"
+                className="rounded-[0.3rem] bg-[#00C884]/15 px-2 py-0.5 text-[0.65rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 transition hover:bg-[#00C884]/25"
               >
                 Enable push
               </button>
@@ -556,12 +556,12 @@ export function NotificationBell() {
           </svg>
         )}
         {!muted && unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[0.52rem] font-bold text-white ring-2 ring-[#07111d]">
+          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[0.52rem] font-bold text-white ring-2 ring-[#111210]">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
         {muted && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-600/80 text-[0.44rem] font-bold text-white ring-2 ring-[#07111d]">
+          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-600/80 text-[0.44rem] font-bold text-white ring-2 ring-[#111210]">
             z
           </span>
         )}

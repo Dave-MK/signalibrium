@@ -169,7 +169,7 @@ export default async function StrategyPerformancePage() {
             label: "Strategies deployed",
             value: String(totalStrategiesUsed || "—"),
             sub: `${totalStrategiesWithSignals} with signals called`,
-            tone: "text-cyan-200",
+            tone: "text-[#00C884]/80",
           },
           {
             label: "Best win rate",
@@ -312,17 +312,17 @@ export default async function StrategyPerformancePage() {
 
                 {/* ── Stats grid ── */}
                 <div className="grid grid-cols-3 gap-[5px]">
-                  <div className="signal-surface-soft rounded-[0.35rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.58rem] text-slate-600 uppercase tracking-[0.11em]">Signals</p>
                     <p className="mt-0.5 text-[0.84rem] font-bold text-slate-200">{row.signals}</p>
                   </div>
-                  <div className="signal-surface-soft rounded-[0.35rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.58rem] text-slate-600 uppercase tracking-[0.11em]">Avg conf</p>
-                    <p className="mt-0.5 text-[0.84rem] font-bold text-cyan-200">
+                    <p className="mt-0.5 text-[0.84rem] font-bold text-[#00C884]/80">
                       {row.avgConfidence > 0 ? `${Math.round(row.avgConfidence)}%` : "—"}
                     </p>
                   </div>
-                  <div className="signal-surface-soft rounded-[0.35rem] p-2">
+                  <div className="signal-surface-soft rounded-[0.6rem] p-2">
                     <p className="text-[0.58rem] text-slate-600 uppercase tracking-[0.11em]">Open now</p>
                     <p className="mt-0.5 text-[0.84rem] font-bold text-amber-200">
                       {siggiAccount.openTrades.filter((t) => strategyOf(t) === row.name).length || "—"}

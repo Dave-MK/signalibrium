@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -263,7 +263,7 @@ export function EquityCurveChart({ curve, startingBalanceGbp }: Props) {
               onClick={() => handlePeriodChange(p)}
               className={`rounded-[0.28rem] px-2.5 py-1 text-[0.68rem] font-semibold transition ${
                 period === p
-                  ? "bg-cyan-400/12 text-cyan-200 ring-1 ring-cyan-400/20"
+                  ? "bg-[#00C884]/12 text-[#00C884]/80 ring-1 ring-[#00C884]/20"
                   : "text-slate-500 hover:text-slate-300"
               }`}
             >
@@ -356,7 +356,7 @@ export function EquityCurveChart({ curve, startingBalanceGbp }: Props) {
                 cy={cy(hoverPoint.equityGbp)}
                 r="4"
                 fill={lineColor}
-                stroke="#07111d"
+                stroke="#111210"
                 strokeWidth="1.5"
               />
             </>
@@ -381,7 +381,7 @@ export function EquityCurveChart({ curve, startingBalanceGbp }: Props) {
       {/* Hover tooltip */}
       {!isEmpty && hoverPoint && (
         <div
-          className="pointer-events-none absolute rounded-[0.35rem] bg-[#07111d] px-2.5 py-1.5 text-[0.72rem] ring-1 ring-white/12 shadow-lg"
+          className="pointer-events-none absolute rounded-[0.35rem] bg-[#111210] px-2.5 py-1.5 text-[0.72rem] ring-1 ring-white/12 shadow-lg"
           style={{
             left:      `${Math.min(85, (hoverIdx! / (n - 1)) * 100)}%`,
             bottom:    "calc(100% + 6px)",

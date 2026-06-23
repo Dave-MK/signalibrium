@@ -255,7 +255,7 @@ export default async function AssetDetailPage({
           <p className="micro-label">Event pressure</p>
           <div className="mt-3 panel-stack-5">
             {relatedEvents.slice(0, 4).map((event) => (
-              <div key={event.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+              <div key={event.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[0.9rem] font-semibold text-white">{event.title}</p>
@@ -279,7 +279,7 @@ export default async function AssetDetailPage({
           <div className="mt-3 grid gap-[5px] xl:grid-cols-2">
             <div className="panel-stack-5">
               {relatedChecks.slice(0, 2).map((check) => (
-                <div key={check.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div key={check.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[0.9rem] font-semibold text-white">{check.symbol}</p>
@@ -294,7 +294,7 @@ export default async function AssetDetailPage({
 
             <div className="panel-stack-5">
               {relatedBacktests.slice(0, 2).map((backtest) => (
-                <div key={backtest.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div key={backtest.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                   <p className="text-[0.9rem] font-semibold text-white">{backtest.strategy}</p>
                   <div className="mt-3 grid gap-[5px] sm:grid-cols-2">
                     <KeyValue label="Win rate" value={formatWinRate(backtest.winRate)} />

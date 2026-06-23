@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -44,7 +44,7 @@ function pnlClass(pnl: number) {
 
 function providerColors(provider: BrokerProvider) {
   switch (provider) {
-    case "Alpaca":  return { chip: "border-cyan-500/30 bg-cyan-500/8 text-cyan-300",      dot: "bg-cyan-400",    accent: "text-cyan-300" };
+    case "Alpaca":  return { chip: "border-[#00C884]/30 bg-[#00C884]/8 text-[#00C884]",      dot: "bg-[#00C884]",    accent: "text-[#00C884]" };
     case "OANDA":   return { chip: "border-amber-500/30 bg-amber-500/8 text-amber-300",   dot: "bg-amber-400",   accent: "text-amber-300" };
     case "Binance": return { chip: "border-yellow-500/30 bg-yellow-500/8 text-yellow-300", dot: "bg-yellow-400", accent: "text-yellow-300" };
     case "Kraken":  return { chip: "border-indigo-500/30 bg-indigo-500/8 text-indigo-300", dot: "bg-indigo-400", accent: "text-indigo-300" };
@@ -274,7 +274,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
         role="dialog"
         aria-label="Broker account"
         style={{ top: dropdownPos.top, right: dropdownPos.right }}
-        className="fixed z-[9991] w-[300px] rounded-[0.64rem] border border-white/10 bg-[#07111d] shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
+        className="fixed z-[9991] w-[calc(100vw-1.5rem)] max-w-[300px] rounded-[0.64rem] border border-white/10 bg-[#111210] shadow-[0_16px_48px_rgba(0,0,0,0.75)]"
       >
         {/* Connection tabs (if multiple) */}
         {connections.length > 1 && (
@@ -427,7 +427,7 @@ export function BrokerStatusChip({ initialConnections }: Props) {
                 aria-label={activeConn.autoExecuteSiggi ? "Disable Siggi auto-trading" : "Enable Siggi auto-trading"}
                 onClick={() => void handleAutoExecuteToggle(activeConn.id, !activeConn.autoExecuteSiggi)}
                 className={`relative shrink-0 h-5 w-9 rounded-full transition-colors duration-200 ${
-                  activeConn.autoExecuteSiggi ? "bg-cyan-500" : "bg-white/10"
+                  activeConn.autoExecuteSiggi ? "bg-[#00C884]" : "bg-white/10"
                 }`}
               >
                 <span

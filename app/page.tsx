@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { buildBotOpportunityView, summarizePredictionAccuracy } from "@/app/_lib/bot-engine";
-import { getMarketSession, type MarketSessionState } from "@/app/_lib/market-hours";
 import { listAssets } from "@/app/_lib/server/repositories/assets";
 import { listBacktests } from "@/app/_lib/server/repositories/backtests";
 import { listConfirmationChecks } from "@/app/_lib/server/repositories/confirmation-checks";
@@ -11,136 +10,10 @@ import { listPredictionHistory } from "@/app/_lib/server/repositories/prediction
 import { listScannerResults } from "@/app/_lib/server/repositories/scanner-results";
 import { getSiggiAccount } from "@/app/_lib/server/repositories/siggi-account";
 import { listBrokerConnections } from "@/app/_lib/server/repositories/broker-connections";
-import { ActionLink, PageHeader, Panel, StatusChip, SummaryCard } from "./_components/ui";
-import { DonutWithLegend, StatBar } from "./_components/donut-chart";
+import { ActionLink, PageHeader, Panel } from "./_components/ui";
+import { DonutWithLegend, DonutChart, StatBar } from "./_components/donut-chart";
 import { DashboardPositionsWidget } from "./_components/dashboard-positions-widget";
 
-function MarketStatusBadge({ state, venue }: { state: MarketSessionState; venue: string }) {
-  if (state === "Open" || state === "24/7") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[0.60rem] font-semibold text-emerald-300 ring-1 ring-emerald-500/20">
-        <span className="h-1 w-1 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.8)]" />
-        {state === "24/7" ? "24/7 Market" : `${venue} Open`}
-      </span>
-    );
-  }
-  if (state === "Weekend") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-sm bg-slate-500/10 px-1.5 py-0.5 text-[0.60rem] font-semibold text-slate-500 ring-1 ring-white/8">
-        <span className="h-1 w-1 rounded-full bg-slate-600" />
-        Weekend — closed
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-sm bg-amber-400/8 px-1.5 py-0.5 text-[0.60rem] font-semibold text-amber-300 ring-1 ring-amber-400/15">
-      <span className="h-1 w-1 rounded-full bg-amber-400 opacity-60" />
-      {venue} closed — not tradeable
-    </span>
-  );
-}
-
-function EntryCard({
-  title,
-  view,
-  rank,
-  siggiInTrade = false,
-  marketState,
-  marketVenue,
-}: {
-  title: string;
-  view: ReturnType<typeof buildBotOpportunityView> | null;
-  rank: number;
-  siggiInTrade?: boolean;
-  marketState?: MarketSessionState;
-  marketVenue?: string;
-}) {
-  if (!view) {
-    return (
-      <div className="signal-surface-soft rounded-[0.4rem] p-3">
-        <p className="micro-label">{title}</p>
-        <p className="mt-1.5 text-[0.9rem] font-semibold text-white">No active setup</p>
-        <p className="mt-1 text-[0.78rem] leading-5 text-slate-400">
-          Siggi hasn&apos;t found a strong enough setup for this slot yet — check back after the next sync.
-        </p>
-      </div>
-    );
-  }
-
-  const directionColor =
-    view.direction === "Bullish"
-      ? "text-emerald-300"
-      : view.direction === "Bearish"
-        ? "text-amber-200"
-        : "text-slate-300";
-  const signalColor =
-    view.decision.label === "ENTER NOW" ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30" : "bg-amber-400/10 text-amber-200 ring-amber-400/20";
-
-  return (
-    <Link
-      href={`/assets/${view.symbol}`}
-      className="signal-surface-soft group block rounded-[0.4rem] p-3 transition hover:bg-white/4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="micro-label">{title}</p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <span className="rounded-sm bg-white/6 px-1.5 py-0.5 text-[0.64rem] font-semibold text-slate-400">
-              #{rank}
-            </span>
-            <p className="truncate text-[0.98rem] font-semibold text-white">
-              {view.symbol}
-            </p>
-            <span className={`text-[0.82rem] font-semibold ${directionColor}`}>
-              {view.direction === "Bullish" ? "▲ LONG" : view.direction === "Bearish" ? "▼ SHORT" : "—"}
-            </span>
-          </div>
-          <p className="mt-0.5 text-[0.74rem] text-slate-500">
-            {view.instrumentName} · {view.timeframe} · {view.horizon}
-          </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {marketState && marketVenue && (
-              <MarketStatusBadge state={marketState} venue={marketVenue} />
-            )}
-            {siggiInTrade && (
-              <span className="inline-flex items-center gap-1 rounded-sm bg-cyan-500/15 px-1.5 py-0.5 text-[0.60rem] font-semibold text-cyan-400 ring-1 ring-cyan-500/30">
-                🤖 Siggi in trade
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <span className={`inline-flex rounded-[0.4rem] px-2.5 py-[0.3rem] text-[0.67rem] font-semibold leading-none ring-1 ${signalColor}`}>
-            {view.decision.label}
-          </span>
-          <p className="mt-2 text-[0.92rem] font-semibold text-cyan-200">{view.confidence}%</p>
-          <p className="mt-0.5 text-[0.68rem] text-slate-500">confidence</p>
-        </div>
-      </div>
-
-      <p className="mt-2.5 text-[0.80rem] leading-5 text-slate-300">{view.rationale}</p>
-
-      <div className="mt-3 grid gap-1.25 sm:grid-cols-4">
-        <SummaryCard label="Entry zone" value={view.entry} detail="Limit order zone" />
-        <SummaryCard label="Stop" value={view.stop} detail="Invalidation" />
-        <SummaryCard label="Target" value={view.target} detail="First take profit" />
-        {view.pipDistanceToEntry
-          ? <SummaryCard label="Distance to entry" value={view.pipDistanceToEntry} detail="Current vs zone" />
-          : <SummaryCard label="Hold for" value={view.tradeSpan} detail={view.tradeSpanDetail} />
-        }
-      </div>
-
-      <div className="mt-2.5 flex items-center justify-between gap-3">
-        <p className={`text-[0.76rem] font-medium ${view.decision.tone}`}>
-          {view.decision.detail}
-        </p>
-        <span className="shrink-0 text-[0.72rem] font-medium text-slate-500 transition group-hover:text-slate-300">
-          Full chart →
-        </span>
-      </div>
-    </Link>
-  );
-}
 
 export default async function DashboardPage() {
   const [
@@ -170,13 +43,6 @@ export default async function DashboardPage() {
   const siggiOpenSymbols = new Set(siggiAccount.openTrades.map((t) => t.symbol));
   const assetsBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
 
-  // Helper: get current market session for a view's asset
-  function viewMarketSession(view: ReturnType<typeof buildBotOpportunityView> | null) {
-    if (!view) return null;
-    const asset = assetsBySymbol.get(view.symbol) ?? null;
-    return getMarketSession(asset);
-  }
-
   const rankedViews = scannerResults
     .filter((setup) => setup.tradeability !== "BLOCKED")
     .map((setup) =>
@@ -191,19 +57,40 @@ export default async function DashboardPage() {
     )
     .sort((left, right) => right.rankScore - left.rankScore);
 
-  const dayViews = rankedViews.filter((v) => v.horizon === "Day");
-  const nowEntry = dayViews[0] ?? rankedViews[0] ?? null;
-  const todayEntry = dayViews[1] ?? rankedViews[1] ?? null;
-  const next24hEntry = dayViews[2] ?? rankedViews[2] ?? null;
+  const nowEntry = rankedViews[0] ?? null;
 
-  const nowSession      = viewMarketSession(nowEntry);
-  const todaySession    = viewMarketSession(todayEntry);
-  const next24hSession  = viewMarketSession(next24hEntry);
-  const topEvent = marketEvents.filter((e) => e.status === "Upcoming" || e.status === "Live")[0] ?? null;
   const predictionAccuracy = summarizePredictionAccuracy(predictionHistory);
 
   const tradeableCount = rankedViews.filter((v) => v.decision.label === "ENTER NOW").length;
   const openTradeCount = siggiAccount.openTrades.length;
+
+  // ── Market Pulse computations ────────────────────────────────────────────
+  const latestEquityGbp = siggiAccount.equityCurve.at(-1)?.equityGbp ?? siggiAccount.cashBalanceGbp;
+  const growthPct = siggiAccount.startingBalanceGbp > 0
+    ? ((latestEquityGbp - siggiAccount.startingBalanceGbp) / siggiAccount.startingBalanceGbp) * 100
+    : 0;
+  const totalResolved = siggiAccount.successfulTrades + siggiAccount.failedTrades;
+  const winRate = totalResolved > 0 ? Math.round((siggiAccount.successfulTrades / totalResolved) * 100) : null;
+  const rrValues = siggiAccount.closedTrades
+    .filter((t) => Math.abs(t.entryPrice - t.stopPrice) > 0)
+    .map((t) => Math.abs(t.targetPrice - t.entryPrice) / Math.abs(t.entryPrice - t.stopPrice))
+    .filter((r) => r > 0 && r < 20);
+  const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b) / rrValues.length : null;
+  // Sparkline from equity curve
+  const sparkRaw = siggiAccount.equityCurve.slice(-28);
+  const sparkValues = sparkRaw.length > 1 ? sparkRaw.map((p) => p.equityGbp) : [siggiAccount.cashBalanceGbp, siggiAccount.cashBalanceGbp];
+  const sparkMin = Math.min(...sparkValues);
+  const sparkMax = Math.max(...sparkValues);
+  const sparkRange = sparkMax - sparkMin || 1;
+  const buildSparkPath = (w: number, h: number) =>
+    sparkValues
+      .map((v, i) => {
+        const x = ((i / (sparkValues.length - 1)) * w).toFixed(1);
+        const y = (h - ((v - sparkMin) / sparkRange) * h * 0.85).toFixed(1);
+        return `${i === 0 ? "M" : "L"}${x},${y}`;
+      })
+      .join(" ");
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Market events calendar — computed once before render ─────────────────
   const calendarStartOfToday = new Date();
@@ -212,8 +99,6 @@ export default async function DashboardPage() {
     const d = new Date(calendarStartOfToday.getTime() + i * 86_400_000);
     return d;
   });
-  const fmtCalendarDay = (d: Date) =>
-    d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/London" });
   const calendarEventsByDay = calendarDays.map((day) => {
     const dayStart = day.getTime();
     const dayEnd = dayStart + 86_400_000;
@@ -230,229 +115,417 @@ export default async function DashboardPage() {
   return (
     <div className="panel-stack-5">
       <PageHeader
-        title="Your trading command centre"
+        title="Your Trading Command Centre."
         description="Siggi scans every market, ranks every opportunity, and tells you exactly what to act on — right now."
         action={<ActionLink href="/scanner">All Opportunities</ActionLink>}
       />
 
-      {/* Market pulse banner */}
-      <Panel className="p-3 sm:p-3.5">
-        <div className="grid gap-1.25 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.5fr))]">
-          <div className="signal-surface rounded-[0.46rem] p-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="micro-label">Market read right now</p>
-                <h2 className="mt-1.5 text-[1.14rem] font-semibold text-white">{marketSnapshot.state}</h2>
-              </div>
-              <StatusChip
-                label={
-                  marketSnapshot.breadthScore >= 60
-                    ? "RISK-ON"
-                    : marketSnapshot.breadthScore <= 40
-                      ? "RISK-OFF"
-                      : "MIXED"
-                }
-              />
-            </div>
-            <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{marketSnapshot.description}</p>
-            {topEvent ? (
-              <div className="mt-3 flex items-center gap-2 rounded-[0.35rem] bg-amber-400/8 px-2.5 py-1.5 ring-1 ring-amber-400/15">
-                <span className="text-[0.72rem] font-semibold text-amber-300">EVENT</span>
-                <p className="text-[0.76rem] text-slate-300">
-                  <span className="font-medium text-white">{topEvent.title}</span> · {topEvent.status} · {topEvent.impact} impact
-                </p>
-              </div>
-            ) : null}
-          </div>
-          <SummaryCard
-            label="Ready to enter"
-            value={`${tradeableCount}`}
-            detail="ENTER NOW signals across all markets"
-            tone="text-emerald-300"
-          />
-          <SummaryCard
-            label="Siggi's positions"
-            value={`${openTradeCount}`}
-            detail="Live trades running right now"
-            tone="text-cyan-200"
-          />
-          {/* Win/Loss donut — links to Signal History */}
-          <Link href="/history" className="signal-surface-soft group block rounded-[0.46rem] p-3 transition hover:bg-white/4">
-            <DonutWithLegend
-              size={72}
-              thickness={12}
-              centerLabel={`${predictionAccuracy.overallAccuracy}%`}
-              centerSublabel="accuracy"
-              title="Signal accuracy"
-              segments={[
-                { value: predictionAccuracy.accuratePredictions,   color: "#34d399", label: "Wins" },
-                { value: predictionAccuracy.inaccuratePredictions, color: "#f87171", label: "Losses" },
-                { value: predictionAccuracy.breakevenPredictions,  color: "#64748b", label: "Breakeven" },
-              ]}
-            />
-            <p className="mt-1 text-right text-[0.65rem] text-slate-600 transition group-hover:text-slate-400">Full history →</p>
-          </Link>
-        </div>
-      </Panel>
+      {/* ── Market Pulse strip ─────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl ring-1 ring-white/[0.06]">
 
-      {/* Top 3 setups */}
-      <div>
-        <div className="mb-2 flex items-center justify-between pl-0.5">
-          <p className="text-[0.84rem] font-semibold text-white">
-            Siggi&apos;s top picks right now
-          </p>
-          <Link href="/scanner" className="text-[0.76rem] font-medium text-slate-400 transition hover:text-white">
-            See all {rankedViews.length} opportunities →
-          </Link>
+        {/* ─ Row 1: KPI metrics ─ */}
+        <div className="grid grid-cols-2 divide-x divide-white/[0.05] bg-[#0D0E0C] sm:grid-cols-3 lg:grid-cols-6">
+          {(
+            [
+              {
+                label: "Total P&L",
+                value: `${growthPct >= 0 ? "+" : ""}${growthPct.toFixed(2)}%`,
+                detail: "All Time",
+                tone: growthPct >= 0 ? "text-emerald-300" : "text-red-300",
+                href: "/siggis-trades",
+                spark: true,
+              },
+              {
+                label: "Win Rate",
+                value: winRate !== null ? `${winRate}%` : "—",
+                detail: "Last 90 Days",
+                tone: (winRate ?? 0) >= 60 ? "text-white" : "text-amber-200",
+                href: "/siggis-trades",
+                spark: false,
+              },
+              {
+                label: "Total Signals",
+                value: predictionHistory.length.toLocaleString(),
+                detail: "All Time",
+                tone: "text-white",
+                href: "/history",
+                spark: false,
+              },
+              {
+                label: "Avg. R:R",
+                value: avgRR !== null ? avgRR.toFixed(2) : "—",
+                detail: "Last 90 Days",
+                tone: "text-white",
+                href: undefined,
+                spark: false,
+              },
+              {
+                label: "Active Trades",
+                value: `${openTradeCount}`,
+                detail: "Live Positions",
+                tone: openTradeCount > 0 ? "text-[#00C884]" : "text-white",
+                href: "/siggis-trades",
+                spark: false,
+              },
+              {
+                label: "Market Mode",
+                value: marketSnapshot.state,
+                detail: "Today",
+                tone:
+                  marketSnapshot.breadthScore >= 60
+                    ? "text-[#00C884]"
+                    : marketSnapshot.breadthScore <= 40
+                      ? "text-red-300"
+                      : "text-amber-200",
+                href: undefined,
+                spark: false,
+                dot: true,
+              },
+            ] as { label: string; value: string; detail: string; tone: string; href?: string; spark: boolean; dot?: boolean }[]
+          ).map(({ label, value, detail, tone, href, spark, dot }) => {
+            const cell = (
+              <div className="flex flex-col justify-center px-4 py-4">
+                <p className="text-[0.60rem] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+                <div className="mt-1 flex items-end gap-2">
+                  <p className={`text-[1.1rem] font-bold leading-none ${tone}`}>{value}</p>
+                  {dot && (
+                    <span
+                      className="mb-0.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{
+                        background:
+                          marketSnapshot.breadthScore >= 60 ? "#00C884"
+                            : marketSnapshot.breadthScore <= 40 ? "#f87171"
+                            : "#fbbf24",
+                      }}
+                    />
+                  )}
+                  {spark && sparkValues.length > 1 && (
+                    <svg viewBox={`0 0 56 20`} className="mb-0.5 h-4 w-12 shrink-0" fill="none" preserveAspectRatio="none">
+                      <path d={buildSparkPath(56, 20)} stroke={growthPct >= 0 ? "#34d399" : "#f87171"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <p className="mt-1 text-[0.62rem] text-slate-600">{detail}</p>
+              </div>
+            );
+            return href ? (
+              <Link key={label} href={href} className="transition hover:bg-white/[0.03]">
+                {cell}
+              </Link>
+            ) : (
+              <div key={label}>{cell}</div>
+            );
+          })}
         </div>
-        <div className="grid gap-1.25 xl:grid-cols-3">
-          <EntryCard
-            title="Best entry now"
-            view={nowEntry}
-            rank={1}
-            siggiInTrade={!!nowEntry && siggiOpenSymbols.has(nowEntry.symbol)}
-            marketState={nowSession?.state}
-            marketVenue={nowSession?.venue}
-          />
-          <EntryCard
-            title="Best entry today"
-            view={todayEntry}
-            rank={2}
-            siggiInTrade={!!todayEntry && siggiOpenSymbols.has(todayEntry.symbol)}
-            marketState={todaySession?.state}
-            marketVenue={todaySession?.venue}
-          />
-          <EntryCard
-            title="Best for next 24h"
-            view={next24hEntry}
-            rank={3}
-            siggiInTrade={!!next24hEntry && siggiOpenSymbols.has(next24hEntry.symbol)}
-            marketState={next24hSession?.state}
-            marketVenue={next24hSession?.venue}
-          />
+
+        {/* ─ Row 2: Market Pulse panel ─ */}
+        <div className="flex min-h-[5.5rem] items-center border-t border-white/[0.05] bg-[#091410] px-5 py-4">
+
+          {/* Left — label + state + description */}
+          <div className="w-52 shrink-0 border-r border-white/[0.05] pr-5">
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <svg viewBox="0 0 20 14" className="h-3 w-[1.1rem] text-[#00C884]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 7 4.5 2 7.5 11 11 5 14 8.5 17 4 19 7" />
+              </svg>
+              <span className="text-[0.60rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Market Pulse</span>
+            </div>
+            <p
+              className={`text-[1.55rem] font-bold leading-none ${
+                marketSnapshot.breadthScore >= 60
+                  ? "text-emerald-300"
+                  : marketSnapshot.breadthScore <= 40
+                    ? "text-red-300"
+                    : "text-amber-200"
+              }`}
+            >
+              {marketSnapshot.state}
+            </p>
+            <p className="mt-1.5 text-[0.68rem] leading-[1.4] text-slate-500">{marketSnapshot.description}</p>
+          </div>
+
+          {/* Centre — 4 sub-metrics */}
+          <div className="flex flex-1 items-stretch divide-x divide-white/[0.05]">
+            {(
+              [
+                {
+                  label: "Breadth Score",
+                  value: `${marketSnapshot.breadthScore}`,
+                  sub:
+                    marketSnapshot.breadthScore >= 65 ? "Risk-On" :
+                    marketSnapshot.breadthScore >= 50 ? "Neutral" : "Risk-Off",
+                  subTone:
+                    marketSnapshot.breadthScore >= 65 ? "text-emerald-400" :
+                    marketSnapshot.breadthScore >= 50 ? "text-slate-400" : "text-red-400",
+                },
+                {
+                  label: "Signal Accuracy",
+                  value: `${predictionAccuracy.overallAccuracy}%`,
+                  sub:
+                    predictionAccuracy.overallAccuracy >= 70 ? "Strong" :
+                    predictionAccuracy.overallAccuracy >= 55 ? "Moderate" : "Building",
+                  subTone:
+                    predictionAccuracy.overallAccuracy >= 70 ? "text-emerald-400" : "text-amber-400",
+                },
+                {
+                  label: "24h Setups",
+                  value: `${rankedViews.length}`,
+                  sub: `${tradeableCount} active`,
+                  subTone: tradeableCount > 0 ? "text-emerald-400" : "text-slate-500",
+                },
+                {
+                  label: "Events Today",
+                  value: `${calendarEventsByDay[0]?.events.length ?? 0}`,
+                  sub:
+                    (calendarEventsByDay[0]?.events.filter((e) => e.impact === "High").length ?? 0) > 0
+                      ? `${calendarEventsByDay[0]?.events.filter((e) => e.impact === "High").length} high impact`
+                      : "No high impact",
+                  subTone:
+                    (calendarEventsByDay[0]?.events.filter((e) => e.impact === "High").length ?? 0) > 0
+                      ? "text-amber-400"
+                      : "text-slate-500",
+                },
+              ] as { label: string; value: string; sub: string; subTone: string }[]
+            ).map(({ label, value, sub, subTone }) => (
+              <div key={label} className="flex flex-col justify-center px-5 py-1">
+                <p className="text-[0.60rem] font-semibold uppercase tracking-[0.10em] text-slate-600">{label}</p>
+                <p className="mt-1 text-[1.05rem] font-bold leading-none text-white">{value}</p>
+                <p className={`mt-1 text-[0.68rem] font-medium ${subTone}`}>{sub}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Right — sparkline + button */}
+          <div className="flex shrink-0 items-center gap-4 border-l border-white/[0.05] pl-5">
+            {sparkValues.length > 1 && (
+              <svg viewBox="0 0 120 44" className="h-11 w-28 shrink-0" fill="none" preserveAspectRatio="none">
+                <path d={buildSparkPath(120, 44)} stroke="#00C884" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+            <Link
+              href="/siggis-trades"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[0.72rem] font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
+            >
+              View Full Pulse
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 opacity-60" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m6 3 5 5-5 5" />
+              </svg>
+            </Link>
+          </div>
+
         </div>
       </div>
 
-      {/* Market events calendar — this week */}
-      {marketEvents.length > 0 && (
-        <Panel className="p-3 sm:p-3.5">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="micro-label">Market events — next 7 days</p>
-            <span className="text-[0.72rem] text-slate-500">{marketEvents.filter(e => e.status !== "Recent").length} upcoming</span>
-          </div>
-          <div className="grid gap-1.25 sm:grid-cols-7">
-            {calendarEventsByDay.map(({ day, events }, i) => {
-              const isToday = i === 0;
-              return (
-                <div
-                  key={day.toISOString()}
-                  className={`rounded-[0.38rem] p-2 ${isToday ? "bg-cyan-500/[0.07] ring-1 ring-cyan-500/20" : "bg-white/2"}`}
-                >
-                  <p className={`text-[0.60rem] font-semibold uppercase tracking-wider mb-1.5 ${isToday ? "text-cyan-300" : "text-slate-500"}`}>
-                    {isToday ? "Today" : fmtCalendarDay(day).split(",")[0]}
-                    <span className="ml-1 font-normal text-slate-600">{fmtCalendarDay(day).split(",")[1]?.trim()}</span>
-                  </p>
-                  {events.length === 0 ? (
-                    <p className="text-[0.62rem] text-slate-700">—</p>
-                  ) : (
-                    <div className="space-y-1">
-                      {events.slice(0, 3).map((ev) => (
-                        <div key={ev.id} className="flex items-start gap-1">
-                          <span
-                            className="mt-0.75 h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ background: calendarImpactColor(ev.impact) }}
-                          />
-                          <p className="text-[0.62rem] leading-[1.35] text-slate-300 line-clamp-2">
-                            {ev.title}
-                          </p>
-                        </div>
-                      ))}
-                      {events.length > 3 && (
-                        <p className="text-[0.60rem] text-slate-600">+{events.length - 3} more</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      )}
+      {/* Market Events — next 7 days (full-width 7-column calendar) */}
+      <Panel className="p-3 sm:p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="micro-label">Market events — next 7 days</p>
+          <span className="text-[0.72rem] text-slate-500">
+            {marketEvents.filter((e) => e.status !== "Recent").length} upcoming
+          </span>
+        </div>
+        <div className="grid grid-cols-7 gap-px overflow-hidden rounded-[0.45rem] bg-white/[0.03]">
+          {calendarEventsByDay.map(({ day, events }, i) => {
+            const isToday = i === 0;
+            const dayName = isToday
+              ? "Today"
+              : day.toLocaleDateString("en-GB", { weekday: "short", timeZone: "Europe/London" });
+            const dayDate = day.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Europe/London" });
+            return (
+              <div
+                key={day.toISOString()}
+                className={`flex flex-col p-2.5 ${isToday ? "bg-[#00C884]/[0.06]" : "bg-[#111210]"}`}
+              >
+                <p className={`text-[0.60rem] font-bold uppercase tracking-wide ${isToday ? "text-[#00C884]" : "text-slate-400"}`}>
+                  {dayName}
+                </p>
+                <p className="mb-2 text-[0.58rem] text-slate-600">{dayDate}</p>
+                {events.length === 0 ? (
+                  <p className="text-[0.60rem] text-slate-700">—</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {events.slice(0, 3).map((ev) => (
+                      <div key={ev.id} className="flex items-start gap-1">
+                        <span
+                          className="mt-[0.2rem] h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ background: calendarImpactColor(ev.impact) }}
+                        />
+                        <p className="truncate text-[0.60rem] leading-[1.3] text-slate-400">{ev.title}</p>
+                      </div>
+                    ))}
+                    {events.length > 3 && (
+                      <p className="text-[0.58rem] text-slate-600">+{events.length - 3} more</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
 
-      {/* Performance + score breakdown */}
+      {/* Row 2: Top Setups table */}
       <Panel className="p-3 sm:p-3.5">
         <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="micro-label">Why Siggi ranks it top</p>
-            <p className="mt-1 text-[0.94rem] font-semibold text-white">
-              {nowEntry?.symbol ?? todayEntry?.symbol ?? "Awaiting top setup"} — score breakdown
-            </p>
-          </div>
-          <Link href="/history" className="text-[0.76rem] font-medium text-slate-400 transition hover:text-white">
-            Full history →
+          <p className="text-[0.84rem] font-semibold text-white">
+            Top Setups from Siggi
+          </p>
+          <Link href="/scanner" className="text-[0.76rem] font-medium text-slate-400 transition hover:text-white">
+            See all {rankedViews.length} →
           </Link>
         </div>
+        {rankedViews.length === 0 ? (
+          <p className="py-4 text-center text-[0.82rem] text-slate-500">No setups ranked yet — check back after next sync.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Pair</th>
+                  <th>Direction</th>
+                  <th>Entry zone</th>
+                  <th>Target</th>
+                  <th>Stop</th>
+                  <th>Confidence</th>
+                  <th>Signal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankedViews.slice(0, 7).map((view, i) => {
+                  const isLong = view.direction === "Bullish";
+                  const isShort = view.direction === "Bearish";
+                  const signiInTrade = siggiOpenSymbols.has(view.symbol);
+                  return (
+                    <tr key={view.symbol + i}>
+                      <td>
+                        <Link href={`/assets/${view.symbol}`} className="group flex items-center gap-2 hover:text-white transition-colors">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[0.3rem] bg-white/[0.06] text-[0.62rem] font-bold text-slate-400">
+                            {i + 1}
+                          </span>
+                          <span className="font-semibold text-white group-hover:text-[#00C884] transition-colors">{view.symbol}</span>
+                          {signiInTrade && (
+                            <span className="hidden sm:inline text-[0.58rem] font-semibold text-[#00C884] bg-[#00C884]/10 px-1.5 py-0.5 rounded-sm ring-1 ring-[#00C884]/20">LIVE</span>
+                          )}
+                        </Link>
+                      </td>
+                      <td>
+                        <span className={`font-semibold text-[0.78rem] ${isLong ? "text-emerald-300" : isShort ? "text-red-300" : "text-slate-400"}`}>
+                          {isLong ? "▲ LONG" : isShort ? "▼ SHORT" : "—"}
+                        </span>
+                      </td>
+                      <td className="text-slate-300 font-mono text-[0.80rem]">{view.entry}</td>
+                      <td className="text-emerald-300 font-mono text-[0.80rem]">{view.target}</td>
+                      <td className="text-red-300 font-mono text-[0.80rem]">{view.stop}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-white/[0.06]">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${view.confidence}%`,
+                                background: view.confidence >= 72 ? "#34d399" : view.confidence >= 55 ? "#fbbf24" : "#f87171",
+                              }}
+                            />
+                          </div>
+                          <span className="text-[0.78rem] font-semibold text-white">{view.confidence}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`inline-flex rounded-[0.3rem] px-2 py-[0.2rem] text-[0.62rem] font-semibold leading-none ring-1 ${
+                          view.decision.label === "ENTER NOW"
+                            ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30"
+                            : "bg-amber-400/10 text-amber-200 ring-amber-400/20"
+                        }`}>
+                          {view.decision.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
-        <div className="grid gap-1.25 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="signal-surface-soft rounded-[0.4rem] p-3">
-            <p className="micro-label">Event effect</p>
-            <p className="mt-1.5 text-[0.80rem] leading-5 text-slate-300">
-              {(nowEntry ?? todayEntry ?? next24hEntry)?.eventEffect ??
-                "No event context yet — Siggi is still building intelligence."}
-            </p>
+      {/* Row 3: Score Breakdown | Signal Accuracy | Live Portfolio */}
+      <div className="grid gap-1.25 lg:grid-cols-3">
+        {/* Score breakdown for top setup */}
+        <Panel className="p-3 sm:p-3.5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="micro-label">Score breakdown</p>
+              <p className="mt-1 text-[0.84rem] font-semibold text-white">
+                {nowEntry?.symbol ?? "Top setup"}
+              </p>
+            </div>
+            {nowEntry && (
+              <DonutChart
+                size={56}
+                thickness={8}
+                segments={[
+                  { value: nowEntry.rankScore, color: "#34d399", label: "Score" },
+                  { value: Math.max(0, 100 - nowEntry.rankScore), color: "rgba(255,255,255,0.06)", label: "" },
+                ]}
+                centerLabel={`${Math.round(nowEntry.rankScore)}`}
+                centerSublabel="score"
+              />
+            )}
           </div>
-          <div className="signal-surface-soft rounded-[0.4rem] p-3">
-            <p className="micro-label">Why Siggi is leaning</p>
-            <p className="mt-1.5 text-[0.80rem] leading-5 text-slate-300">
-              {(nowEntry ?? todayEntry ?? next24hEntry)?.priorityReason ??
-                "Siggi checks live price, chart structure, upcoming events, and historical replay to rank the highest-probability setups first."}
-            </p>
-          </div>
-          <div className="signal-surface-soft rounded-[0.4rem] p-3">
-            <p className="micro-label">Recent accuracy (last 12)</p>
-            <p className={`mt-1.5 text-[0.96rem] font-semibold ${predictionAccuracy.recentAccuracy >= 60 ? "text-emerald-300" : "text-amber-200"}`}>
-              {predictionAccuracy.recentAccuracy}%
-            </p>
-            <p className="mt-1 text-[0.76rem] text-slate-400">
-              Siggi&apos;s accuracy on the most recent 12 resolved calls
-            </p>
-          </div>
-        </div>
-
-        {nowEntry ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {nowEntry.scoreBreakdown.map((item) => (
-              <div key={item.label} className="signal-surface-soft rounded-[0.4rem] p-3">
+          {nowEntry ? (
+            <div className="space-y-2">
+              {nowEntry.scoreBreakdown.map((item) => (
                 <StatBar
+                  key={item.label}
                   label={item.label}
                   value={item.score}
                   detail={item.detail}
                   color={item.score >= 72 ? "#34d399" : item.score <= 44 ? "#f59e0b" : "#22d3ee"}
                 />
-              </div>
-            ))}
+              ))}
+            </div>
+          ) : (
+            <p className="text-[0.78rem] text-slate-500">No setup ranked yet.</p>
+          )}
+        </Panel>
+
+        {/* Signal accuracy donut */}
+        <Link href="/history" className="panel panel-hover block p-3 sm:p-3.5 transition">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="micro-label">Signal accuracy</p>
+            <span className="text-[0.65rem] text-slate-600 transition hover:text-slate-400">Full history →</span>
           </div>
-        ) : null}
-      </Panel>
+          <div className="mt-3 flex justify-center">
+            <DonutWithLegend
+              size={100}
+              thickness={14}
+              centerLabel={`${predictionAccuracy.overallAccuracy}%`}
+              centerSublabel="accuracy"
+              title=""
+              segments={[
+                { value: predictionAccuracy.accuratePredictions,   color: "#34d399", label: `${predictionAccuracy.accuratePredictions} Wins` },
+                { value: predictionAccuracy.inaccuratePredictions, color: "#f87171", label: `${predictionAccuracy.inaccuratePredictions} Losses` },
+                { value: predictionAccuracy.breakevenPredictions,  color: "#64748b", label: `${predictionAccuracy.breakevenPredictions} BE` },
+              ]}
+            />
+          </div>
+        </Link>
 
-      {/* Live broker positions */}
-      {primaryConnection && (
-        <DashboardPositionsWidget connectionId={primaryConnection.id} />
-      )}
-
-      {/* CTA to scanner */}
-      <div className="flex flex-col items-center gap-3 rounded-lg bg-linear-to-r from-cyan-500/8 via-violet-500/4 to-transparent p-4 ring-1 ring-white/8 sm:flex-row sm:justify-between">
-        <div>
-          <p className="text-[0.94rem] font-semibold text-white">
-            {rankedViews.length} ranked opportunities waiting
-          </p>
-          <p className="mt-0.5 text-[0.78rem] text-slate-400">
-            The full scanner shows every signal with live charts, event context, and position sizing.
-          </p>
-        </div>
-        <ActionLink href="/scanner">
-          Open All Opportunities →
-        </ActionLink>
+        {/* Live portfolio */}
+        {primaryConnection ? (
+          <DashboardPositionsWidget connectionId={primaryConnection.id} />
+        ) : (
+          <Panel className="flex flex-col items-center justify-center p-4 text-center">
+            <svg viewBox="0 0 20 20" className="h-8 w-8 text-slate-700 mb-2" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <rect x="3" y="5" width="14" height="11" rx="1.3" />
+              <path d="M7 5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V5" />
+            </svg>
+            <p className="text-[0.80rem] font-semibold text-white">Live Portfolio</p>
+            <p className="mt-1 text-[0.72rem] text-slate-500">Connect a broker to see your open positions here.</p>
+            <Link href="/my-trades" className="mt-3 text-[0.72rem] font-medium text-[#00C884] hover:text-[#00F79A] transition-colors">
+              Connect broker →
+            </Link>
+          </Panel>
+        )}
       </div>
     </div>
   );

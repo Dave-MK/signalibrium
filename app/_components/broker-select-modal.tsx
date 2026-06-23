@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,7 +38,7 @@ const BROKERS: BrokerEntry[] = [
     key: "Alpaca", name: "Alpaca", tagline: "US Stocks, ETFs & Crypto",
     method: "oauth", demoLabel: "Paper", liveLabel: "Live",
     signupUrl: "https://app.alpaca.markets/signup",
-    accent: "text-cyan-300", border: "border-cyan-500/40", bg: "bg-cyan-500/8",
+    accent: "text-[#00C884]", border: "border-[#00C884]/40", bg: "bg-[#00C884]/8",
   },
   {
     key: "OANDA", name: "OANDA", tagline: "Forex & CFDs",
@@ -218,10 +218,10 @@ export function BrokerSelectModal({ onClose, onConnected }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Connect a broker"
-        className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-[440px] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.76rem] border border-white/10 bg-[#07111d] shadow-[0_24px_64px_rgba(0,0,0,0.85)]"
+        className="fixed left-1/2 top-1/2 z-[9999] w-[calc(100vw-1.5rem)] max-w-[440px] max-h-[90dvh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.76rem] border border-white/10 bg-[#111210] shadow-[0_24px_64px_rgba(0,0,0,0.85)]"
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#07111d] px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#111210] px-5 py-4">
           <h2 className="text-[0.92rem] font-semibold text-white">Connect a broker</h2>
           {!connecting && (
             <button type="button" onClick={onClose} aria-label="Close"

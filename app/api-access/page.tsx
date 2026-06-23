@@ -16,7 +16,7 @@ export default async function ApiAccessPage() {
     <div className="panel-stack-5">
       <PageHeader
         eyebrow="Developer"
-        title="Signal API Access"
+        title="API Access"
         description="Pull live ENTER NOW signals and Siggi's open trades directly into your own algo, EA, bot, or spreadsheet via a secured REST endpoint."
       />
 

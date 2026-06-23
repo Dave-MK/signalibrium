@@ -17,6 +17,10 @@ import { SiggiResetButton } from "./siggi-reset-button";
 import { TradesTabs } from "./trades-tabs";
 import { InlineNoteButton } from "@/app/_components/trade-note-form";
 import { RiskControlsPanel } from "@/app/_components/risk-controls-panel";
+import dynamic from "next/dynamic";
+const SiggiLiveVsPaper = dynamic(
+  () => import("@/app/_components/siggi-live-vs-paper").then((m) => ({ default: m.SiggiLiveVsPaper }))
+);
 import type { TradeNoteOutcome } from "@/app/_lib/server/workspace-types";
 
 // Correlation groups — mirrors siggi-simulation.ts CORRELATION_GROUPS
@@ -258,38 +262,29 @@ export default async function SiggiTradesPage() {
       />
 
       {/* ── Visual KPI strip ── */}
-      <div className="grid grid-cols-2 gap-[5px] sm:grid-cols-4">
-        {/* Equity */}
+      <div className="grid grid-cols-2 gap-[5px] sm:grid-cols-3 lg:grid-cols-6">
+        {/* Total P&L */}
         <Panel className="p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-[0.3rem] bg-cyan-400/10">
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-cyan-300" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <rect x="2" y="4" width="12" height="9" rx="1.3" />
-                <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
-              </svg>
-            </span>
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Equity</p>
-          </div>
-          <p className={`text-[1.3rem] font-bold leading-none ${totalBalanceGbp >= siggiAccount.startingBalanceGbp ? "text-emerald-300" : "text-red-300"}`}>
-            {formatGbp(totalBalanceGbp)}
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Total P&amp;L</p>
+          <p className={`mt-1.5 text-[1.3rem] font-bold leading-none ${growthPct >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+            {growthPct >= 0 ? "+" : ""}{growthPct.toFixed(1)}%
           </p>
-          <p className="mt-1 text-[0.66rem] text-slate-600">
-            {growthPct >= 0 ? "+" : ""}{growthPct.toFixed(1)}% from start
+          <p className="mt-1 text-[0.66rem] text-slate-600">{formatGbp(totalBalanceGbp)} equity</p>
+        </Panel>
+
+        {/* Open P&L */}
+        <Panel className="p-3">
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Open P&amp;L</p>
+          <p className={`mt-1.5 text-[1.3rem] font-bold leading-none ${liveOpenPnlGbp >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+            {liveOpenPnlGbp >= 0 ? "+" : ""}{totalBalanceGbp > 0 ? ((liveOpenPnlGbp / totalBalanceGbp) * 100).toFixed(1) : "0.0"}%
           </p>
+          <p className="mt-1 text-[0.66rem] text-slate-600">{formatGbp(liveOpenPnlGbp)} unrealised</p>
         </Panel>
 
         {/* Win Rate */}
         <Panel className="p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-[0.3rem] bg-emerald-400/10">
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 text-emerald-300" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M3 9 6 6l2.5 2.5L13 4" />
-                <path d="M11 4h2v2" />
-              </svg>
-            </span>
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Win rate</p>
-          </div>
-          <p className={`text-[1.3rem] font-bold leading-none ${winRate >= 55 ? "text-emerald-300" : winRate >= 40 ? "text-amber-200" : resolvedTrades > 0 ? "text-red-300" : "text-slate-500"}`}>
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Win Rate</p>
+          <p className={`mt-1.5 text-[1.3rem] font-bold leading-none ${winRate >= 55 ? "text-emerald-300" : winRate >= 40 ? "text-amber-200" : resolvedTrades > 0 ? "text-red-300" : "text-slate-500"}`}>
             {resolvedTrades > 0 ? `${winRate}%` : "—"}
           </p>
           <p className="mt-1 text-[0.66rem] text-slate-600">
@@ -297,40 +292,43 @@ export default async function SiggiTradesPage() {
           </p>
         </Panel>
 
-        {/* Portfolio Heat */}
+        {/* Avg RR */}
         <Panel className="p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`flex h-7 w-7 items-center justify-center rounded-[0.3rem] ${heatPct > 30 ? "bg-red-400/10" : heatPct > 20 ? "bg-amber-400/10" : "bg-emerald-400/10"}`}>
-              <svg viewBox="0 0 16 16" className={`h-3.5 w-3.5 ${heatPct > 30 ? "text-red-300" : heatPct > 20 ? "text-amber-300" : "text-emerald-300"}`} fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M8 13a4 4 0 0 0 2.5-7C9.5 5 9 3.5 8 2c-1 1.5-1.5 3-2.5 4a4 4 0 0 0 2.5 7Z" />
-              </svg>
-            </span>
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Portfolio heat</p>
-          </div>
-          <p className={`text-[1.3rem] font-bold leading-none ${heatPct > 30 ? "text-red-300" : heatPct > 20 ? "text-amber-200" : "text-emerald-300"}`}>
-            {heatPct.toFixed(1)}%
-          </p>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.06]">
-            <div className={`h-full rounded-full ${heatTone}`} style={{ width: `${heatFillPct}%` }} />
-          </div>
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Avg RR</p>
+          {(() => {
+            const rrValues = siggiAccount.closedTrades
+              .filter((t) => t.entryPrice && t.stopPrice && t.targetPrice && Math.abs(t.entryPrice - t.stopPrice) > 0)
+              .map((t) => Math.abs(t.targetPrice - t.entryPrice) / Math.abs(t.entryPrice - t.stopPrice))
+              .filter((r) => r > 0 && r < 20);
+            const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b) / rrValues.length : null;
+            return (
+              <>
+                <p className={`mt-1.5 text-[1.3rem] font-bold leading-none ${avgRR !== null && avgRR >= 1.5 ? "text-emerald-300" : avgRR !== null ? "text-amber-200" : "text-slate-500"}`}>
+                  {avgRR !== null ? `${avgRR.toFixed(2)}` : "—"}
+                </p>
+                <p className="mt-1 text-[0.66rem] text-slate-600">risk/reward ratio</p>
+              </>
+            );
+          })()}
         </Panel>
 
-        {/* Drawdown */}
+        {/* Max Drawdown */}
         <Panel className="p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`flex h-7 w-7 items-center justify-center rounded-[0.3rem] ${currentDrawdownPct > 15 ? "bg-red-400/10" : "bg-slate-400/8"}`}>
-              <svg viewBox="0 0 16 16" className={`h-3.5 w-3.5 ${currentDrawdownPct > 15 ? "text-red-300" : currentDrawdownPct > 7 ? "text-amber-300" : "text-slate-400"}`} fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M2 4 5 8l2.5-2.5L10 8l4-5" />
-                <path d="M2 12h12" />
-              </svg>
-            </span>
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Drawdown</p>
-          </div>
-          <p className={`text-[1.3rem] font-bold leading-none ${currentDrawdownPct > 15 ? "text-red-300" : currentDrawdownPct > 7 ? "text-amber-200" : "text-slate-400"}`}>
-            {currentDrawdownPct > 0.05 ? `-${currentDrawdownPct.toFixed(1)}%` : "At HWM"}
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Max DD</p>
+          <p className={`mt-1.5 text-[1.3rem] font-bold leading-none ${maxDrawdownPct > 20 ? "text-red-300" : maxDrawdownPct > 10 ? "text-amber-200" : "text-slate-400"}`}>
+            {maxDrawdownPct > 0.05 ? `-${maxDrawdownPct.toFixed(1)}%` : "0%"}
+          </p>
+          <p className="mt-1 text-[0.66rem] text-slate-600">peak to trough</p>
+        </Panel>
+
+        {/* Total Trades */}
+        <Panel className="p-3">
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-slate-600">Total Trades</p>
+          <p className="mt-1.5 text-[1.3rem] font-bold leading-none text-white">
+            {siggiAccount.openTrades.length + siggiAccount.closedTrades.length}
           </p>
           <p className="mt-1 text-[0.66rem] text-slate-600">
-            {currentDrawdownPct > 0.05 ? "from high watermark" : "No current drawdown"}
+            {siggiAccount.openTrades.length} open · {siggiAccount.closedTrades.length} closed
           </p>
         </Panel>
       </div>
@@ -353,7 +351,7 @@ export default async function SiggiTradesPage() {
                   const ageLabel = ageHours < 48 ? `${Math.round(ageHours)}h` : `${Math.round(ageHours / 24)}d`;
                   const pred = trade.predictionId ? predictionById.get(trade.predictionId) : null;
                   return (
-                    <div key={trade.id} className="signal-surface-soft rounded-[0.4rem]">
+                    <div key={trade.id} className="signal-surface-soft rounded-[0.65rem]">
                       <div className="grid lg:grid-cols-[1fr_260px]">
                         {/* ── Left: trade details ── */}
                         <div className="p-3">
@@ -368,8 +366,8 @@ export default async function SiggiTradesPage() {
                                 </p>
                                 {/* ── "i" info button with hover tooltip ── */}
                                 <div className="group/info relative">
-                                  <button type="button" aria-label="How Siggi manages this trade" className="flex h-5 w-5 items-center justify-center rounded-full border border-white/15 text-[0.62rem] font-bold text-slate-500 transition hover:border-cyan-400/40 hover:text-cyan-300">i</button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 scale-95 rounded-[0.5rem] border border-white/10 bg-[#07111d] p-3 opacity-0 shadow-[0_16px_48px_rgba(0,0,0,0.6)] transition-all duration-150 group-hover/info:pointer-events-auto group-hover/info:scale-100 group-hover/info:opacity-100">
+                                  <button type="button" aria-label="How Siggi manages this trade" className="flex h-5 w-5 items-center justify-center rounded-full border border-white/15 text-[0.62rem] font-bold text-slate-500 transition hover:border-[#00C884]/40 hover:text-[#00C884]">i</button>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 scale-95 rounded-[0.5rem] border border-white/10 bg-[#111210] p-3 opacity-0 shadow-[0_16px_48px_rgba(0,0,0,0.6)] transition-all duration-150 group-hover/info:pointer-events-auto group-hover/info:scale-100 group-hover/info:opacity-100">
                                     <p className="mb-2 text-[0.70rem] font-semibold uppercase tracking-wider text-slate-500">How Siggi operates</p>
                                     {ACCOUNT_FLOW_SECTIONS.map((section) => (
                                       <div key={section.heading} className="mb-2 last:mb-0">
@@ -409,7 +407,7 @@ export default async function SiggiTradesPage() {
                                 <span>Timeframe <span className="text-slate-300">{pred.timeframe}</span></span>
                                 <span>Horizon <span className="text-slate-300">{pred.horizon}</span></span>
                                 <span>Trend <span className={`font-medium ${pred.trendAtCall === "Bullish" ? "text-emerald-300" : pred.trendAtCall === "Bearish" ? "text-red-300" : "text-slate-300"}`}>{pred.trendAtCall}</span></span>
-                                <span>Conf at call <span className="text-cyan-200">{pred.confidenceAtCall}%</span></span>
+                                <span>Conf at call <span className="text-[#00C884]/80">{pred.confidenceAtCall}%</span></span>
                               </div>
                               {pred.indicatorSnapshotAtCall.length > 0 && (
                                 <div>
@@ -458,7 +456,7 @@ export default async function SiggiTradesPage() {
                   );
                 })
               ) : (
-                <div className="signal-surface-soft rounded-[0.4rem] p-4 text-center">
+                <div className="signal-surface-soft rounded-[0.65rem] p-4 text-center">
                   <p className="text-[0.84rem] font-semibold text-slate-300">No open trades</p>
                   <p className="mt-1 text-[0.76rem] text-slate-500">The next qualifying ENTER NOW signal will open here automatically on the next sync.</p>
                 </div>
@@ -579,23 +577,23 @@ export default async function SiggiTradesPage() {
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-[5px] pt-1">
-                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                <div className="signal-surface-soft rounded-[0.5rem] px-2 py-1.5">
                   <p className="text-[0.60rem] text-slate-500">Streak</p>
                   <p className={`text-[0.82rem] font-bold ${currentStreak === 0 ? "text-slate-500" : currentStreakIsWin ? "text-emerald-300" : "text-red-300"}`}>
                     {currentStreak === 0 ? "—" : `${currentStreak}${currentStreakIsWin ? "W" : "L"}`}
                   </p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                <div className="signal-surface-soft rounded-[0.5rem] px-2 py-1.5">
                   <p className="text-[0.60rem] text-slate-500">Best streak</p>
-                  <p className="text-[0.82rem] font-bold text-cyan-200">{longestWinStreak > 0 ? `${longestWinStreak}W` : "—"}</p>
+                  <p className="text-[0.82rem] font-bold text-[#00C884]/80">{longestWinStreak > 0 ? `${longestWinStreak}W` : "—"}</p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                <div className="signal-surface-soft rounded-[0.5rem] px-2 py-1.5">
                   <p className="text-[0.60rem] text-slate-500">Avg hold</p>
                   <p className="text-[0.82rem] font-bold text-slate-300">
                     {avgHoldHours === null ? "—" : avgHoldHours < 48 ? `${Math.round(avgHoldHours)}h` : `${Math.round(avgHoldHours / 24)}d`}
                   </p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.38rem] px-2 py-1.5">
+                <div className="signal-surface-soft rounded-[0.5rem] px-2 py-1.5">
                   <p className="text-[0.60rem] text-slate-500">Resets</p>
                   <p className="text-[0.82rem] font-bold text-amber-200">{siggiAccount.resetCount}</p>
                 </div>
@@ -710,14 +708,14 @@ export default async function SiggiTradesPage() {
                 label="Peak equity"
                 value={formatGbp(siggiAccount.highWatermarkGbp)}
                 detail="All-time high watermark"
-                tone="text-cyan-200"
+                tone="text-[#00C884]/80"
               />
             </div>
           )}
 
           {/* Drawdown analytics strip */}
           <div className="mt-3 border-t border-white/6 pt-3 grid gap-[5px] sm:grid-cols-3">
-            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+            <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
               <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Max drawdown</p>
               <p className={`text-[0.86rem] font-bold ${maxDrawdownPct > 20 ? "text-red-300" : maxDrawdownPct > 10 ? "text-amber-200" : "text-emerald-300"}`}>
                 {maxDrawdownPct > 0 ? `-${maxDrawdownPct.toFixed(1)}%` : "—"}
@@ -729,14 +727,14 @@ export default async function SiggiTradesPage() {
                 />
               </div>
             </div>
-            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+            <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
               <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Current drawdown</p>
               <p className={`text-[0.86rem] font-bold ${currentDrawdownPct > 15 ? "text-red-300" : currentDrawdownPct > 7 ? "text-amber-200" : "text-emerald-300"}`}>
                 {currentDrawdownPct > 0.05 ? `-${currentDrawdownPct.toFixed(1)}%` : "At HWM"}
               </p>
               <p className="mt-0.5 text-[0.62rem] text-slate-600">from high watermark</p>
             </div>
-            <div className="signal-surface-soft rounded-[0.38rem] p-2.5">
+            <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
               <p className="text-[0.60rem] text-slate-500 uppercase tracking-wider mb-1">Recovery factor</p>
               <p className={`text-[0.86rem] font-bold ${recoveryFactor === null ? "text-slate-500" : recoveryFactor >= 1.5 ? "text-emerald-300" : recoveryFactor >= 0.8 ? "text-amber-200" : "text-red-300"}`}>
                 {recoveryFactor === null ? "—" : recoveryFactor.toFixed(2)}
@@ -763,7 +761,7 @@ export default async function SiggiTradesPage() {
           <p className="micro-label">Recent activity</p>
           <div className="mt-3 space-y-2">
             {siggiAccount.activityLog.slice(0, 12).map((activity) => (
-              <div key={activity.id} className="signal-surface-soft rounded-[0.4rem] p-2.5">
+              <div key={activity.id} className="signal-surface-soft rounded-[0.65rem] p-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-[0.84rem] font-semibold text-white">
@@ -884,6 +882,14 @@ export default async function SiggiTradesPage() {
           </div>
         }
       />
+
+      {/* ── Live vs paper & verdict accuracy ── */}
+      {siggiAccount.closedTrades.length > 0 && (
+        <Panel className="p-3 sm:p-3.5">
+          <p className="micro-label mb-3">Live execution vs paper simulation</p>
+          <SiggiLiveVsPaper closedTrades={siggiAccount.closedTrades} />
+        </Panel>
+      )}
 
       {/* ── Risk guard-rails ── */}
       <RiskControlsPanel initial={riskControls} />

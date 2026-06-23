@@ -25,7 +25,7 @@ function fmtDate(iso: string | null) {
 function StatusBadge({ status }: { status: PersistedTradeTicket["status"] }) {
   const cls =
     status === "Filled"   ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/25" :
-    status === "Working"  ? "bg-cyan-500/15 text-cyan-300 ring-cyan-500/25" :
+    status === "Working"  ? "bg-[#00C884]/15 text-[#00C884] ring-[#00C884]/25" :
     status === "Submitted"? "bg-blue-500/15 text-blue-300 ring-blue-500/25" :
     status === "Cancelled"|| status === "Rejected" ? "bg-red-500/15 text-red-300 ring-red-500/25" :
     status === "Ready"    ? "bg-amber-500/15 text-amber-300 ring-amber-500/25" :
@@ -141,7 +141,7 @@ function TicketRow({
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitPending}
-                className="rounded-[0.3rem] bg-cyan-500/12 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/20 transition hover:bg-cyan-500/22 disabled:opacity-40"
+                className="rounded-[0.3rem] bg-[#00C884]/12 px-2.5 py-1 text-[0.68rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/20 transition hover:bg-[#00C884]/22 disabled:opacity-40"
               >
                 {submitPending ? "Submitting…" : "Submit"}
               </button>
@@ -227,7 +227,7 @@ export function TicketsClient({
                 onClick={() => setFilter(f)}
                 className={`rounded-[0.30rem] px-2.5 py-1 text-[0.68rem] font-semibold ring-1 transition ${
                   filter === f
-                    ? "bg-cyan-500/15 text-cyan-200 ring-cyan-500/30"
+                    ? "bg-[#00C884]/15 text-[#00C884]/80 ring-[#00C884]/30"
                     : "bg-white/[0.03] text-slate-500 ring-white/8 hover:text-slate-300"
                 }`}
               >
@@ -241,7 +241,7 @@ export function TicketsClient({
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-[0.38rem] bg-cyan-500/12 px-3 py-1.5 text-[0.76rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/20 transition hover:bg-cyan-500/22"
+          className="flex items-center gap-1.5 rounded-[0.38rem] bg-[#00C884]/12 px-3 py-1.5 text-[0.76rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/20 transition hover:bg-[#00C884]/22"
         >
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7">
             <path d="M8 3v10M3 8h10" />

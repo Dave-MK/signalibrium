@@ -72,7 +72,7 @@ function PctInput({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-20 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-cyan-500/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-20 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-[#00C884]/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
       />
       <span className="text-[0.76rem] text-slate-500">%</span>
     </div>
@@ -101,7 +101,7 @@ function IntInput({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="w-20 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-cyan-500/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
+      className="w-20 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-[#00C884]/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
     />
   );
 }
@@ -125,7 +125,7 @@ function GbpInput({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-28 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-cyan-500/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-28 rounded-[0.32rem] border border-white/10 bg-white/5 px-2.5 py-1.5 text-[0.8rem] text-white tabular-nums outline-none focus:border-[#00C884]/50 focus:bg-white/8 disabled:cursor-not-allowed disabled:opacity-40"
       />
     </div>
   );
@@ -182,7 +182,7 @@ export function RiskControlsPanel({ initial }: Props) {
   ]);
 
   return (
-    <div className="signal-surface-soft rounded-[0.48rem] divide-y divide-white/6">
+    <div className="signal-surface-soft rounded-[0.65rem] divide-y divide-white/6">
       {/* Header */}
       <div className="px-4 py-3.5 sm:px-5">
         <p className="text-[0.84rem] font-semibold text-slate-100">Risk guard-rails</p>
@@ -235,7 +235,7 @@ export function RiskControlsPanel({ initial }: Props) {
                 aria-checked={dailyLimitEnabled}
                 onClick={() => setDailyLimitEnabled((v) => !v)}
                 className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
-                  dailyLimitEnabled ? "bg-cyan-500" : "bg-white/10"
+                  dailyLimitEnabled ? "bg-[#00C884]" : "bg-white/10"
                 }`}
               >
                 <span
@@ -267,7 +267,7 @@ export function RiskControlsPanel({ initial }: Props) {
                 aria-checked={posCapEnabled}
                 onClick={() => setPosCapEnabled((v) => !v)}
                 className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
-                  posCapEnabled ? "bg-cyan-500" : "bg-white/10"
+                  posCapEnabled ? "bg-[#00C884]" : "bg-white/10"
                 }`}
               >
                 <span
@@ -300,7 +300,7 @@ export function RiskControlsPanel({ initial }: Props) {
           type="button"
           disabled={saving}
           onClick={() => void handleSave()}
-          className="shrink-0 rounded-[0.36rem] bg-cyan-600/80 px-4 py-1.5 text-[0.78rem] font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 rounded-[0.36rem] bg-[#00C884]/80 px-4 py-1.5 text-[0.78rem] font-medium text-white transition hover:bg-[#00C884]/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>

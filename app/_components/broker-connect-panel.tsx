@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { createBrokerConnectionApi } from "@/app/_lib/workspace-api";
@@ -28,9 +28,9 @@ const BROKER_CONFIGS = [
     provider: "Alpaca" as const,
     name: "Alpaca",
     description: "US stocks, ETFs & crypto. Paper and live accounts.",
-    color: "text-cyan-300",
-    borderColor: "border-cyan-500/30",
-    bgColor: "bg-cyan-500/5",
+    color: "text-[#00C884]",
+    borderColor: "border-[#00C884]/30",
+    bgColor: "bg-[#00C884]/5",
     needsSecret: true,
     keyLabel: "API Key",
     secretLabel: "API Secret",
@@ -136,7 +136,7 @@ export function BrokerConnectPanel({ onClose, onConnected }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label="Connect a broker"
-        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/8 bg-[#07111d] shadow-2xl"
+        className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/8 bg-[#111210] shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">

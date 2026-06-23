@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -98,7 +98,7 @@ function FullScreenModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-[rgba(3,6,12,0.86)] p-2.5 backdrop-blur-sm sm:p-4">
-      <div className="flex h-full flex-col overflow-hidden rounded-[0.7rem] border border-white/10 bg-[#07111d] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <div className="flex h-full flex-col overflow-hidden rounded-[0.7rem] border border-white/10 bg-[#111210] shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/8 px-4 py-3 sm:px-5">
           <div>
             <p className="micro-label">Fullscreen Review</p>
@@ -209,12 +209,22 @@ function LeaderboardRow({
               <StatusChip label={formatMarketSessionLabel(marketSession.state)} />
               <span className="rounded-[0.22rem] bg-white/[0.06] px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-wide text-slate-400">{view.timeframe}</span>
               {siggiInTrade && (
-                <span className="rounded-[0.22rem] bg-cyan-500/15 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-cyan-400 ring-1 ring-cyan-500/30">🤖 Siggi</span>
+                <span className="rounded-[0.22rem] bg-[#00C884]/15 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-[#00C884] ring-1 ring-[#00C884]/30">🤖 Siggi</span>
+              )}
+              {setup.analysis?.aiVerdict && (
+                <span className={`rounded-[0.22rem] px-1.5 py-0.5 text-[0.62rem] font-semibold ring-1 ${
+                  setup.analysis.aiVerdict === "Strong" ? "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" :
+                  setup.analysis.aiVerdict === "Good" ? "bg-[#00C884]/15 text-[#00C884] ring-[#00C884]/30" :
+                  setup.analysis.aiVerdict === "Marginal" ? "bg-amber-400/10 text-amber-300 ring-amber-400/20" :
+                  "bg-rose-500/15 text-rose-400 ring-rose-500/30"
+                }`}>
+                  {setup.analysis.aiVerdict}
+                </span>
               )}
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[0.96rem] font-bold tabular-nums text-cyan-200">{view.confidence}%</p>
+            <p className="text-[0.96rem] font-bold tabular-nums text-[#00C884]/80">{view.confidence}%</p>
             <p className="text-[0.62rem] text-slate-500">confidence</p>
             <p className="mt-1 text-[0.78rem] font-semibold text-white">{view.exactEntry}</p>
             <p className="text-[0.62rem] text-slate-500">enter at</p>
@@ -248,7 +258,7 @@ function LeaderboardRow({
             {view.horizon}
           </span>
           {siggiInTrade && (
-            <span className="rounded-[0.25rem] bg-cyan-500/15 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide text-cyan-400 ring-1 ring-cyan-500/30">
+            <span className="rounded-[0.25rem] bg-[#00C884]/15 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide text-[#00C884] ring-1 ring-[#00C884]/30">
               Siggi in trade
             </span>
           )}
@@ -323,7 +333,7 @@ function LeaderboardRow({
       {/* Trade span */}
       <div className="min-w-0" title={view.tradeSpanDetail}>
         <p className="micro-label">Hold</p>
-        <p className="mt-1 text-[0.8rem] font-semibold text-cyan-200">{view.tradeSpan}</p>
+        <p className="mt-1 text-[0.8rem] font-semibold text-[#00C884]/80">{view.tradeSpan}</p>
       </div>
 
       {/* Timing */}
@@ -364,6 +374,16 @@ function LeaderboardRow({
             </span>
           );
         })()}
+        {setup.analysis?.aiVerdict && (
+          <span className={`mt-1 inline-block rounded-[0.22rem] px-1.5 py-0.5 text-[0.62rem] font-semibold ring-1 ${
+            setup.analysis.aiVerdict === "Strong" ? "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" :
+            setup.analysis.aiVerdict === "Good" ? "bg-[#00C884]/15 text-[#00C884] ring-[#00C884]/30" :
+            setup.analysis.aiVerdict === "Marginal" ? "bg-amber-400/10 text-amber-300 ring-amber-400/20" :
+            "bg-rose-500/15 text-rose-400 ring-rose-500/30"
+          }`}>
+            Siggi&apos;s Read: {setup.analysis.aiVerdict}
+          </span>
+        )}
       </div>
 
       {/* Buttons */}
@@ -594,26 +614,26 @@ export default function ScannerPageClient({
           }
         />
         {refreshStatus && (
-          <div className="rounded-[0.4rem] bg-cyan-500/10 px-3 py-2 text-[0.78rem] font-medium text-cyan-300 ring-1 ring-cyan-500/20">
+          <div className="rounded-[0.4rem] bg-[#00C884]/10 px-3 py-2 text-[0.78rem] font-medium text-[#00C884] ring-1 ring-[#00C884]/20">
             {refreshStatus}
           </div>
         )}
 
         <Panel className="p-3 sm:p-3.5">
           <div className="grid gap-[5px] sm:grid-cols-3">
-            <div className="signal-surface-soft rounded-[0.4rem] p-3">
+            <div className="signal-surface-soft rounded-[0.65rem] p-3">
               <p className="micro-label">{activeTab}</p>
               <p className="mt-1.5 text-[0.96rem] font-semibold text-white">{tabRows.length}</p>
               <p className="mt-1 text-[0.76rem] text-slate-400">
                 {totalPages > 1 ? `Page ${safePage} of ${totalPages} · ` : ""}Ranked opportunities
               </p>
             </div>
-            <div className="signal-surface-soft rounded-[0.4rem] p-3">
+            <div className="signal-surface-soft rounded-[0.65rem] p-3">
               <p className="micro-label">Short-term focus</p>
-              <p className="mt-1.5 text-[0.96rem] font-semibold text-cyan-200">{shortTermCount}</p>
+              <p className="mt-1.5 text-[0.96rem] font-semibold text-[#00C884]/80">{shortTermCount}</p>
               <p className="mt-1 text-[0.76rem] text-slate-400">Day and week opportunities</p>
             </div>
-            <div className="signal-surface-soft rounded-[0.4rem] p-3">
+            <div className="signal-surface-soft rounded-[0.65rem] p-3">
               <p className="micro-label">Ready now</p>
               <p className="mt-1.5 text-[0.96rem] font-semibold text-emerald-300">{readyNowCount}</p>
               <p className="mt-1 text-[0.76rem] text-slate-400">In entry zone now</p>
@@ -749,7 +769,7 @@ export default function ScannerPageClient({
           <div className="panel-stack-5">
             <Panel className="p-3 sm:p-3.5">
               <div className="grid gap-[5px] lg:grid-cols-[minmax(0,1.1fr)_repeat(3,minmax(0,0.48fr))]">
-                <div className="signal-surface rounded-[0.46rem] p-3">
+                <div className="signal-surface rounded-[0.7rem] p-3">
                   <p className="micro-label">Siggi call</p>
                   <p className="mt-1.5 text-[1.02rem] font-semibold text-white">
                     {selectedEventsItem.view.decision.label} / {selectedEventsItem.view.opportunityAction === "BUY" ? "LONG" : selectedEventsItem.view.opportunityAction === "SELL" ? "SHORT" : selectedEventsItem.view.opportunityAction}
@@ -761,7 +781,7 @@ export default function ScannerPageClient({
                     {selectedEventsItem.view.eventEntryGuidance}
                   </p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="signal-surface-soft rounded-[0.65rem] p-3">
                   <p className="micro-label">Confidence</p>
                   <p className="mt-1.5 text-[0.98rem] font-semibold text-white">
                     {selectedEventsItem.view.confidence}%
@@ -772,7 +792,7 @@ export default function ScannerPageClient({
                       : "Current prediction quality"}
                   </p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="signal-surface-soft rounded-[0.65rem] p-3">
                   <p className="micro-label">Event move</p>
                   <p className="mt-1.5 text-[0.98rem] font-semibold text-emerald-300">
                     {selectedEventsItem.view.eventMove}
@@ -781,7 +801,7 @@ export default function ScannerPageClient({
                     {selectedEventsItem.view.eventLikelihood}% likelihood
                   </p>
                 </div>
-                <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                <div className="signal-surface-soft rounded-[0.65rem] p-3">
                   <p className="micro-label">Replay edge</p>
                   <p className="mt-1.5 text-[0.98rem] font-semibold text-emerald-300">
                     {selectedEventBacktests[0]
@@ -797,7 +817,7 @@ export default function ScannerPageClient({
               <p className="micro-label">Why Siggi is leaning this way</p>
               <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
                 {selectedEventsItem.view.scoreBreakdown.map((item) => (
-                  <div key={item.label} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div key={item.label} className="signal-surface-soft rounded-[0.65rem] p-3">
                     <p className="micro-label">{item.label}</p>
                     <p className="mt-1.5 text-[0.96rem] font-semibold text-white">{item.score}%</p>
                     <p className="mt-1 text-[0.76rem] leading-5 text-slate-400">{item.detail}</p>
@@ -806,11 +826,74 @@ export default function ScannerPageClient({
               </div>
             </Panel>
 
+            {selectedEventsItem.setup.analysis?.aiVerdict && (() => {
+              const ai = selectedEventsItem.setup.analysis!;
+              return (
+                <Panel className="p-3 sm:p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="micro-label">Siggi&apos;s Read</p>
+                    <div className="flex items-center gap-2">
+                      {ai.aiScore != null && (
+                        <span className="text-[0.72rem] tabular-nums text-slate-400">{ai.aiScore}/100</span>
+                      )}
+                      <span className={`rounded-[0.25rem] px-2 py-0.5 text-[0.72rem] font-semibold ring-1 ${
+                        ai.aiVerdict === "Strong" ? "bg-emerald-500/15 text-emerald-400 ring-emerald-500/30" :
+                        ai.aiVerdict === "Good" ? "bg-[#00C884]/15 text-[#00C884] ring-[#00C884]/30" :
+                        ai.aiVerdict === "Marginal" ? "bg-amber-400/10 text-amber-300 ring-amber-400/20" :
+                        "bg-rose-500/15 text-rose-400 ring-rose-500/30"
+                      }`}>
+                        {ai.aiVerdict}
+                      </span>
+                    </div>
+                  </div>
+                  {ai.aiReasoning && (
+                    <p className="mt-2 text-[0.82rem] leading-5 text-slate-300">{ai.aiReasoning}</p>
+                  )}
+                  {ai.aiEntryRefinement && (
+                    <div className="mt-2 rounded-[0.35rem] border border-[#00C884]/20 bg-[#00C884]/8 px-2.5 py-2">
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#00C884]">Entry refinement</p>
+                      <p className="mt-0.5 text-[0.78rem] leading-5 text-[#00C884]/80">{ai.aiEntryRefinement}</p>
+                    </div>
+                  )}
+                  {((ai.aiPatterns?.length ?? 0) > 0 || (ai.aiKeyRisks?.length ?? 0) > 0) && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {ai.aiPatterns && ai.aiPatterns.length > 0 && (
+                        <div>
+                          <p className="micro-label mb-2">Confluences identified</p>
+                          <ul className="space-y-1.5">
+                            {ai.aiPatterns.map((p) => (
+                              <li key={p} className="flex gap-1.5 text-[0.78rem] leading-5 text-slate-300">
+                                <span className="mt-0.5 shrink-0 text-emerald-400">↑</span>
+                                <span>{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {ai.aiKeyRisks && ai.aiKeyRisks.length > 0 && (
+                        <div>
+                          <p className="micro-label mb-2">Key risks</p>
+                          <ul className="space-y-1.5">
+                            {ai.aiKeyRisks.map((r) => (
+                              <li key={r} className="flex gap-1.5 text-[0.78rem] leading-5 text-slate-400">
+                                <span className="mt-0.5 shrink-0 text-rose-400">↓</span>
+                                <span>{r}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Panel>
+              );
+            })()}
+
             <Panel className="p-3 sm:p-3.5">
               <p className="micro-label">Scheduled drivers and likely effect</p>
               <div className="mt-3 grid gap-[5px] xl:grid-cols-2">
                 {selectedEventRows.map((event) => (
-                  <div key={event.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div key={event.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{event.title}</p>
@@ -865,32 +948,32 @@ export default function ScannerPageClient({
                     These figures are projected from strategy-class ranges. Real historical fills will replace them as Siggi records live trades.
                   </p>
                   <div className="mt-3 grid gap-[5px] sm:grid-cols-3 xl:grid-cols-6">
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Win rate</p>
                       <p className="mt-1 text-[0.92rem] font-semibold text-white">{bt.winRatePct}%</p>
                       <p className="mt-0.5 text-[0.7rem] text-slate-400">{bt.totalTrades} signals</p>
                     </div>
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Profit factor</p>
                       <p className="mt-1 text-[0.92rem] font-semibold text-emerald-300">{bt.profitFactor.toFixed(2)}</p>
                       <p className="mt-0.5 text-[0.7rem] text-slate-400">gross profit / loss</p>
                     </div>
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Max drawdown</p>
                       <p className="mt-1 text-[0.92rem] font-semibold text-red-300">{bt.maxDrawdownPct}%</p>
                       <p className="mt-0.5 text-[0.7rem] text-slate-400">peak-to-trough</p>
                     </div>
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Ann. return</p>
-                      <p className="mt-1 text-[0.92rem] font-semibold text-cyan-200">{formatPercent(bt.annualisedReturnPct)}</p>
+                      <p className="mt-1 text-[0.92rem] font-semibold text-[#00C884]/80">{formatPercent(bt.annualisedReturnPct)}</p>
                       <p className="mt-0.5 text-[0.7rem] text-slate-400">CAGR estimate</p>
                     </div>
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Sharpe</p>
                       <p className="mt-1 text-[0.92rem] font-semibold text-white">{bt.sharpe.toFixed(2)}</p>
                       <p className="mt-0.5 text-[0.7rem] text-slate-400">risk-adjusted</p>
                     </div>
-                    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                       <p className="micro-label">Trade on</p>
                       <div className="mt-1.5">
                         <PlatformLogos platforms={getInstrumentPlatforms(universeEntry!)} />
@@ -937,22 +1020,22 @@ export default function ScannerPageClient({
                   </p>
                   {riskPerUnit > 0 && (
                     <div className="mt-3 grid gap-[5px] sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                         <p className="micro-label">1% risk · $10k account</p>
                         <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(10_000, 0.01)} units</p>
                         <p className="mt-0.5 text-[0.7rem] text-slate-400">$100 max loss on trade</p>
                       </div>
-                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                         <p className="micro-label">1% risk · $50k account</p>
                         <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(50_000, 0.01)} units</p>
                         <p className="mt-0.5 text-[0.7rem] text-slate-400">$500 max loss on trade</p>
                       </div>
-                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                         <p className="micro-label">2% risk · $10k account</p>
                         <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(10_000, 0.02)} units</p>
                         <p className="mt-0.5 text-[0.7rem] text-slate-400">$200 max loss on trade</p>
                       </div>
-                      <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+                      <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
                         <p className="micro-label">2% risk · $50k account</p>
                         <p className="mt-1 text-[0.92rem] font-semibold text-white">{calcUnits(50_000, 0.02)} units</p>
                         <p className="mt-0.5 text-[0.7rem] text-slate-400">$1,000 max loss on trade</p>
@@ -970,7 +1053,7 @@ export default function ScannerPageClient({
               <p className="micro-label">Confirmation memory</p>
               <div className="mt-3 grid gap-[5px] xl:grid-cols-2">
                 {selectedEventChecks.map((check) => (
-                  <div key={check.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div key={check.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{check.symbol}</p>

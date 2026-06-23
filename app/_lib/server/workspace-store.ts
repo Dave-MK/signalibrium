@@ -15,6 +15,7 @@ import type {
   PersistedPredictionHistoryRecord,
   PersistedPriceAlert,
   PersistedRiskControls,
+  PersistedTradeLearnings,
   PersistedScannerResult,
   PersistedSiggiAccount,
   PersistedSiggiActivity,
@@ -322,6 +323,7 @@ async function writeKvNamespacedSlices(data: PersistedWorkspaceData) {
       marketSnapshot: data.marketSnapshot,
       priceAlerts: data.priceAlerts,
       riskControls: data.riskControls,
+      tradeLearnings: data.tradeLearnings,
     })],
     ["SET", kvAssetsKey, JSON.stringify({ assets: data.assets })],
     ["SET", kvIntelligenceKey, JSON.stringify({
@@ -1428,6 +1430,10 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
               ]),
             )
           : defaultWorkspaceData.syncState.pricePulseTape,
+      dailyLossLimitNotifiedAt:
+        typeof candidate.syncState?.dailyLossLimitNotifiedAt === "string"
+          ? candidate.syncState.dailyLossLimitNotifiedAt
+          : null,
     },
     brokerConnections: Array.isArray(candidate.brokerConnections)
       ? candidate.brokerConnections.map((connection) =>
@@ -1475,6 +1481,12 @@ function normalizeWorkspaceData(raw: unknown): PersistedWorkspaceData {
     riskControls: normalizeRiskControls(
       (candidate as Partial<PersistedWorkspaceData>).riskControls,
     ),
+    tradeLearnings: (() => {
+      const raw = (candidate as Partial<PersistedWorkspaceData>).tradeLearnings;
+      if (!raw || typeof raw !== "object") return null;
+      if (typeof (raw as Record<string, unknown>).generatedAt !== "string") return null;
+      return raw as PersistedTradeLearnings;
+    })(),
   };
 
   // Reconcile prediction accuracy against actual trade outcomes (idempotent backfill)

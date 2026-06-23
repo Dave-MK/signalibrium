@@ -11,14 +11,14 @@ import { DonutChart, StatBar } from "../_components/donut-chart";
 
 function ResolutionEvidence({ text }: { text: string | null }) {
   if (!text) return null;
-  return <p className="mt-1 text-[0.72rem] leading-4 text-cyan-200">{text}</p>;
+  return <p className="mt-1 text-[0.72rem] leading-4 text-[#00C884]/80">{text}</p>;
 }
 
 function OutcomeChip({ outcome }: { outcome: string }) {
   if (outcome === "Hit Target") return <span className="inline-flex items-center rounded-[0.3rem] bg-emerald-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/30">WIN</span>;
   if (outcome === "Stopped")    return <span className="inline-flex items-center rounded-[0.3rem] bg-red-500/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-red-300 ring-1 ring-red-500/30">LOSS</span>;
   if (outcome === "Breakeven")  return <span className="inline-flex items-center rounded-[0.3rem] bg-slate-600/30 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-300 ring-1 ring-slate-500/30">BREAKEVEN</span>;
-  if (outcome === "Monitoring") return <span className="inline-flex items-center rounded-[0.3rem] bg-cyan-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-cyan-400 ring-1 ring-cyan-500/20">LIVE</span>;
+  if (outcome === "Monitoring") return <span className="inline-flex items-center rounded-[0.3rem] bg-[#00C884]/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-[#00C884] ring-1 ring-[#00C884]/20">LIVE</span>;
   return <span className="inline-flex items-center rounded-[0.3rem] bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-500 ring-1 ring-white/8">{outcome.toUpperCase()}</span>;
 }
 
@@ -71,8 +71,8 @@ export default async function HistoryPage() {
       {!hasRealHistory && (
         <Panel className="p-4 sm:p-5">
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/10 ring-1 ring-cyan-500/20">
-              <svg viewBox="0 0 20 20" fill="none" className="h-6 w-6 text-cyan-400" stroke="currentColor" strokeWidth="1.5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00C884]/10 ring-1 ring-[#00C884]/20">
+              <svg viewBox="0 0 20 20" fill="none" className="h-6 w-6 text-[#00C884]" stroke="currentColor" strokeWidth="1.5">
                 <path d="M10 3v7l4 2" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="10" cy="10" r="7" />
               </svg>
@@ -177,7 +177,7 @@ export default async function HistoryPage() {
                 label="Recent win rate"
                 value={`${accuracy.recentAccuracy}%`}
                 detail="Last 12 resolved real predictions"
-                tone="text-cyan-200"
+                tone="text-[#00C884]/80"
               />
               <SummaryCard
                 label="Real predictions tracked"
@@ -193,11 +193,11 @@ export default async function HistoryPage() {
               <div className="mt-3 grid gap-[5px]">
                 {activeCalls.length > 0 ? (
                   activeCalls.map((item) => (
-                    <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <div key={item.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
-                          <p className="mt-0.5 text-[0.76rem] font-medium text-cyan-300">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.decisionAtCall}</p>
+                          <p className="mt-0.5 text-[0.76rem] font-medium text-[#00C884]">{item.actionAtCall === "BUY" ? "LONG ▲" : item.actionAtCall === "SELL" ? "SHORT ▼" : item.actionAtCall} · {item.timeframe} · {item.decisionAtCall}</p>
                           <p className="mt-0.5 text-[0.72rem] text-slate-400">
                             Entry {item.entryAtCall} · Stop {item.stopAtCall} · Target {item.targetAtCall}
                           </p>
@@ -210,7 +210,7 @@ export default async function HistoryPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div className="signal-surface-soft rounded-[0.65rem] p-3">
                     <p className="text-[0.82rem] leading-5 text-slate-400">
                       No live calls being tracked yet. They appear here the moment Siggi locks in an ENTER NOW signal.
                     </p>
@@ -223,7 +223,7 @@ export default async function HistoryPage() {
               <p className="micro-label">Best calls</p>
               <div className="mt-3 grid gap-[5px]">
                 {bestCalls.length > 0 ? bestCalls.map((item) => (
-                  <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div key={item.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
@@ -239,7 +239,7 @@ export default async function HistoryPage() {
                     <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
                   </div>
                 )) : (
-                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div className="signal-surface-soft rounded-[0.65rem] p-3">
                     <p className="text-[0.82rem] leading-5 text-slate-400">Wins appear here as predictions resolve.</p>
                   </div>
                 )}
@@ -251,7 +251,7 @@ export default async function HistoryPage() {
               <div className="mt-3 grid gap-[5px]">
                 {breakevenCalls.length > 0 ? (
                   breakevenCalls.map((item) => (
-                    <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                    <div key={item.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
@@ -267,7 +267,7 @@ export default async function HistoryPage() {
                     </div>
                   ))
                 ) : (
-                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div className="signal-surface-soft rounded-[0.65rem] p-3">
                     <p className="text-[0.82rem] leading-5 text-slate-400">No breakeven closes yet.</p>
                   </div>
                 )}
@@ -278,7 +278,7 @@ export default async function HistoryPage() {
               <p className="micro-label">Misses to learn from</p>
               <div className="mt-3 grid gap-[5px]">
                 {misses.length > 0 ? misses.map((item) => (
-                  <div key={item.id} className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div key={item.id} className="signal-surface-soft rounded-[0.65rem] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[0.92rem] font-semibold text-white">{item.symbol}</p>
@@ -294,7 +294,7 @@ export default async function HistoryPage() {
                     <p className="mt-2 text-[0.80rem] leading-5 text-slate-300">{item.narrative}</p>
                   </div>
                 )) : (
-                  <div className="signal-surface-soft rounded-[0.4rem] p-3">
+                  <div className="signal-surface-soft rounded-[0.65rem] p-3">
                     <p className="text-[0.82rem] leading-5 text-slate-400">No losses yet — they appear here when a prediction resolves at the stop.</p>
                   </div>
                 )}

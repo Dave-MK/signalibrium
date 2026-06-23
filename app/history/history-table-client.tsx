@@ -25,13 +25,13 @@ function OutcomeChip({ outcome }: { outcome: string }) {
   if (outcome === "Breakeven")
     return <span className="inline-flex items-center rounded-[0.3rem] bg-slate-600/30 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-300 ring-1 ring-slate-500/30">BREAKEVEN</span>;
   if (outcome === "Monitoring")
-    return <span className="inline-flex items-center rounded-[0.3rem] bg-cyan-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-cyan-400 ring-1 ring-cyan-500/20">LIVE</span>;
+    return <span className="inline-flex items-center rounded-[0.3rem] bg-[#00C884]/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-[#00C884] ring-1 ring-[#00C884]/20">LIVE</span>;
   return <span className="inline-flex items-center rounded-[0.3rem] bg-white/5 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-500 ring-1 ring-white/8">{outcome.toUpperCase()}</span>;
 }
 
 function ResolutionEvidence({ text }: { text: string | null }) {
   if (!text) return null;
-  return <p className="mt-1 text-[0.72rem] leading-4 text-cyan-200">{text}</p>;
+  return <p className="mt-1 text-[0.72rem] leading-4 text-[#00C884]/80">{text}</p>;
 }
 
 function outcomeToNoteOutcome(outcome: string): TradeNoteOutcome | undefined {
@@ -101,7 +101,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setShown(PAGE_SIZE); }}
             placeholder="Search symbol…"
-            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[0.75rem] text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/40 focus:outline-none"
+            className="w-full rounded-[0.35rem] border border-white/8 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[0.75rem] text-slate-200 placeholder:text-slate-600 focus:border-[#00C884]/40 focus:outline-none"
           />
           {search && (
             <button type="button" onClick={() => { setSearch(""); setShown(PAGE_SIZE); }}
@@ -126,7 +126,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                 onClick={() => { setOutcomeFilter(f); setShown(PAGE_SIZE); }}
                 className={`rounded-[0.30rem] px-2 py-0.5 text-[0.66rem] font-semibold ring-1 transition ${
                   outcomeFilter === f
-                    ? "bg-cyan-500/15 text-cyan-200 ring-cyan-500/30"
+                    ? "bg-[#00C884]/15 text-[#00C884]/80 ring-[#00C884]/30"
                     : "bg-white/[0.03] text-slate-500 ring-white/8 hover:text-slate-300"
                 }`}
               >
@@ -176,7 +176,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                         <p className="text-[0.88rem] font-semibold text-white">{item.symbol}</p>
                         <StatusChip label={item.actionAtCall === "BUY" ? "LONG" : item.actionAtCall === "SELL" ? "SHORT" : item.actionAtCall} />
                         {item.tradedStatus === "skipped" && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-amber-900/40 text-amber-300">SIGGI SKIPPED</span>}
-                        {item.tradedStatus === "traded"  && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-cyan-900/40 text-cyan-300">SIGGI TRADED</span>}
+                        {item.tradedStatus === "traded"  && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-[#00C884]/12 text-[#00C884]">SIGGI TRADED</span>}
                         {isSeed && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-amber-900/50 text-amber-300">SEED</span>}
                       </div>
                       <p className="mt-0.5 text-[0.72rem] text-slate-400">{item.instrumentName} · {item.timeframe} · {item.horizon}</p>
@@ -241,7 +241,7 @@ export function HistoryTableClient({ items, notes, currency, rates }: Props) {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="text-[0.88rem] font-semibold text-white">{item.symbol} <span className="text-slate-400">/ {item.instrumentName}</span></p>
                       {item.tradedStatus === "skipped" && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-amber-900/40 text-amber-300">SKIPPED</span>}
-                      {item.tradedStatus === "traded"  && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-cyan-900/40 text-cyan-300">TRADED</span>}
+                      {item.tradedStatus === "traded"  && <span className="rounded px-1.5 py-0.5 text-[0.60rem] font-semibold uppercase tracking-wider bg-[#00C884]/12 text-[#00C884]">TRADED</span>}
                       {isSeed && <span className="rounded px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider bg-amber-900/50 text-amber-300">SEED</span>}
                     </div>
                     <p className="mt-0.5 text-[0.74rem] text-slate-400">{item.assetClass} / {item.timeframe} / {item.horizon}</p>

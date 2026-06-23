@@ -104,6 +104,8 @@ export type PersistedAssetRecord = Asset & {
 
 export type OpportunityAnalysisStatus = "Ranked" | "Analysing" | "Analysed";
 
+export type AiSignalVerdict = "Strong" | "Good" | "Marginal" | "Skip";
+
 export type OpportunityAnalysisSnapshot = {
   bias: string;
   weeklyOutlook: string;
@@ -142,6 +144,20 @@ export type OpportunityAnalysisSnapshot = {
   executionNotes: string[];
   analyzedAt: string;
   timeframe: string;
+  /** AI-generated signal quality score (0–100). Null if Gemini is not configured. */
+  aiScore?: number | null;
+  /** AI verdict on whether to act on this setup. */
+  aiVerdict?: AiSignalVerdict | null;
+  /** AI reasoning narrative (2–3 sentences). */
+  aiReasoning?: string | null;
+  /** Specific patterns or confluences the AI identified. */
+  aiPatterns?: string[] | null;
+  /** Key risks or reasons for caution identified by the AI. */
+  aiKeyRisks?: string[] | null;
+  /** When the AI last scored this setup. */
+  aiScoredAt?: string | null;
+  /** Refined entry suggestion from the AI based on the raw candle tape (OB, FVG, S/R). Empty string = use computed zone. */
+  aiEntryRefinement?: string | null;
   chartAnnotations: {
     supportLevels: number[];
     resistanceLevels: number[];
@@ -293,6 +309,7 @@ export type PersistedSiggiTrade = {
   stopMode: "Initial" | "Breakeven" | "Trailing";
   initialStopPrice: number;
   partialExitDone: boolean;
+  partialExitTp2Done?: boolean;
   stakeGbp: number;
   stakeUsd: number;
   quantity: number;
@@ -302,6 +319,8 @@ export type PersistedSiggiTrade = {
   brokerOrderId?: string | null;
   /** Close order ID returned by the broker (set when Siggi closes the position). */
   brokerCloseOrderId?: string | null;
+  /** Siggi's Read verdict at the time this trade was opened. Used to measure AI accuracy over time. */
+  aiVerdictAtOpen?: AiSignalVerdict | null;
   currentPriceUsd: number | null;
   unrealizedPnlGbp: number | null;
   unrealizedPnlUsd: number | null;
@@ -428,6 +447,29 @@ export type PersistedPriceAlert = {
   updatedAt: string;
 };
 
+/**
+ * AI-generated performance learnings derived from Siggi's closed trades.
+ * Refreshed automatically whenever new trades close.
+ */
+export type PersistedTradeLearnings = {
+  /** ISO timestamp of when this analysis was generated. */
+  generatedAt: string;
+  /** How many closed trades were analysed to produce this. */
+  tradesAnalyzed: number;
+  /** One-sentence summary of what Siggi's current edge looks like. */
+  currentEdge: string;
+  /** Patterns and conditions that have been correlating with wins. */
+  winPatterns: string[];
+  /** Patterns and conditions that have been correlating with losses — avoid these. */
+  lossPatterns: string[];
+  /** Active risk warnings to flag when a new signal matches a danger pattern. */
+  riskWarnings: string[];
+  /** How well the AI verdicts (Strong/Good/Marginal/Skip) predicted outcomes. */
+  verdictCalibration: string;
+  /** Overall confidence in the current edge given recent results. */
+  overallConfidence: "High" | "Moderate" | "Low";
+};
+
 /** Siggi risk guard-rails — persisted per-workspace so they survive deploys. */
 export type PersistedRiskControls = {
   /** Max risk per trade as a fraction of equity (default 0.02 = 2%). */
@@ -464,6 +506,8 @@ export type PersistedWorkspaceData = {
     intelligenceLastSyncedAt: string;
     pricePulseLastSyncedAt: string;
     pricePulseTape: Record<string, PersistedPricePulsePoint[]>;
+    /** ISO timestamp of the last daily-loss-limit breach notification — prevents spam. */
+    dailyLossLimitNotifiedAt: string | null;
   };
   brokerConnections: PersistedBrokerConnection[];
   watchlists: PersistedWatchlist[];
@@ -480,4 +524,6 @@ export type PersistedWorkspaceData = {
   siggiAccount: PersistedSiggiAccount;
   priceAlerts: PersistedPriceAlert[];
   riskControls: PersistedRiskControls;
+  /** AI-generated learnings from Siggi's closed trades — null until enough trades close. */
+  tradeLearnings: PersistedTradeLearnings | null;
 };

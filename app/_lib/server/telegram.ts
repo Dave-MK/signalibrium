@@ -157,6 +157,42 @@ export function formatTradeClosedMessage(trade: {
   ].join("\n");
 }
 
+export function formatPriceAlertMessage(alert: {
+  symbol: string;
+  label: string;
+  condition: "above" | "below";
+  targetPrice: number;
+  currentPrice: number;
+}): string {
+  const dir = alert.condition === "above" ? "▲ crossed above" : "▼ crossed below";
+  return [
+    `🔔 <b>PRICE ALERT — ${alert.symbol}</b>`,
+    `${alert.label}`,
+    ``,
+    `${dir} <b>${fmt(alert.targetPrice, 4)}</b>`,
+    `Current price: ${fmt(alert.currentPrice, 4)}`,
+  ].join("\n");
+}
+
+export function formatDailyLossLimitMessage(params: {
+  limitPercent: number;
+  dropPercent: number;
+  startEquityGbp: number;
+  currentEquityGbp: number;
+}): string {
+  return [
+    `⛔ <b>SIGGI — DAILY LOSS LIMIT HIT</b>`,
+    ``,
+    `Limit:    ${fmt(params.limitPercent, 1)}%  of start-of-day equity`,
+    `Drawdown: ${fmt(params.dropPercent, 1)}%`,
+    ``,
+    `Start:   £${fmt(params.startEquityGbp)}`,
+    `Current: £${fmt(params.currentEquityGbp)}`,
+    ``,
+    `<i>Siggi has paused new trades for the rest of the day.</i>`,
+  ].join("\n");
+}
+
 export function formatEnterNowMessage(signal: {
   symbol: string;
   instrumentName: string;

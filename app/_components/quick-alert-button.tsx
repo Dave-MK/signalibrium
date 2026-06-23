@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * QuickAlertButton
@@ -93,7 +93,7 @@ function Popover({
       <div
         ref={ref}
         style={{ position: "absolute", top, left, width: 272 }}
-        className="z-[9994] rounded-[0.55rem] border border-white/10 bg-[#07111d] p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.8)]"
+        className="z-[9994] rounded-[0.55rem] border border-white/10 bg-[#111210] p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.8)]"
       >
         <p className="mb-2.5 text-[0.76rem] font-semibold text-white">Set price alert · {prefill.symbol}</p>
         <form onSubmit={submit} className="space-y-2.5">
@@ -102,7 +102,7 @@ function Popover({
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="w-full rounded-[0.3rem] border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:border-cyan-500/40 focus:outline-none"
+              className="w-full rounded-[0.3rem] border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:border-[#00C884]/40 focus:outline-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -111,7 +111,7 @@ function Popover({
               <select
                 value={condition}
                 onChange={(e) => setCondition(e.target.value as "above" | "below")}
-                className="w-full rounded-[0.3rem] border border-white/8 bg-[#07111d] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:outline-none"
+                className="w-full rounded-[0.3rem] border border-white/8 bg-[#111210] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:outline-none"
               >
                 <option value="above">Above</option>
                 <option value="below">Below</option>
@@ -124,7 +124,7 @@ function Popover({
                 step="any"
                 value={priceStr}
                 onChange={(e) => setPriceStr(e.target.value)}
-                className="w-full rounded-[0.3rem] border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:border-cyan-500/40 focus:outline-none"
+                className="w-full rounded-[0.3rem] border border-white/8 bg-white/[0.03] px-2.5 py-1.5 text-[0.75rem] text-slate-200 focus:border-[#00C884]/40 focus:outline-none"
               />
             </div>
           </div>
@@ -133,7 +133,7 @@ function Popover({
             <button
               type="submit"
               disabled={pending}
-              className="flex-1 rounded-[0.3rem] bg-cyan-500/15 py-1.5 text-[0.72rem] font-semibold text-cyan-300 ring-1 ring-cyan-500/25 transition hover:bg-cyan-500/25 disabled:opacity-50"
+              className="flex-1 rounded-[0.3rem] bg-[#00C884]/15 py-1.5 text-[0.72rem] font-semibold text-[#00C884] ring-1 ring-[#00C884]/25 transition hover:bg-[#00C884]/25 disabled:opacity-50"
             >
               {pending ? "Saving…" : "Save alert"}
             </button>

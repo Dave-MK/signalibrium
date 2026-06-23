@@ -10,8 +10,9 @@ export default async function AlertsPage() {
   return (
     <div className="panel-stack-5">
       <PageHeader
-        title="Price Alerts"
-        description="Set a target price on any symbol — you'll get an instant notification (in-app and OS push if enabled) the moment price crosses the level."
+        eyebrow="Alerts"
+        title="Never Miss What Matters."
+        description="Set price alerts for any instrument — you'll get an instant notification the moment price crosses your level. In-app and OS push supported."
       />
 
       <Panel className="p-4">

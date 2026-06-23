@@ -24,7 +24,7 @@ function WatchMetric({
   value: string;
 }) {
   return (
-    <div className="signal-surface-soft rounded-[0.4rem] p-2.5">
+    <div className="signal-surface-soft rounded-[0.65rem] p-2.5">
       <p className="micro-label">{label}</p>
       <p className="mt-1.5 text-[0.82rem] font-semibold text-white">{value}</p>
     </div>
@@ -197,7 +197,7 @@ export default function AssetsPageClient({
             </div>
 
             {syncSummary ? (
-              <div className="signal-surface-soft mt-3 rounded-[0.4rem] p-3">
+              <div className="signal-surface-soft mt-3 rounded-[0.65rem] p-3">
                 <p className="micro-label">Live Sync</p>
                 <p className="mt-1.5 text-[0.84rem] font-semibold text-white">
                   {syncSummary.syncedSymbols.length} symbols refreshed
@@ -209,7 +209,7 @@ export default function AssetsPageClient({
             ) : null}
           </div>
 
-          <div className="signal-surface-soft rounded-[0.4rem] p-3">
+          <div className="signal-surface-soft rounded-[0.65rem] p-3">
             <p className="micro-label">New Watchlist</p>
             <div className="mt-3 space-y-2.5">
               <input
@@ -247,7 +247,7 @@ export default function AssetsPageClient({
                   <div className="mt-1.5 flex items-center gap-2">
                     <Link
                       href={`/assets/${asset.symbol}`}
-                      className="text-[1rem] font-semibold text-white transition hover:text-cyan-200"
+                      className="text-[1rem] font-semibold text-white transition hover:text-[#00C884]/80"
                     >
                       {asset.symbol}
                     </Link>

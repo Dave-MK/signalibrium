@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -183,16 +183,16 @@ export function GettingStartedChecklist() {
           right: open ? panelWidth : 0,
           transition: "right 300ms cubic-bezier(0.4,0,0.2,1)",
         }}
-        className="fixed top-1/2 z-50 -translate-y-1/2 cursor-pointer select-none rounded-l-[0.55rem] border border-r-0 border-cyan-400/25 bg-gradient-to-b from-[#0d2236] to-[#091a2b] shadow-[0_4px_24px_rgba(0,0,0,0.55),-2px_0_12px_rgba(6,182,212,0.08)] backdrop-blur-xl"
+        className="fixed top-1/2 z-50 -translate-y-1/2 cursor-pointer select-none rounded-l-[0.55rem] border border-r-0 border-[#00C884]/25 bg-gradient-to-b from-[#0d2236] to-[#091a2b] shadow-[0_4px_24px_rgba(0,0,0,0.55),-2px_0_12px_rgba(0,200,132,0.08)] backdrop-blur-xl"
       >
         {/* Coloured accent strip on left edge */}
-        <span className="absolute inset-y-0 left-0 w-[3px] rounded-l-[0.55rem] bg-gradient-to-b from-cyan-400 to-violet-500 opacity-80" />
+        <span className="absolute inset-y-0 left-0 w-[3px] rounded-l-[0.55rem] bg-gradient-to-b from-[#00C884] to-[#00F79A] opacity-80" />
 
         <div className="px-2.5 py-3.5">
           {/* Checklist icon */}
           <svg
             viewBox="0 0 20 20"
-            className="mx-auto h-[1.1rem] w-[1.1rem] text-cyan-300"
+            className="mx-auto h-[1.1rem] w-[1.1rem] text-[#00C884]"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.6"
@@ -215,7 +215,7 @@ export function GettingStartedChecklist() {
 
           {/* Vertical label */}
           <span
-            className="mt-2 block text-[0.58rem] font-bold uppercase tracking-[0.12em] text-cyan-400"
+            className="mt-2 block text-[0.58rem] font-bold uppercase tracking-[0.12em] text-[#00C884]"
             style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
           >
             Guide
@@ -245,7 +245,7 @@ export function GettingStartedChecklist() {
       {/* ── Slide-out panel ───────────────────────────────────────────── */}
       <div
         style={{ width: panelWidth }}
-        className={`fixed top-0 right-0 z-40 flex h-full flex-col border-l border-white/8 bg-[#07111d]/98 shadow-[0_0_60px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-transform duration-300 ${
+        className={`fixed top-0 right-0 z-40 flex h-full flex-col border-l border-white/8 bg-[#111210]/98 shadow-[0_0_60px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -276,13 +276,13 @@ export function GettingStartedChecklist() {
           <div className="mt-3">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-[0.68rem] text-slate-500">{completedCount} of {total} done</span>
-              <span className={`text-[0.68rem] font-semibold ${progress === 100 ? "text-emerald-400" : "text-cyan-300"}`}>
+              <span className={`text-[0.68rem] font-semibold ${progress === 100 ? "text-emerald-400" : "text-[#00C884]"}`}>
                 {progress}%
               </span>
             </div>
             <div className="h-1 w-full overflow-hidden rounded-full bg-white/8">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-[width] duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-[#00C884] to-[#00F79A] transition-[width] duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -302,7 +302,7 @@ export function GettingStartedChecklist() {
                   isDone
                     ? "bg-emerald-500/6"
                     : onThisPage
-                      ? "bg-cyan-400/6 ring-1 ring-cyan-400/15"
+                      ? "bg-[#00C884]/6 ring-1 ring-[#00C884]/15"
                       : "hover:bg-white/[0.03]"
                 }`}
               >
@@ -344,19 +344,19 @@ export function GettingStartedChecklist() {
                         <button
                           type="button"
                           onClick={() => toggle(step.id)}
-                          className="text-[0.70rem] font-semibold text-cyan-400 transition hover:text-cyan-200"
+                          className="text-[0.70rem] font-semibold text-[#00C884] transition hover:text-[#00C884]/80"
                         >
                           {isDone ? "✓ Done" : "Got it →"}
                         </button>
                       ) : onThisPage ? (
-                        <span className="inline-flex items-center gap-1 text-[0.70rem] font-semibold text-cyan-300">
-                          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(0,229,255,0.8)]" />
+                        <span className="inline-flex items-center gap-1 text-[0.70rem] font-semibold text-[#00C884]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#00C884] shadow-[0_0_6px_rgba(0,200,132,0.8)]" />
                           You&apos;re here
                         </span>
                       ) : (
                         <Link
                           href={step.href}
-                          className="text-[0.70rem] font-semibold text-slate-400 transition hover:text-cyan-300"
+                          className="text-[0.70rem] font-semibold text-slate-400 transition hover:text-[#00C884]"
                           onClick={closePanel}
                         >
                           Go to {step.pageLabel} →
