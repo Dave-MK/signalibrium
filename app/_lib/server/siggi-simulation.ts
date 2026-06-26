@@ -40,15 +40,15 @@ const maxPortfolioHeatRatio = 0.40;    // was 0.06 — up to 40% of equity at op
 const maxTradesPerAssetClass = 6;      // was 2 — more diversity per asset class allowed
 const bustThresholdGbp = 50;           // scale with £10k starting balance (was £1 for £50 account)
 
-function clamp(value: number, minimum: number, maximum: number) {
+export function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
-function roundMoney(value: number) {
+export function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
-function convertGbpToUsd(valueGbp: number, usdToGbpRate: number) {
+export function convertGbpToUsd(valueGbp: number, usdToGbpRate: number) {
   if (!Number.isFinite(usdToGbpRate) || usdToGbpRate <= 0) {
     return valueGbp;
   }
@@ -56,7 +56,7 @@ function convertGbpToUsd(valueGbp: number, usdToGbpRate: number) {
   return valueGbp / usdToGbpRate;
 }
 
-function computeUnrealizedPnlUsd(trade: PersistedSiggiTrade, currentPriceUsd: number) {
+export function computeUnrealizedPnlUsd(trade: PersistedSiggiTrade, currentPriceUsd: number) {
   return trade.side === "SELL"
     ? (trade.entryPrice - currentPriceUsd) * trade.quantity
     : (currentPriceUsd - trade.entryPrice) * trade.quantity;
@@ -93,7 +93,7 @@ function buildActivity(input: {
  * "Stopped"     = closed at a loss  (P&L < 0)
  * "Breakeven"   = closed at entry   (P&L = 0, within a £0.01 rounding tolerance)
  */
-function pnlToTradeStatus(
+export function pnlToTradeStatus(
   realizedPnlGbp: number,
 ): "Hit Target" | "Stopped" | "Breakeven" {
   if (realizedPnlGbp > 0.01)  return "Hit Target";
@@ -106,7 +106,7 @@ function pnlToTradeStatus(
  * (Stopped), stopping as soon as a win (Hit Target) or Breakeven is hit.
  * closedTrades is newest-first so this naturally counts the current streak.
  */
-function computeConsecutiveLosses(account: PersistedSiggiAccount): number {
+export function computeConsecutiveLosses(account: PersistedSiggiAccount): number {
   let count = 0;
   for (const trade of account.closedTrades) {
     if (trade.status === "Stopped") {
@@ -157,7 +157,7 @@ function buildTradeNarrative(
   return `${openPhrase} ${record.symbol} ${record.actionAtCall === "SELL" ? "short" : "long"} on the ${record.timeframe}. ${convictionLine}${patternNote}${eventNote}${levelsLine}`.trim();
 }
 
-function computeTotalEquityGbp(account: PersistedSiggiAccount) {
+export function computeTotalEquityGbp(account: PersistedSiggiAccount) {
   return roundMoney(
     account.cashBalanceGbp +
       account.openTrades.reduce(
@@ -167,7 +167,7 @@ function computeTotalEquityGbp(account: PersistedSiggiAccount) {
   );
 }
 
-function computeTotalOpenRiskGbp(account: PersistedSiggiAccount, usdToGbpRate: number) {
+export function computeTotalOpenRiskGbp(account: PersistedSiggiAccount, usdToGbpRate: number) {
   return account.openTrades.reduce((total, trade) => {
     const riskPerUnit = Math.abs(trade.entryPrice - trade.stopPrice);
     return total + riskPerUnit * trade.quantity * usdToGbpRate;
@@ -234,7 +234,7 @@ function collapseDuplicateOpenTrades(account: PersistedSiggiAccount, syncedAt: s
  * Returns the correlation group key for a given symbol, or null if none.
  * Used to prevent Siggi from doubling up on highly-correlated positions.
  */
-function getCorrelationGroup(symbol: string): string | null {
+export function getCorrelationGroup(symbol: string): string | null {
   const upper = symbol.toUpperCase().replace(/\s/g, "");
   for (const [group, members] of Object.entries(CORRELATION_GROUPS)) {
     if (members.some((m) => m.toUpperCase().replace(/\s/g, "") === upper)) {
@@ -254,7 +254,7 @@ const signalMaxAgeHours: Record<string, number> = {
   Month: 96,
 };
 
-function computeRiskReward(record: PersistedPredictionHistoryRecord) {
+export function computeRiskReward(record: PersistedPredictionHistoryRecord) {
   const entryPrice =
     record.actionAtCall === "SELL" ? record.entryHighAtCall : record.entryLowAtCall;
   const riskDistance = Math.abs(entryPrice - record.stopPriceAtCall);
@@ -264,7 +264,7 @@ function computeRiskReward(record: PersistedPredictionHistoryRecord) {
   return rewardDistance / riskDistance;
 }
 
-function isSignalFresh(record: PersistedPredictionHistoryRecord, nowMs: number) {
+export function isSignalFresh(record: PersistedPredictionHistoryRecord, nowMs: number) {
   const maxAgeHours = signalMaxAgeHours[record.horizon] ?? 24;
   const calledAtMs = Date.parse(record.calledAt);
   return Number.isFinite(calledAtMs) && nowMs - calledAtMs <= maxAgeHours * 60 * 60 * 1000;
@@ -928,7 +928,7 @@ function maybeTimeoutTrade(input: {
   );
 }
 
-function shouldCloseFromLivePrice(trade: PersistedSiggiTrade, currentPriceUsd: number) {
+export function shouldCloseFromLivePrice(trade: PersistedSiggiTrade, currentPriceUsd: number) {
   if (trade.side === "SELL") {
     const targetHit = currentPriceUsd <= trade.targetPrice;
     const stopHit = currentPriceUsd >= trade.stopPrice;
