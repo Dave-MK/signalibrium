@@ -5,6 +5,7 @@ import {
   computeRiskReward,
   computeTotalEquityGbp,
   computeTotalOpenRiskGbp,
+  computeTradeSizing,
   computeUnrealizedPnlUsd,
   convertGbpToUsd,
   getCorrelationGroup,
@@ -12,7 +13,9 @@ import {
   pnlToTradeStatus,
   roundMoney,
   shouldCloseFromLivePrice,
+  type TradeSizingInput,
 } from "./siggi-simulation";
+import { DEFAULT_RISK_CONTROLS } from "./workspace-types";
 import type {
   PersistedPredictionHistoryRecord,
   PersistedSiggiAccount,
@@ -281,5 +284,111 @@ describe("getCorrelationGroup", () => {
 
   it("returns null for an uncorrelated / unknown symbol", () => {
     expect(getCorrelationGroup("DOGE/USD")).toBeNull();
+  });
+});
+
+// ── Position sizing (the core money calculation) ─────────────────────────────
+
+function sizingInput(overrides: Partial<TradeSizingInput> = {}): TradeSizingInput {
+  // Baseline: £10k equity, all cash free, no drawdown, no losing streak, max
+  // confidence, normal volatility, 0.8 GBP/USD. With entry 100 / stop-distance
+  // 10 this yields a clean stake £2400 / qty 30 (see the baseline test below).
+  return {
+    entryPrice: 100,
+    riskDistanceUsd: 10,
+    totalEquityGbp: 10_000,
+    freeCashGbp: 10_000,
+    highWatermarkGbp: 10_000,
+    consecutiveLosses: 0,
+    confidence: 95,
+    volatility: null,
+    usdToGbpRate: 0.8,
+    riskCtx: { ...DEFAULT_RISK_CONTROLS },
+    ...overrides,
+  };
+}
+
+describe("computeTradeSizing", () => {
+  it("computes the baseline stake, USD stake and quantity (known-answer)", () => {
+    const r = computeTradeSizing(sizingInput());
+    expect(r).not.toBeNull();
+    // effectiveMaxRisk = 0.02 * 1 * 1 * 1.20 (max confidence) * 1 = 0.024
+    expect(r!.effectiveMaxRisk).toBeCloseTo(0.024, 6);
+    expect(r!.stakeGbp).toBeCloseTo(2400, 6);
+    expect(r!.stakeUsd).toBeCloseTo(3000, 6); // 2400 / 0.8
+    expect(r!.quantity).toBeCloseTo(30, 6); // min(3000/100, 300/10)
+    expect(r!.volatilityMultiplier).toBe(1.0);
+    expect(r!.drawdownMultiplier).toBe(1.0);
+    expect(r!.antiTiltMultiplier).toBe(1.0);
+  });
+
+  it("never risks more than the position-size cap when one is set", () => {
+    const r = computeTradeSizing(
+      sizingInput({ riskCtx: { ...DEFAULT_RISK_CONTROLS, maxPositionSizeGbp: 100 } }),
+    );
+    expect(r).not.toBeNull();
+    expect(r!.stakeGbp).toBeCloseTo(100, 6); // clamped from 2400 down to the cap
+    expect(r!.quantity).toBeCloseTo(1.25, 6); // min(125/100, 12.5/10)
+  });
+
+  // ── Guards return null (do not open) ──────────────────────────────────────
+
+  it("blocks the trade when the stop distance is invalid", () => {
+    expect(computeTradeSizing(sizingInput({ riskDistanceUsd: 0 }))).toBeNull();
+    expect(computeTradeSizing(sizingInput({ riskDistanceUsd: -5 }))).toBeNull();
+    expect(computeTradeSizing(sizingInput({ riskDistanceUsd: Number.NaN }))).toBeNull();
+  });
+
+  it("blocks the trade when deployable cash is below the floor", () => {
+    // cashReserve = 500, min-to-trade = 50 → need freeCash - 500 > 50.
+    expect(computeTradeSizing(sizingInput({ freeCashGbp: 500 }))).toBeNull(); // deployable 0
+    expect(computeTradeSizing(sizingInput({ freeCashGbp: 550 }))).toBeNull(); // deployable exactly 50, not > 50
+    expect(computeTradeSizing(sizingInput({ freeCashGbp: 560 }))).not.toBeNull(); // deployable 60 > 50
+  });
+
+  // ── The four independent risk throttles ───────────────────────────────────
+
+  it("applies the volatility throttle", () => {
+    expect(computeTradeSizing(sizingInput({ volatility: "Fast" }))!.volatilityMultiplier).toBe(0.75);
+    expect(computeTradeSizing(sizingInput({ volatility: "Elevated" }))!.volatilityMultiplier).toBe(0.875);
+    expect(computeTradeSizing(sizingInput({ volatility: "Calm" as TradeSizingInput["volatility"] }))!.volatilityMultiplier).toBe(1.0);
+  });
+
+  it("halves risk on a drawdown deeper than 8% from the high-water mark", () => {
+    // equity 10k, peak 20k → 50% drawdown
+    expect(computeTradeSizing(sizingInput({ highWatermarkGbp: 20_000 }))!.drawdownMultiplier).toBe(0.5);
+    // equity 10k, peak 10.5k → ~4.8% drawdown, under the 8% threshold
+    expect(computeTradeSizing(sizingInput({ highWatermarkGbp: 10_500 }))!.drawdownMultiplier).toBe(1.0);
+  });
+
+  it("applies the anti-tilt throttle by streak length", () => {
+    expect(computeTradeSizing(sizingInput({ consecutiveLosses: 2 }))!.antiTiltMultiplier).toBe(1.0);
+    expect(computeTradeSizing(sizingInput({ consecutiveLosses: 3 }))!.antiTiltMultiplier).toBe(0.6);
+    expect(computeTradeSizing(sizingInput({ consecutiveLosses: 4 }))!.antiTiltMultiplier).toBe(0.6);
+    expect(computeTradeSizing(sizingInput({ consecutiveLosses: 5 }))!.antiTiltMultiplier).toBe(0.4);
+  });
+
+  it("scales risk between 0.85x (min confidence) and 1.20x (95%+)", () => {
+    // At/below min confidence (68): 0.02 * 0.85 = 0.017
+    expect(computeTradeSizing(sizingInput({ confidence: 68 }))!.effectiveMaxRisk).toBeCloseTo(0.017, 6);
+    expect(computeTradeSizing(sizingInput({ confidence: 40 }))!.effectiveMaxRisk).toBeCloseTo(0.017, 6); // clamped, not negative
+    // At max (95): 0.02 * 1.20 = 0.024
+    expect(computeTradeSizing(sizingInput({ confidence: 95 }))!.effectiveMaxRisk).toBeCloseTo(0.024, 6);
+  });
+
+  it("compounds all four throttles multiplicatively", () => {
+    // Fast (0.75) * deep-drawdown (0.5) * max-confidence (1.20) * 5-loss tilt (0.4)
+    // effectiveMaxRisk = 0.02 * 0.75 * 0.5 * 1.20 * 0.4 = 0.0036
+    const r = computeTradeSizing(
+      sizingInput({ volatility: "Fast", highWatermarkGbp: 20_000, confidence: 95, consecutiveLosses: 5 }),
+    );
+    expect(r!.effectiveMaxRisk).toBeCloseTo(0.0036, 8);
+  });
+
+  it("falls back gracefully when the FX rate is invalid (stake stays in GBP terms)", () => {
+    const r = computeTradeSizing(sizingInput({ usdToGbpRate: 0 }));
+    expect(r).not.toBeNull();
+    // convertGbpToUsd returns the GBP value unchanged, so stakeUsd == stakeGbp
+    expect(r!.stakeUsd).toBeCloseTo(r!.stakeGbp, 6);
   });
 });

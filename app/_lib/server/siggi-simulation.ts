@@ -485,6 +485,108 @@ function shouldOpenTrade(input: {
   return { allow: true, reason: null };
 }
 
+/** Inputs to the pure position-sizing calculation. */
+export type TradeSizingInput = {
+  /** Entry price in USD (entry-low for a BUY, entry-high for a SELL). */
+  entryPrice: number;
+  /** Absolute stop distance from entry, in USD. */
+  riskDistanceUsd: number;
+  /** Current total account equity in GBP. */
+  totalEquityGbp: number;
+  /** Free (uncommitted) cash in GBP. */
+  freeCashGbp: number;
+  /** All-time equity high-water mark in GBP, used for the drawdown throttle. */
+  highWatermarkGbp: number;
+  /** Current consecutive-loss streak (drives the anti-tilt throttle). */
+  consecutiveLosses: number;
+  /** Signal confidence (0–100). */
+  confidence: number;
+  /** Asset volatility band, or null when unknown. */
+  volatility: PersistedAssetRecord["volatility"] | null;
+  /** USD→GBP rate (GBP per USD). */
+  usdToGbpRate: number;
+  /** Active risk controls. */
+  riskCtx: RiskCtx;
+};
+
+/** Result of the sizing calculation, or `null` when a guard blocks the trade. */
+export type TradeSizingResult = {
+  stakeGbp: number;
+  stakeUsd: number;
+  quantity: number;
+  effectiveMaxRisk: number;
+  volatilityMultiplier: number;
+  drawdownMultiplier: number;
+  antiTiltMultiplier: number;
+};
+
+/**
+ * Pure position-sizing for a new Siggi trade.
+ *
+ * Tier 3 risk model — base risk-per-trade is scaled by four independent
+ * throttles (volatility, drawdown-from-peak, confidence, anti-tilt), then
+ * converted into a GBP stake and a USD quantity. Returns `null` when any
+ * guard trips (invalid stop distance, insufficient deployable cash, or a
+ * non-positive computed quantity), meaning the trade should not be opened.
+ *
+ * Behaviour-preserving extraction of the maths previously inline in
+ * openSiggiTrade — see siggi-simulation.test.ts for the locked-in semantics.
+ */
+export function computeTradeSizing(input: TradeSizingInput): TradeSizingResult | null {
+  if (!Number.isFinite(input.riskDistanceUsd) || input.riskDistanceUsd <= 0) {
+    return null;
+  }
+
+  const cashReserve = input.totalEquityGbp * input.riskCtx.minCashReserveRatio;
+  const minimumFreeCashToTradeGbp = Math.max(10, input.totalEquityGbp * 0.005);
+  const deployable = input.freeCashGbp - cashReserve;
+
+  if (deployable <= minimumFreeCashToTradeGbp) {
+    return null;
+  }
+
+  // Tier 3 — volatility-adjusted, drawdown-throttled, confidence-weighted, anti-tilt risk sizing
+  const volatilityMultiplier =
+    input.volatility === "Fast" ? 0.75
+    : input.volatility === "Elevated" ? 0.875
+    : 1.0;
+  const highWatermark = Math.max(input.highWatermarkGbp, input.totalEquityGbp);
+  const drawdownFromPeak = highWatermark > 0 ? (highWatermark - input.totalEquityGbp) / highWatermark : 0;
+  const drawdownMultiplier = drawdownFromPeak > 0.08 ? 0.5 : 1.0;
+  // Scale between 0.85× (min confidence) and 1.20× (95%+ confidence)
+  const confidenceRange = Math.max(0, Math.min(1, (input.confidence - minConfidence) / (95 - minConfidence)));
+  const confidenceMultiplier = 0.85 + confidenceRange * 0.35;
+  // Anti-tilt: halve risk after 3 consecutive losses, cap at 40% after 5+
+  const antiTiltMultiplier = input.consecutiveLosses >= 5 ? 0.4 : input.consecutiveLosses >= 3 ? 0.6 : 1.0;
+  const effectiveMaxRisk = input.riskCtx.maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier * confidenceMultiplier * antiTiltMultiplier;
+
+  // Risk-based sizing: stake = riskAmount / stopDistance
+  const riskAmount = input.totalEquityGbp * effectiveMaxRisk;
+  const stopDistanceRatio = input.riskDistanceUsd / Math.max(input.entryPrice, 0.000001);
+  const stakeGbpCap = input.riskCtx.maxPositionSizeGbp != null
+    ? Math.min(deployable, input.riskCtx.maxPositionSizeGbp)
+    : deployable;
+  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), Math.max(10, input.totalEquityGbp * 0.005), stakeGbpCap);
+  const riskBudgetGbp = stakeGbp * stopDistanceRatio;
+  const stakeUsd = convertGbpToUsd(stakeGbp, input.usdToGbpRate);
+  const riskBudgetUsd = convertGbpToUsd(riskBudgetGbp, input.usdToGbpRate);
+  const quantity = Math.min(stakeUsd / Math.max(input.entryPrice, 0.000001), riskBudgetUsd / input.riskDistanceUsd);
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return null;
+  }
+
+  return {
+    stakeGbp,
+    stakeUsd,
+    quantity,
+    effectiveMaxRisk,
+    volatilityMultiplier,
+    drawdownMultiplier,
+    antiTiltMultiplier,
+  };
+}
+
 function openSiggiTrade(input: {
   account: PersistedSiggiAccount;
   asset: PersistedAssetRecord | null;
@@ -499,52 +601,35 @@ function openSiggiTrade(input: {
   const entryPrice =
     direction === "SELL" ? input.record.entryHighAtCall : input.record.entryLowAtCall;
   const riskDistanceUsd = Math.abs(entryPrice - input.record.stopPriceAtCall);
-
-  if (!Number.isFinite(riskDistanceUsd) || riskDistanceUsd <= 0) {
-    return input.account;
-  }
-
   const totalEquityGbp = computeTotalEquityGbp(input.account);
-  const freeCash = input.account.cashBalanceGbp;
-  const cashReserve = totalEquityGbp * riskCtx.minCashReserveRatio;
-  const minimumFreeCashToTradeGbp = Math.max(10, totalEquityGbp * 0.005);
-  const deployable = freeCash - cashReserve;
-
-  if (deployable <= minimumFreeCashToTradeGbp) {
-    return input.account;
-  }
-
-  // Tier 3 — volatility-adjusted, drawdown-throttled, confidence-weighted, anti-tilt risk sizing
-  const volatilityMultiplier =
-    input.asset?.volatility === "Fast" ? 0.75
-    : input.asset?.volatility === "Elevated" ? 0.875
-    : 1.0;
-  const highWatermark = Math.max(input.account.highWatermarkGbp, totalEquityGbp);
-  const drawdownFromPeak = highWatermark > 0 ? (highWatermark - totalEquityGbp) / highWatermark : 0;
-  const drawdownMultiplier = drawdownFromPeak > 0.08 ? 0.5 : 1.0;
-  // Scale between 0.85× (min confidence) and 1.20× (95%+ confidence)
-  const confidenceRange = Math.max(0, Math.min(1, (input.view.confidence - minConfidence) / (95 - minConfidence)));
-  const confidenceMultiplier = 0.85 + confidenceRange * 0.35;
-  // Anti-tilt: halve risk after 3 consecutive losses, cap at 40% after 5+
   const consecutiveLosses = computeConsecutiveLosses(input.account);
-  const antiTiltMultiplier = consecutiveLosses >= 5 ? 0.4 : consecutiveLosses >= 3 ? 0.6 : 1.0;
-  const effectiveMaxRisk = riskCtx.maxRiskPerTrade * volatilityMultiplier * drawdownMultiplier * confidenceMultiplier * antiTiltMultiplier;
 
-  // Risk-based sizing: stake = riskAmount / stopDistance
-  const riskAmount = totalEquityGbp * effectiveMaxRisk;
-  const stopDistanceRatio = riskDistanceUsd / Math.max(entryPrice, 0.000001);
-  const stakeGbpCap = riskCtx.maxPositionSizeGbp != null
-    ? Math.min(deployable, riskCtx.maxPositionSizeGbp)
-    : deployable;
-  const stakeGbp = clamp(riskAmount / Math.max(stopDistanceRatio, 0.001), Math.max(10, totalEquityGbp * 0.005), stakeGbpCap);
-  const riskBudgetGbp = stakeGbp * stopDistanceRatio;
-  const stakeUsd = convertGbpToUsd(stakeGbp, input.usdToGbpRate);
-  const riskBudgetUsd = convertGbpToUsd(riskBudgetGbp, input.usdToGbpRate);
-  const quantity = Math.min(stakeUsd / Math.max(entryPrice, 0.000001), riskBudgetUsd / riskDistanceUsd);
+  const sizing = computeTradeSizing({
+    entryPrice,
+    riskDistanceUsd,
+    totalEquityGbp,
+    freeCashGbp: input.account.cashBalanceGbp,
+    highWatermarkGbp: input.account.highWatermarkGbp,
+    consecutiveLosses,
+    confidence: input.view.confidence,
+    volatility: input.asset?.volatility ?? null,
+    usdToGbpRate: input.usdToGbpRate,
+    riskCtx,
+  });
 
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  if (!sizing) {
     return input.account;
   }
+
+  const {
+    stakeGbp,
+    stakeUsd,
+    quantity,
+    effectiveMaxRisk,
+    volatilityMultiplier,
+    drawdownMultiplier,
+    antiTiltMultiplier,
+  } = sizing;
 
   const openingMarkPrice =
     Number.isFinite(input.view.currentPrice) && input.view.currentPrice > 0
