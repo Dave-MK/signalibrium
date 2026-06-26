@@ -249,7 +249,9 @@ export default async function SiggiTradesPage() {
     avgHoldLabel,
   ].filter(Boolean).join(" · ");
 
-  // Now the page renders (formatGbp is already defined above, so this is fine)
+  // Server component: rendered once per request, so reading the clock here is
+  // deterministic for this render. (The purity rule targets client re-renders.)
+  // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
 
   return (

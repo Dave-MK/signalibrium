@@ -137,7 +137,7 @@ function EntryCard({
             )}
             {entry.improvement && (
               <div>
-                <p className="mb-1 text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">What I'd do differently</p>
+                <p className="mb-1 text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">What I’d do differently</p>
                 <p className="text-[0.82rem] leading-5 text-slate-300">{entry.improvement}</p>
               </div>
             )}
@@ -279,7 +279,7 @@ function BulkReviewModal({
           <p className="text-2xl mb-2">🎉</p>
           <p className="text-[0.94rem] font-semibold text-white">All caught up!</p>
           <p className="mt-1 text-[0.78rem] text-slate-400">
-            You've reviewed everything in the queue. Come back after the next batch of trades resolve.
+            You’ve reviewed everything in the queue. Come back after the next batch of trades resolve.
           </p>
           <button
             type="button"

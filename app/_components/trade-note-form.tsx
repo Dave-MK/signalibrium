@@ -296,7 +296,7 @@ export function TradeNoteForm({
 
       {/* Improvement */}
       <div>
-        <label className={labelCls}>What I'd do differently</label>
+        <label className={labelCls}>What I’d do differently</label>
         <textarea
           rows={compact ? 2 : 3}
           placeholder="Given the same setup tomorrow, what would change? Entry, sizing, timing, patience?"

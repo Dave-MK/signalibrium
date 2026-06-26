@@ -70,7 +70,7 @@ export default async function JournalPage() {
       <div>
         <h1 className="text-[1.15rem] font-bold text-white">Trade Journal</h1>
         <p className="mt-0.5 text-[0.78rem] text-slate-500">
-          Review your calls, understand your decisions, and track what you'd do differently.
+          Review your calls, understand your decisions, and track what you’d do differently.
         </p>
       </div>
 

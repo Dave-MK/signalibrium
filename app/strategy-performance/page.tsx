@@ -333,7 +333,7 @@ export default async function StrategyPerformancePage() {
                 {/* ── Empty state hint ── */}
                 {row.trades === 0 && row.signals > 0 && (
                   <p className="mt-2.5 text-[0.68rem] leading-4 text-slate-600">
-                    Signals called but no trades closed yet — check back after Siggi's first close on this strategy.
+                    Signals called but no trades closed yet — check back after Siggi’s first close on this strategy.
                   </p>
                 )}
               </Panel>

@@ -114,7 +114,7 @@ export default async function HistoryPage() {
 
             {/* 2. Siggi Trade Win Rate */}
             <Panel className="p-3">
-              <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Siggi's trade win rate</p>
+              <p className="text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Siggi’s trade win rate</p>
               <div className="mt-2 flex items-center gap-3">
                 <DonutChart
                   size={56}

@@ -352,9 +352,13 @@ function LeaderboardRow({
               </span>
             );
           }
+          // Relative "X min ago" badge — intentionally recomputed against the
+          // current clock on each render so the age stays fresh.
+          // eslint-disable-next-line react-hooks/purity
+          const renderNow = Date.now();
           const minsAgo = Math.max(
             0,
-            Math.floor((Date.now() - Date.parse(setup.analysisUpdatedAt)) / 60_000),
+            Math.floor((renderNow - Date.parse(setup.analysisUpdatedAt)) / 60_000),
           );
           const ageLabel =
             minsAgo === 0
@@ -1043,7 +1047,7 @@ export default function ScannerPageClient({
                     </div>
                   )}
                   <p className="mt-2 text-[0.68rem] leading-4 text-slate-600">
-                    Risk no more than 1–2% of your account per trade. These are indicative unit sizes — adjust for leverage, lot sizes, and your broker's minimum increments.
+                    Risk no more than 1–2% of your account per trade. These are indicative unit sizes — adjust for leverage, lot sizes, and your broker’s minimum increments.
                   </p>
                 </Panel>
               );

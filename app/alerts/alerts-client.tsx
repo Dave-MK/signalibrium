@@ -290,7 +290,7 @@ export function AlertsClient({ initialAlerts }: { initialAlerts: PersistedPriceA
 
       <p className="text-[0.68rem] leading-5 text-slate-600">
         Alerts are checked every time the market pulse runs (~15s). Notifications fire when price crosses your level —
-        you'll get a toast in-app and an OS notification if you've enabled push access. Fired alerts stay visible until
+        you’ll get a toast in-app and an OS notification if you’ve enabled push access. Fired alerts stay visible until
         you delete them.
       </p>
     </div>
