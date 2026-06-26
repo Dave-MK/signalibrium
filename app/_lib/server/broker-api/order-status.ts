@@ -5,7 +5,7 @@
  * Used by the broker-fills cron to update ticket statuses.
  */
 
-import { createHmac } from "crypto";
+import { createHash, createHmac } from "crypto";
 import type { BrokerEnvironment } from "../workspace-types";
 import type { StoredBrokerCredential } from "../broker-credentials";
 import type { BrokerOrderResult } from "./orders";
@@ -145,7 +145,6 @@ export async function fetchBinanceOrderStatus(
 // ─── Kraken ───────────────────────────────────────────────────────────────────
 
 function krakenSign(path: string, data: string, nonce: string, secret: string): string {
-  const { createHash } = require("crypto") as typeof import("crypto");
   const msgHash = createHash("sha256").update(nonce + data).digest("binary");
   return createHmac("sha512", Buffer.from(secret, "base64"))
     .update(path + msgHash, "binary")

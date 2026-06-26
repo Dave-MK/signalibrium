@@ -30,7 +30,13 @@ export function useBrokerPositions(
   const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchingRef    = useRef(false);
   const connectionRef  = useRef(connectionId);
-  connectionRef.current = connectionId;
+
+  // Keep the ref in sync after commit — writing a ref during render is impure
+  // (React may discard or replay renders). The polling effect below also
+  // re-runs on connectionId change, so the ref is never stale when it matters.
+  useEffect(() => {
+    connectionRef.current = connectionId;
+  }, [connectionId]);
 
   const fetchPositions = useCallback(async () => {
     const id = connectionRef.current;
